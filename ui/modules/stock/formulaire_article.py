@@ -415,11 +415,12 @@ class FormulaireArticle(ctk.CTkToplevel):
                 )
                 # Créer un mouvement initial si quantité > 0
                 if quantite > 0:
+                    from core.stock import TYPES_MOUVEMENTS
                     from datetime import date
                     add_mouvement(
                         stock_id=article_id,
                         date=date.today().strftime("%Y-%m-%d"),
-                        type_mouvement="Entrée — Achat",
+                        type_mouvement=TYPES_MOUVEMENTS[0],  # "Entrée — Achat"
                         quantite=quantite,
                         prix_unitaire=prix if prix > 0 else None,
                         fournisseur_id=fournisseur_id,
