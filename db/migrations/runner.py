@@ -1,5 +1,6 @@
 """Exécuteur de migrations SQLite."""
 
+import re
 from pathlib import Path
 
 from db.connection import get_connection
@@ -8,6 +9,11 @@ from utils.logger import get_logger
 logger = get_logger(__name__)
 
 MIGRATIONS_DIR = Path(__file__).parent
+
+_ALTER_ADD_COLUMN_RE = re.compile(
+    r"ALTER\s+TABLE\s+\S+\s+ADD\s+COLUMN\s+",
+    re.IGNORECASE,
+)
 
 
 def run_migrations() -> None:
@@ -27,7 +33,7 @@ def run_migrations() -> None:
 
             logger.info("Application de la migration : %s", migration_name)
             try:
-                conn.executescript(sql_file.read_text(encoding="utf-8"))
+                _execute_migration(conn, sql_file.read_text(encoding="utf-8"))
                 conn.execute(
                     """
                     INSERT INTO _migrations (nom)
@@ -63,3 +69,25 @@ def _get_applied_migrations(conn) -> set[str]:
     """Retourne l'ensemble des migrations déjà appliquées."""
     rows = conn.execute("SELECT nom FROM _migrations").fetchall()
     return {row["nom"] for row in rows}
+
+
+def _execute_migration(conn, sql: str) -> None:
+    """Exécute un script de migration en gérant les cas SQLite particuliers.
+
+    Les instructions ``ALTER TABLE ... ADD COLUMN`` dont la colonne existe déjà
+    sont ignorées silencieusement (SQLite ne supporte pas ``IF NOT EXISTS``).
+    Les autres instructions sont exécutées via ``executescript``.
+    """
+    statements = [s.strip() for s in sql.split(";") if s.strip()]
+
+    for stmt in statements:
+        if _ALTER_ADD_COLUMN_RE.search(stmt):
+            try:
+                conn.execute(stmt)
+            except Exception as exc:
+                if "duplicate column name" in str(exc).lower():
+                    logger.debug("Colonne déjà existante, ignoré : %s", stmt[:80])
+                else:
+                    raise
+        else:
+            conn.executescript(stmt + ";")
