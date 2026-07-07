@@ -9,13 +9,10 @@ Permet de personnaliser :
 
 from __future__ import annotations
 
-import json
-from pathlib import Path
 from typing import Any
 
 import customtkinter as ctk
 
-from config.settings import CONFIG_DIR
 from ui import theme as app_theme
 from utils.logger import get_logger
 

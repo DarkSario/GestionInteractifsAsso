@@ -1,7 +1,6 @@
 """Chargement et application du thème visuel depuis config/theme.json."""
 
 import json
-from pathlib import Path
 from typing import Any
 
 import customtkinter as ctk

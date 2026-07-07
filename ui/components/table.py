@@ -1,12 +1,9 @@
 """Treeview générique stylé pour l'affichage de données tabulaires."""
 
-import tkinter as tk
 import tkinter.ttk as ttk
 from typing import Any, Sequence
 
 import customtkinter as ctk
-
-from ui import theme as app_theme
 
 
 class DataTable(ctk.CTkFrame):

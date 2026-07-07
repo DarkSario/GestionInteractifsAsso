@@ -1,7 +1,5 @@
 """Fixtures pytest pour la suite de tests de Gestion Interactifs Asso."""
 
-import sqlite3
-import tempfile
 from pathlib import Path
 
 import pytest
@@ -31,11 +29,11 @@ def db_conn(tmp_db: Path):
     from db.migrations.runner import run_migrations
 
     # Pointe vers la DB temporaire
-    db_module.set_db_file(tmp_db)
+    db_module.set_db_file(str(tmp_db))
     conn = db_module.get_connection()
-    run_migrations(conn)
+    conn.close()
+    run_migrations()
+    conn = db_module.get_connection()
     yield conn
     conn.close()
-    # Remet le chemin par défaut après le test
-    from config.settings import DB_PATH
-    db_module.set_db_file(DB_PATH)
+    db_module.set_db_file("")

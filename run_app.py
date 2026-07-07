@@ -3,9 +3,10 @@
 import sys
 import traceback
 
-from utils.logger import get_logger
-from ui.theme import load_theme
 from ui.app import MainApp
+from ui.screens.welcome import WelcomeScreen
+from ui.theme import load_theme
+from utils.logger import get_logger
 
 logger = get_logger(__name__)
 
@@ -15,7 +16,13 @@ def main() -> None:
     logger.info("=== Démarrage de l'application ===")
     try:
         load_theme()
-        app = MainApp()
+        welcome = WelcomeScreen()
+        db_path = welcome.run()
+        if not db_path:
+            logger.info("Aucune base sélectionnée, fermeture de l'application.")
+            return
+
+        app = MainApp(db_path)
         app.mainloop()
     except Exception:
         logger.critical("Erreur non gérée au démarrage :\n%s", traceback.format_exc())
