@@ -83,7 +83,7 @@ class MainApp(ctk.CTk):
         menu_modules.add_command(label="Trésorerie", command=self._todo)
         menu_modules.add_command(label="Événements", command=self._todo)
         menu_modules.add_command(label="Buvette", command=self._todo)
-        menu_modules.add_command(label="Stock", command=self._todo)
+        menu_modules.add_command(label="Stock", command=self._ouvrir_stock)
         menubar.add_cascade(label="Modules", menu=menu_modules)
 
         menubar.add_command(label="Exports", command=self._todo)
@@ -91,6 +91,8 @@ class MainApp(ctk.CTk):
         menubar.add_command(label="Journal général", command=self._todo)
 
         menu_admin = tk.Menu(menubar, tearoff=0)
+        menu_admin.add_command(label="Référentiels Stock", command=self._ouvrir_referentiels_stock)
+        menu_admin.add_separator()
         menu_admin.add_command(label="Apparence", command=self._ouvrir_theme_editor)
         menu_admin.add_separator()
         menu_admin.add_command(label="Sauvegarde", command=self._todo)
@@ -139,7 +141,7 @@ class MainApp(ctk.CTk):
             ("💰 Trésorerie", self._todo),
             ("📅 Événements", self._todo),
             ("🍺 Buvette", self._todo),
-            ("📦 Stock", self._todo),
+            ("📦 Stock", self._ouvrir_stock),
             ("📊 Tableau de bord", self._todo),
             ("📤 Exports", self._todo),
             ("📋 Journal général", self._todo),
@@ -199,6 +201,20 @@ class MainApp(ctk.CTk):
         from ui.modules.membres.liste import ListeMembres
 
         fenetre = ListeMembres(self)
+        fenetre.grab_set()
+
+    def _ouvrir_stock(self) -> None:
+        """Ouvre la fenêtre de gestion du stock."""
+        from ui.modules.stock.liste import ListeStock
+
+        fenetre = ListeStock(self)
+        fenetre.grab_set()
+
+    def _ouvrir_referentiels_stock(self) -> None:
+        """Ouvre la fenêtre de gestion des référentiels du stock."""
+        from ui.modules.stock.referentiels import Referentiels
+
+        fenetre = Referentiels(self)
         fenetre.grab_set()
 
     def _ouvrir_theme_editor(self) -> None:

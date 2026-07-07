@@ -33,6 +33,8 @@ def test_run_migrations_creates_expected_tables(tmp_db) -> None:
         "evenements",
         "mouvements_stock",
         "retrocessions_ecoles",
+        "unites",
+        "fournisseurs",
     }.issubset(tables)
     assert {
         "nom_asso",
@@ -44,6 +46,7 @@ def test_run_migrations_creates_expected_tables(tmp_db) -> None:
     assert [row["nom"] for row in migration_rows] == [
         "0001_init.sql",
         "0002_membres_remboursements.sql",
+        "0003_stock.sql",
     ]
 
 
@@ -61,4 +64,4 @@ def test_run_migrations_is_idempotent(tmp_db) -> None:
         conn.close()
         set_db_file("")
 
-    assert count == 2
+    assert count == 3
