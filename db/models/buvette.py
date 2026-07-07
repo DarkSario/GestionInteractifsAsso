@@ -8,6 +8,7 @@ from db.connection import get_connection
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
+TYPE_MOUVEMENT_SORTIE_UTILISATION = "Sortie — Utilisation"
 
 
 # ── Articles ─────────────────────────────────────────────────────────────────
@@ -17,22 +18,35 @@ def get_all_articles_buvette(include_archives: bool = False) -> list[dict]:
     """Retourne la liste des articles buvette."""
     conn = get_connection()
     try:
-        where_clause = "" if include_archives else "WHERE a.statut_archive = 0"
-        rows = conn.execute(
-            f"""
-            SELECT a.id, a.nom, a.categorie_id, c.nom AS categorie_nom,
-                   a.unite_id, u.nom AS unite_nom,
-                   a.contenance, a.prix_vente, a.prix_achat,
-                   a.stock_actuel, a.stock_id, s.nom AS stock_nom,
-                   a.statut_archive, a.commentaire
-            FROM articles_buvette a
-            LEFT JOIN categories c ON c.id = a.categorie_id
-            LEFT JOIN unites u ON u.id = a.unite_id
-            LEFT JOIN stock s ON s.id = a.stock_id
-            {where_clause}
-            ORDER BY a.statut_archive ASC, a.nom ASC
+        if include_archives:
+            query = """
+                SELECT a.id, a.nom, a.categorie_id, c.nom AS categorie_nom,
+                       a.unite_id, u.nom AS unite_nom,
+                       a.contenance, a.prix_vente, a.prix_achat,
+                       a.stock_actuel, a.stock_id, s.nom AS stock_nom,
+                       a.statut_archive, a.commentaire
+                FROM articles_buvette a
+                LEFT JOIN categories c ON c.id = a.categorie_id
+                LEFT JOIN unites u ON u.id = a.unite_id
+                LEFT JOIN stock s ON s.id = a.stock_id
+                ORDER BY a.statut_archive ASC, a.nom ASC
             """
-        ).fetchall()
+            rows = conn.execute(query).fetchall()
+        else:
+            query = """
+                SELECT a.id, a.nom, a.categorie_id, c.nom AS categorie_nom,
+                       a.unite_id, u.nom AS unite_nom,
+                       a.contenance, a.prix_vente, a.prix_achat,
+                       a.stock_actuel, a.stock_id, s.nom AS stock_nom,
+                       a.statut_archive, a.commentaire
+                FROM articles_buvette a
+                LEFT JOIN categories c ON c.id = a.categorie_id
+                LEFT JOIN unites u ON u.id = a.unite_id
+                LEFT JOIN stock s ON s.id = a.stock_id
+                WHERE a.statut_archive = 0
+                ORDER BY a.statut_archive ASC, a.nom ASC
+            """
+            rows = conn.execute(query).fetchall()
         return [dict(r) for r in rows]
     finally:
         conn.close()
@@ -476,11 +490,12 @@ def finaliser_approvisionnement(appro_id: int) -> bool:
                         INSERT INTO mouvements_stock
                             (stock_id, date, type, quantite, prix_unitaire,
                              fournisseur_id, evenement_id, numero_facture, commentaire)
-                        VALUES (?, ?, 'Sortie — Utilisation', ?, ?, ?, ?, NULL, ?)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, NULL, ?)
                         """,
                         (
                             stock_general_id,
                             appro["date"],
+                            TYPE_MOUVEMENT_SORTIE_UTILISATION,
                             -int(ligne["quantite"]),
                             float(ligne["prix_unitaire"] or 0),
                             appro["fournisseur_id"],
@@ -497,12 +512,12 @@ def finaliser_approvisionnement(appro_id: int) -> bool:
             ).fetchone()
             fournisseur_nom = fournisseur["nom"] if fournisseur else None
 
-        commentaire = appro["commentaire"] or ""
+        appro_commentaire = appro["commentaire"] or ""
         libelle = f"Approvisionnement buvette — {appro['date']}"
-        if commentaire:
-            commentaire = f"{libelle}\n{commentaire}"
+        if appro_commentaire:
+            commentaire_final = f"{libelle}\n{appro_commentaire}"
         else:
-            commentaire = libelle
+            commentaire_final = libelle
 
         conn.execute(
             """
@@ -516,7 +531,7 @@ def finaliser_approvisionnement(appro_id: int) -> bool:
                 "Approvisionnement buvette",
                 float(appro["montant_total"] or 0),
                 fournisseur_nom,
-                commentaire,
+                commentaire_final,
             ),
         )
 

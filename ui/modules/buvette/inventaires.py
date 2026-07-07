@@ -245,11 +245,16 @@ class _FormulaireInventaire(ctk.CTkToplevel):
 
         lignes = []
         for article in self._articles:
+            raw_qte_comptee = self._entries[article["id"]].get().strip()
+            try:
+                qte_comptee: int | str = int(raw_qte_comptee)
+            except ValueError:
+                qte_comptee = raw_qte_comptee
             lignes.append(
                 {
                     "article_id": article["id"],
                     "quantite_theorique": int(article.get("stock_actuel") or 0),
-                    "quantite_comptee": self._entries[article["id"]].get().strip(),
+                    "quantite_comptee": qte_comptee,
                 }
             )
 
@@ -266,14 +271,13 @@ class _FormulaireInventaire(ctk.CTkToplevel):
         )
 
         for ligne in lignes:
-            qte_comptee = int(ligne["quantite_comptee"])
             add_ligne_inventaire(
                 inventaire_id,
                 ligne["article_id"],
                 ligne["quantite_theorique"],
-                qte_comptee,
+                ligne["quantite_comptee"],
             )
-            update_stock_article_buvette(ligne["article_id"], qte_comptee)
+            update_stock_article_buvette(ligne["article_id"], ligne["quantite_comptee"])
 
         self.destroy()
 

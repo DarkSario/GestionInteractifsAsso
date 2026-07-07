@@ -21,6 +21,8 @@ from db.models.unites import get_all_unites
 from ui import theme as app_theme
 from ui.components.dialogs import afficher_erreur, afficher_info, demander_confirmation
 
+SEUIL_ALERTE_STOCK_BUVETTE = 3
+
 
 class OngletArticles(ctk.CTkFrame):
     """Liste et gestion des articles buvette."""
@@ -144,7 +146,7 @@ class OngletArticles(ctk.CTkFrame):
                     continue
 
             stock = int(article.get("stock_actuel") or 0)
-            tag = "alerte" if stock <= 3 else ""
+            tag = "alerte" if stock <= SEUIL_ALERTE_STOCK_BUVETTE else ""
             self._tree.insert(
                 "",
                 "end",
