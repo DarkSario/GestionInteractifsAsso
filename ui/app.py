@@ -79,7 +79,7 @@ class MainApp(ctk.CTk):
         menubar = tk.Menu(self)
 
         menu_modules = tk.Menu(menubar, tearoff=0)
-        menu_modules.add_command(label="Adhérents", command=self._todo)
+        menu_modules.add_command(label="Adhérents", command=self._ouvrir_membres)
         menu_modules.add_command(label="Trésorerie", command=self._todo)
         menu_modules.add_command(label="Événements", command=self._todo)
         menu_modules.add_command(label="Buvette", command=self._todo)
@@ -135,7 +135,7 @@ class MainApp(ctk.CTk):
         frame_buttons.pack()
 
         modules = [
-            ("👥 Adhérents", self._todo),
+            ("👥 Adhérents", self._ouvrir_membres),
             ("💰 Trésorerie", self._todo),
             ("📅 Événements", self._todo),
             ("🍺 Buvette", self._todo),
@@ -193,6 +193,13 @@ class MainApp(ctk.CTk):
             "En construction",
             "Ce module n'est pas encore disponible.\nIl sera implémenté prochainement.",
         )
+
+    def _ouvrir_membres(self) -> None:
+        """Ouvre la fenêtre de gestion des membres."""
+        from ui.modules.membres.liste import ListeMembres
+
+        fenetre = ListeMembres(self)
+        fenetre.grab_set()
 
     def _ouvrir_theme_editor(self) -> None:
         """Ouvre l'éditeur de thème visuel."""

@@ -22,6 +22,7 @@ TABLES = {
         "statut TEXT DEFAULT 'actif'",
         "date_adhesion TEXT",
         "commentaire TEXT",
+        "statut_archive INTEGER DEFAULT 0",
     ),
     "categories": (
         "id INTEGER PRIMARY KEY AUTOINCREMENT",
@@ -62,6 +63,7 @@ TABLES = {
         "type TEXT",
         "justificatif TEXT",
         "commentaire TEXT",
+        "membre_id INTEGER REFERENCES membres(id)",
     ),
     "depenses_regulieres": (
         "id INTEGER PRIMARY KEY AUTOINCREMENT",
@@ -74,6 +76,8 @@ TABLES = {
         "numero_facture TEXT",
         "statut_reglement TEXT DEFAULT 'non réglé'",
         "commentaire TEXT",
+        "membre_id INTEGER REFERENCES membres(id)",
+        "statut_remboursement TEXT DEFAULT 'non concerné'",
     ),
     "depenses_diverses": (
         "id INTEGER PRIMARY KEY AUTOINCREMENT",
@@ -86,6 +90,8 @@ TABLES = {
         "numero_facture TEXT",
         "statut_reglement TEXT DEFAULT 'non réglé'",
         "commentaire TEXT",
+        "membre_id INTEGER REFERENCES membres(id)",
+        "statut_remboursement TEXT DEFAULT 'non concerné'",
     ),
     "depots_retraits_banque": (
         "id INTEGER PRIMARY KEY AUTOINCREMENT",
@@ -210,6 +216,17 @@ TABLES = {
         "date TEXT NOT NULL",
         "ecole TEXT NOT NULL",
         "montant REAL NOT NULL",
+        "commentaire TEXT",
+    ),
+    "remboursements": (
+        "id INTEGER PRIMARY KEY AUTOINCREMENT",
+        "depense_type TEXT NOT NULL CHECK(depense_type IN ('reguliere', 'diverse', 'evenement'))",
+        "depense_id INTEGER NOT NULL",
+        "membre_id INTEGER NOT NULL REFERENCES membres(id)",
+        "date_remboursement TEXT",
+        "montant REAL NOT NULL",
+        "moyen_paiement TEXT CHECK(moyen_paiement IN ('chèque', 'virement', 'espèces'))",
+        "reference TEXT",
         "commentaire TEXT",
     ),
 }
