@@ -1,0 +1,16 @@
+*.db
+*.db-wal
+*.db-shm
+*.bak
+*.bak.*
+logs/
+__pycache__/
+.venv/
+*.pyc
+.env
+config/logo.png
+dist/
+build/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
