@@ -31,11 +31,10 @@ def handle_errors(func: F) -> F:
         try:
             return func(*args, **kwargs)
         except Exception as exc:
+            class_name = args[0].__class__.__name__ if args else "?"
             logger.error(
                 "Erreur dans %s.%s : %s\n%s",
-                getattr(args[0], "__class__", {__name__: "?"})
-                if args
-                else "?",
+                class_name,
                 func.__name__,
                 exc,
                 traceback.format_exc(),

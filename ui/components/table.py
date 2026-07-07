@@ -88,10 +88,18 @@ class DataTable(ctk.CTkFrame):
     def _sort_by(self, col: str) -> None:
         """Trie le tableau par la colonne cliquée."""
         items = [(self._tree.set(k, col), k) for k in self._tree.get_children("")]
+        # Détermine une seule fois si les valeurs sont numériques
         try:
+            float(items[0][0]) if items else None
+            numeric = True
+        except (ValueError, IndexError):
+            numeric = False
+
+        if numeric:
             items.sort(key=lambda t: float(t[0]))
-        except ValueError:
+        else:
             items.sort(key=lambda t: t[0].lower())
+
         for index, (_, k) in enumerate(items):
             self._tree.move(k, "", index)
             tag = "odd" if index % 2 else "even"

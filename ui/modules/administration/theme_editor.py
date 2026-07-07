@@ -182,7 +182,7 @@ class ThemeEditor(ctk.CTkToplevel):
             if result and result[1]:
                 var.set(result[1])
         except ImportError:
-            logger.warning("tkcolorpicker non disponible — saisie manuelle uniquement")
+            logger.warning("tkcolorpicker non disponible - saisie manuelle uniquement")
             from ui.components.dialogs import afficher_info
             afficher_info(
                 self,
