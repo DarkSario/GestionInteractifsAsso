@@ -2,7 +2,6 @@
 
 import logging
 import logging.handlers
-from pathlib import Path
 
 from config.settings import LOGS_DIR
 
