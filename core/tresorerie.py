@@ -1,210 +1,143 @@
-"""Logique métier pour le module Trésorerie."""
+"""Logique métier du module Trésorerie (Phase 6a)."""
 
 from __future__ import annotations
 
-from db.models.tresorerie import (
-    get_all_depenses_diverses,
-    get_all_depenses_regulieres,
-    get_all_depots_retraits,
-    get_all_dons,
-    get_all_retrocessions,
-    get_config,
-)
+from datetime import datetime
 
-CATEGORIES_DEPENSE = [
-    "Achats matériel",
-    "Alimentation / boissons",
-    "Assurance",
-    "Communication / impression",
-    "Déplacements",
-    "Divers",
-    "Frais bancaires",
-    "Fournitures bureau",
-    "Locations",
-    "Prestataires",
-    "Remboursements",
-    "Salaires / honoraires",
-    "Taxes / impôts",
-]
+from db.models.tresorerie import get_all_categories
 
-TYPES_DON = [
-    "don",
-    "subvention",
-    "autre",
-]
-
-MOYENS_PAIEMENT = [
-    "espèces",
-    "chèque",
-    "carte",
-    "virement",
-    "autre",
-]
-
-STATUTS_REGLEMENT = [
-    "non réglé",
-    "réglé",
-    "en attente",
-]
-
-TYPES_MOUVEMENT_BANQUE = [
-    "dépôt",
-    "retrait",
-]
+MIN_VALID_YEAR = 2000
+MAX_VALID_YEAR_OFFSET = 50
 
 
-def valider_depense(
-    date_depense: str,
-    categorie: str,
-    montant: str | float,
-) -> list[str]:
-    """Valide les champs d'une dépense. Retourne une liste d'erreurs."""
-    erreurs: list[str] = []
-    if not date_depense or not str(date_depense).strip():
-        erreurs.append("La date est obligatoire.")
-    if not categorie or not str(categorie).strip():
-        erreurs.append("La catégorie est obligatoire.")
+def to_float(value: str | float | int | None) -> float | None:
+    if value is None:
+        return None
     try:
-        val = float(str(montant).replace(",", "."))
-        if val <= 0:
-            erreurs.append("Le montant doit être supérieur à 0.")
+        return float(str(value).replace(" ", "").replace(",", "."))
     except (TypeError, ValueError):
+        return None
+
+
+def _date_valide(value: str | None) -> bool:
+    if not value or not str(value).strip():
+        return False
+    try:
+        datetime.strptime(str(value), "%Y-%m-%d")
+        return True
+    except ValueError:
+        return False
+
+
+def valider_operation(libelle, montant, date_operation, type_operation) -> list[str]:
+    erreurs: list[str] = []
+
+    if not libelle or not str(libelle).strip():
+        erreurs.append("Le libellé est obligatoire.")
+
+    montant_float = to_float(montant)
+    if montant_float is None:
         erreurs.append("Le montant doit être un nombre valide.")
+    elif montant_float <= 0:
+        erreurs.append("Le montant doit être supérieur à 0.")
+
+    if not _date_valide(str(date_operation)):
+        erreurs.append("La date d'opération est invalide (format attendu : YYYY-MM-DD).")
+
+    if type_operation not in {"recette", "depense", "virement_interne"}:
+        erreurs.append("Le type d'opération est invalide.")
+
     return erreurs
 
 
-def valider_don(
-    date: str,
-    source: str,
-    montant: str | float,
-) -> list[str]:
-    """Valide les champs d'un don/subvention. Retourne une liste d'erreurs."""
+def valider_compte(nom, solde_initial) -> list[str]:
     erreurs: list[str] = []
-    if not date or not str(date).strip():
-        erreurs.append("La date est obligatoire.")
-    if not source or not str(source).strip():
-        erreurs.append("La source est obligatoire.")
-    try:
-        val = float(str(montant).replace(",", "."))
-        if val <= 0:
-            erreurs.append("Le montant doit être supérieur à 0.")
-    except (TypeError, ValueError):
-        erreurs.append("Le montant doit être un nombre valide.")
+
+    if not nom or not str(nom).strip():
+        erreurs.append("Le nom du compte est obligatoire.")
+
+    if to_float(solde_initial) is None:
+        erreurs.append("Le solde initial doit être un nombre valide.")
+
     return erreurs
 
 
-def valider_mouvement_banque(
-    date: str,
-    type_mouvement: str,
-    montant: str | float,
-) -> list[str]:
-    """Valide un mouvement bancaire. Retourne une liste d'erreurs."""
+def valider_subvention(organisme, annee, montant_demande) -> list[str]:
     erreurs: list[str] = []
-    if not date or not str(date).strip():
-        erreurs.append("La date est obligatoire.")
-    if type_mouvement not in TYPES_MOUVEMENT_BANQUE:
-        erreurs.append("Le type de mouvement est invalide (dépôt ou retrait).")
+
+    if not organisme or not str(organisme).strip():
+        erreurs.append("L'organisme est obligatoire.")
+
     try:
-        val = float(str(montant).replace(",", "."))
-        if val <= 0:
-            erreurs.append("Le montant doit être supérieur à 0.")
+        annee_int = int(annee)
+        max_valid_year = datetime.now().year + MAX_VALID_YEAR_OFFSET
+        if annee_int < MIN_VALID_YEAR or annee_int > max_valid_year:
+            erreurs.append("L'année est invalide.")
     except (TypeError, ValueError):
-        erreurs.append("Le montant doit être un nombre valide.")
+        erreurs.append("L'année est invalide.")
+
+    montant = to_float(montant_demande)
+    if montant is None:
+        erreurs.append("Le montant demandé doit être un nombre valide.")
+    elif montant < 0:
+        erreurs.append("Le montant demandé ne peut pas être négatif.")
+
     return erreurs
 
 
-def valider_retrocession(
-    date: str,
-    ecole: str,
-    montant: str | float,
-) -> list[str]:
-    """Valide une rétrocession. Retourne une liste d'erreurs."""
+def valider_remise_cheque(cheques: list[dict]) -> list[str]:
     erreurs: list[str] = []
-    if not date or not str(date).strip():
-        erreurs.append("La date est obligatoire.")
-    if not ecole or not str(ecole).strip():
-        erreurs.append("Le nom de l'école est obligatoire.")
-    try:
-        val = float(str(montant).replace(",", "."))
-        if val <= 0:
-            erreurs.append("Le montant doit être supérieur à 0.")
-    except (TypeError, ValueError):
-        erreurs.append("Le montant doit être un nombre valide.")
+
+    if not cheques:
+        return ["La remise doit contenir au moins un chèque."]
+
+    for idx, cheque in enumerate(cheques, start=1):
+        nom_tireur = cheque.get("nom_tireur")
+        montant = to_float(cheque.get("montant"))
+        if not nom_tireur or not str(nom_tireur).strip():
+            erreurs.append(f"Chèque {idx} : le nom du tireur est obligatoire.")
+        if montant is None or montant <= 0:
+            erreurs.append(f"Chèque {idx} : le montant doit être supérieur à 0.")
+
     return erreurs
 
 
-def _to_float(value) -> float:
-    """Convertit une valeur en float, retourne 0.0 en cas d'erreur."""
-    try:
-        return float(value or 0)
-    except (TypeError, ValueError):
-        return 0.0
+def calculer_solde_compte(solde_initial: float, operations: list[dict]) -> float:
+    solde = float(solde_initial or 0)
+
+    for operation in operations:
+        if operation.get("statut") != "valide":
+            continue
+
+        montant = float(operation.get("montant") or 0)
+        type_operation = operation.get("type_operation")
+        if type_operation == "recette":
+            solde += montant
+        elif type_operation == "depense":
+            solde -= montant
+        elif type_operation == "virement_interne":
+            if operation.get("source_module") == "virement_entrant":
+                solde += montant
+            else:
+                solde -= montant
+
+    return round(solde, 2)
 
 
-def calculer_bilan(exercice: str | None = None) -> dict:
-    """Calcule le bilan complet de trésorerie pour l'exercice donné.
+def get_categories_for_type(type_operation: str) -> list[dict]:
+    if type_operation == "recette":
+        return get_all_categories("recette")
+    if type_operation == "depense":
+        return get_all_categories("depense")
+    return get_all_categories()
 
-    Retourne un dictionnaire avec :
-    - solde_ouverture, total_recettes, total_depenses,
-      total_depots, total_retraits, total_retrocessions,
-      solde_theorique, solde_banque.
-    """
-    config = get_config()
-    solde_ouverture = _to_float(config.get("solde_ouverture"))
-    disponible_banque = _to_float(config.get("disponible_banque"))
 
-    dons = get_all_dons(exercice)
-    total_dons = round(sum(_to_float(d.get("montant")) for d in dons), 2)
+def formater_montant(montant: float) -> str:
+    value = float(montant or 0)
+    return f"{value:,.2f} €".replace(",", " ").replace(".", ",")
 
-    dep_reg = get_all_depenses_regulieres(exercice)
-    total_dep_reg = round(sum(_to_float(d.get("montant")) for d in dep_reg), 2)
 
-    dep_div = get_all_depenses_diverses(exercice)
-    total_dep_div = round(sum(_to_float(d.get("montant")) for d in dep_div), 2)
-
-    depots_retraits = get_all_depots_retraits(exercice)
-    total_depots = round(
-        sum(
-            _to_float(m.get("montant"))
-            for m in depots_retraits
-            if m.get("type") == "dépôt"
-        ),
-        2,
-    )
-    total_retraits = round(
-        sum(
-            _to_float(m.get("montant"))
-            for m in depots_retraits
-            if m.get("type") == "retrait"
-        ),
-        2,
-    )
-
-    retrocessions = get_all_retrocessions(exercice)
-    total_retrocessions = round(
-        sum(_to_float(r.get("montant")) for r in retrocessions), 2
-    )
-
-    total_recettes = round(total_dons, 2)
-    total_depenses = round(total_dep_reg + total_dep_div + total_retrocessions, 2)
-
-    solde_theorique = round(
-        solde_ouverture + total_recettes - total_depenses, 2
-    )
-    solde_banque = round(
-        disponible_banque + total_depots - total_retraits, 2
-    )
-
-    return {
-        "solde_ouverture": solde_ouverture,
-        "total_dons": total_dons,
-        "total_depenses_regulieres": total_dep_reg,
-        "total_depenses_diverses": total_dep_div,
-        "total_retrocessions": total_retrocessions,
-        "total_recettes": total_recettes,
-        "total_depenses": total_depenses,
-        "total_depots": total_depots,
-        "total_retraits": total_retraits,
-        "solde_theorique": solde_theorique,
-        "solde_banque": solde_banque,
-    }
+def slug_reference_remise(date: str, compte_nom: str) -> str:
+    nom = "".join(ch for ch in str(compte_nom or "") if ch.isalnum())
+    nom = nom[:8] if nom else "Compte"
+    return f"Remise_{nom}_{date}"
