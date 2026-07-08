@@ -82,7 +82,7 @@ class MainApp(ctk.CTk):
         menu_modules.add_command(label="Adhérents", command=self._ouvrir_membres)
         menu_modules.add_command(label="Trésorerie", command=self._todo)
         menu_modules.add_command(label="Événements", command=self._todo)
-        menu_modules.add_command(label="Buvette", command=self._todo)
+        menu_modules.add_command(label="Buvette", command=self._ouvrir_buvette)
         menu_modules.add_command(label="Stock", command=self._ouvrir_stock)
         menubar.add_cascade(label="Modules", menu=menu_modules)
 
@@ -140,7 +140,7 @@ class MainApp(ctk.CTk):
             ("👥 Adhérents", self._ouvrir_membres),
             ("💰 Trésorerie", self._todo),
             ("📅 Événements", self._todo),
-            ("🍺 Buvette", self._todo),
+            ("🍺 Buvette", self._ouvrir_buvette),
             ("📦 Stock", self._ouvrir_stock),
             ("📊 Tableau de bord", self._todo),
             ("📤 Exports", self._todo),
@@ -208,6 +208,13 @@ class MainApp(ctk.CTk):
         from ui.modules.stock.liste import ListeStock
 
         fenetre = ListeStock(self)
+        fenetre.grab_set()
+
+    def _ouvrir_buvette(self) -> None:
+        """Ouvre la fenêtre de gestion de la buvette."""
+        from ui.modules.buvette.liste import ListeBuvette
+
+        fenetre = ListeBuvette(self)
         fenetre.grab_set()
 
     def _ouvrir_referentiels_stock(self) -> None:
