@@ -86,9 +86,19 @@ def add_evenement(
         conn.close()
 
 
+_COLONNES_EVENEMENT = frozenset({
+    "nom", "type", "description", "date_debut", "date_fin",
+    "statut", "budget_previsionnel", "bilan_fin",
+})
+
+
 def update_evenement(evenement_id: int, **kwargs) -> bool:
     """Met à jour les champs d'un événement."""
     if not kwargs:
+        return False
+    champs_invalides = set(kwargs) - _COLONNES_EVENEMENT
+    if champs_invalides:
+        logger.error("update_evenement: colonnes non autorisées : %s", champs_invalides)
         return False
     colonnes = ", ".join(f"{k} = ?" for k in kwargs)
     valeurs = list(kwargs.values()) + [evenement_id]
@@ -168,9 +178,16 @@ def add_tarif(
         conn.close()
 
 
+_COLONNES_TARIF = frozenset({"nom", "prix", "est_gratuit", "ordre"})
+
+
 def update_tarif(tarif_id: int, **kwargs) -> bool:
     """Met à jour les champs d'un tarif."""
     if not kwargs:
+        return False
+    champs_invalides = set(kwargs) - _COLONNES_TARIF
+    if champs_invalides:
+        logger.error("update_tarif: colonnes non autorisées : %s", champs_invalides)
         return False
     colonnes = ", ".join(f"{k} = ?" for k in kwargs)
     valeurs = list(kwargs.values()) + [tarif_id]
@@ -497,9 +514,19 @@ def get_depenses_evenement(evenement_id: int) -> list[dict]:
         conn.close()
 
 
+_COLONNES_DEPENSE = frozenset({
+    "libelle", "montant", "date", "categorie",
+    "fournisseur_id", "mode_paiement", "commentaire", "tresorerie_id",
+})
+
+
 def update_depense(depense_id: int, **kwargs) -> bool:
     """Met à jour les champs d'une dépense."""
     if not kwargs:
+        return False
+    champs_invalides = set(kwargs) - _COLONNES_DEPENSE
+    if champs_invalides:
+        logger.error("update_depense: colonnes non autorisées : %s", champs_invalides)
         return False
     colonnes = ", ".join(f"{k} = ?" for k in kwargs)
     valeurs = list(kwargs.values()) + [depense_id]
@@ -574,9 +601,19 @@ def add_benevole(
         conn.close()
 
 
+_COLONNES_BENEVOLE = frozenset({
+    "membre_id", "nom_externe", "prenom_externe", "role",
+    "heure_debut", "heure_fin", "statut", "remplacant_id", "commentaire",
+})
+
+
 def update_benevole(benevole_id: int, **kwargs) -> bool:
     """Met à jour les champs d'un bénévole."""
     if not kwargs:
+        return False
+    champs_invalides = set(kwargs) - _COLONNES_BENEVOLE
+    if champs_invalides:
+        logger.error("update_benevole: colonnes non autorisées : %s", champs_invalides)
         return False
     colonnes = ", ".join(f"{k} = ?" for k in kwargs)
     valeurs = list(kwargs.values()) + [benevole_id]

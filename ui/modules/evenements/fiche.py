@@ -253,10 +253,9 @@ class FicheEvenement(ctk.CTkToplevel):
         self._var_date_debut.set(evt.get("date_debut") or "")
         self._var_date_fin.set(evt.get("date_fin") or "")
         self._var_statut.set(LABELS_STATUT.get(evt.get("statut", "planifie"), "Planifié"))
+        budget = evt.get("budget_previsionnel")
         self._var_budget.set(
-            f"{float(evt['budget_previsionnel']):.2f}".replace(".", ",")
-            if evt.get("budget_previsionnel") is not None
-            else ""
+            f"{float(budget):.2f}".replace(".", ",") if budget is not None else ""
         )
         self._txt_bilan.delete("1.0", "end")
         self._txt_bilan.insert("1.0", evt.get("bilan_fin") or "")
@@ -626,7 +625,10 @@ class FicheEvenement(ctk.CTkToplevel):
             return
         vals = self._tree_ventes.item(sel[0], "values")
         vente_id = int(vals[0])
-        if vals[5].lower() == "annulé":
+        # Vérifie le statut réel depuis la base (pas le texte affiché)
+        ventes = get_ventes_evenement(self._evenement_id)
+        vente = next((v for v in ventes if v["id"] == vente_id), None)
+        if vente and vente["statut"] == "annule":
             afficher_info(self, "Info", "Cette vente est déjà annulée.")
             return
         if demander_confirmation(self, "Annuler la vente", "Confirmer l'annulation de cette vente ?"):
