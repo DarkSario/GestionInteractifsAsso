@@ -7,9 +7,15 @@ from typing import Any
 
 import customtkinter as ctk
 
-from db.models.tombola import (add_carnet, add_lot, enregistrer_gagnant,
-                               generer_pv_tirage, get_carnets_evenement,
-                               get_lots_evenement, get_stats_tombola)
+from db.models.tombola import (
+    add_carnet,
+    add_lot,
+    enregistrer_gagnant,
+    generer_pv_tirage,
+    get_carnets_evenement,
+    get_lots_evenement,
+    get_stats_tombola,
+)
 from ui.components.dialogs import afficher_erreur, afficher_info
 
 

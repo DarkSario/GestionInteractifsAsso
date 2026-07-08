@@ -7,12 +7,20 @@ from typing import Any
 
 import customtkinter as ctk
 
-from db.models.tableaux import (add_colonne, add_ligne, add_tableau,
-                                apply_template, calculer_totaux,
-                                dupliquer_tableau, get_all_templates,
-                                get_colonnes_tableau, get_lignes_tableau,
-                                get_tableaux_evenement, save_template,
-                                set_cellule)
+from db.models.tableaux import (
+    add_colonne,
+    add_ligne,
+    add_tableau,
+    apply_template,
+    calculer_totaux,
+    dupliquer_tableau,
+    get_all_templates,
+    get_colonnes_tableau,
+    get_lignes_tableau,
+    get_tableaux_evenement,
+    save_template,
+    set_cellule,
+)
 from ui.components.dialogs import afficher_info
 
 

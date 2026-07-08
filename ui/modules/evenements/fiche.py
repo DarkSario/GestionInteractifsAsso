@@ -9,25 +9,44 @@ from typing import Any
 
 import customtkinter as ctk
 
-from core.evenements import (calculer_bilan_evenement, calculer_frais_sumup,
-                             generer_numero_billet, valider_evenement,
-                             valider_tarif, valider_vente)
-from db.models.evenements import (add_benevole, add_billet, add_depense,
-                                  add_evenement, add_tarif, add_vente,
-                                  add_vente_ligne, annuler_vente,
-                                  delete_benevole, delete_depense,
-                                  delete_tarif, get_benevoles_evenement,
-                                  get_depenses_evenement, get_evenement_by_id,
-                                  get_lignes_vente, get_parametre,
-                                  get_stats_benevoles, get_stats_billetterie,
-                                  get_tarifs_evenement, get_ventes_evenement,
-                                  update_benevole, update_depense,
-                                  update_evenement, update_tarif)
+from core.evenements import (
+    calculer_bilan_evenement,
+    calculer_frais_sumup,
+    generer_numero_billet,
+    valider_evenement,
+    valider_tarif,
+    valider_vente,
+)
+from db.models.evenements import (
+    add_benevole,
+    add_billet,
+    add_depense,
+    add_evenement,
+    add_tarif,
+    add_vente,
+    add_vente_ligne,
+    annuler_vente,
+    delete_benevole,
+    delete_depense,
+    delete_tarif,
+    get_benevoles_evenement,
+    get_depenses_evenement,
+    get_evenement_by_id,
+    get_lignes_vente,
+    get_parametre,
+    get_stats_benevoles,
+    get_stats_billetterie,
+    get_tarifs_evenement,
+    get_ventes_evenement,
+    update_benevole,
+    update_depense,
+    update_evenement,
+    update_tarif,
+)
 from db.models.fournisseurs import get_all_fournisseurs
 from db.models.membres import get_all_membres
 from ui import theme as app_theme
-from ui.components.dialogs import (afficher_erreur, afficher_info,
-                                   demander_confirmation)
+from ui.components.dialogs import afficher_erreur, afficher_info, demander_confirmation
 from ui.modules.evenements.stands import StandsView
 from ui.modules.evenements.tableaux import TableauxView
 from ui.modules.evenements.tombola import TombolaView
