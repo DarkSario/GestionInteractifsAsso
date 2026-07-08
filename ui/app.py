@@ -92,6 +92,7 @@ class MainApp(ctk.CTk):
 
         menu_admin = tk.Menu(menubar, tearoff=0)
         menu_admin.add_command(label="Référentiels Stock", command=self._ouvrir_referentiels_stock)
+        menu_admin.add_command(label="⚙️ Infos association", command=self._ouvrir_config_asso)
         menu_admin.add_separator()
         menu_admin.add_command(label="Apparence", command=self._ouvrir_theme_editor)
         menu_admin.add_separator()
@@ -230,6 +231,13 @@ class MainApp(ctk.CTk):
 
         fenetre = ListeBuvette(self)
         fenetre.grab_set()
+
+    def _ouvrir_config_asso(self) -> None:
+        """Ouvre le dialogue de configuration des informations de l'association."""
+        from ui.modules.evenements.config_asso_dialog import ConfigAssoDialog
+
+        dialog = ConfigAssoDialog(self)
+        dialog.grab_set()
 
     def _ouvrir_referentiels_stock(self) -> None:
         """Ouvre la fenêtre de gestion des référentiels du stock."""
