@@ -83,7 +83,9 @@ _COLONNES_LOT = frozenset(
         "commentaire",
     }
 )
-_UPDATE_LOT_SQL = {col: f"UPDATE tombola_lots SET {col} = ? WHERE id = ?" for col in _COLONNES_LOT}
+_UPDATE_LOT_SQL = {
+    col: f"UPDATE tombola_lots SET {col} = ? WHERE id = ?" for col in _COLONNES_LOT
+}
 
 
 def update_lot(lot_id, **kwargs) -> bool:
@@ -264,9 +266,13 @@ def get_stats_tombola(evenement_id: int) -> dict:
 
     total_carnets = sum(_quantite_carnet(c) for c in carnets)
     vendus = sum(_quantite_carnet(c) for c in carnets if c.get("statut") == "vendu")
-    retournes = sum(_quantite_carnet(c) for c in carnets if c.get("statut") == "retourne")
+    retournes = sum(
+        _quantite_carnet(c) for c in carnets if c.get("statut") == "retourne"
+    )
     perdus = sum(_quantite_carnet(c) for c in carnets if c.get("statut") == "perdu")
-    montant_total = round(sum(float(c.get("montant_encaisse") or 0) for c in carnets), 2)
+    montant_total = round(
+        sum(float(c.get("montant_encaisse") or 0) for c in carnets), 2
+    )
     lots_attribues = sum(1 for lot in lots if lot.get("statut") == "attribue")
 
     return {

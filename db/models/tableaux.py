@@ -83,7 +83,9 @@ def delete_tableau(tableau_id: int) -> bool:
             (tableau_id,),
         )
         conn.execute("DELETE FROM tableaux_lignes WHERE tableau_id = ?", (tableau_id,))
-        conn.execute("DELETE FROM tableaux_colonnes WHERE tableau_id = ?", (tableau_id,))
+        conn.execute(
+            "DELETE FROM tableaux_colonnes WHERE tableau_id = ?", (tableau_id,)
+        )
         cur = conn.execute("DELETE FROM tableaux_perso WHERE id = ?", (tableau_id,))
         conn.commit()
         return cur.rowcount > 0
@@ -252,7 +254,9 @@ def delete_colonne(colonne_id: int) -> bool:
     """Supprime une colonne et ses cellules."""
     conn = get_connection()
     try:
-        conn.execute("DELETE FROM tableaux_cellules WHERE colonne_id = ?", (colonne_id,))
+        conn.execute(
+            "DELETE FROM tableaux_cellules WHERE colonne_id = ?", (colonne_id,)
+        )
         cur = conn.execute("DELETE FROM tableaux_colonnes WHERE id = ?", (colonne_id,))
         conn.commit()
         return cur.rowcount > 0
@@ -437,13 +441,11 @@ def get_all_templates() -> list[dict]:
     """Retourne tous les templates de tableaux."""
     conn = get_connection()
     try:
-        rows = conn.execute(
-            """
+        rows = conn.execute("""
             SELECT id, nom, description, colonnes_json, created_at
             FROM tableaux_templates
             ORDER BY nom ASC, id DESC
-            """
-        ).fetchall()
+            """).fetchall()
         return [dict(r) for r in rows]
     finally:
         conn.close()
@@ -519,7 +521,9 @@ def delete_template(template_id: int) -> bool:
     """Supprime un template."""
     conn = get_connection()
     try:
-        cur = conn.execute("DELETE FROM tableaux_templates WHERE id = ?", (template_id,))
+        cur = conn.execute(
+            "DELETE FROM tableaux_templates WHERE id = ?", (template_id,)
+        )
         conn.commit()
         return cur.rowcount > 0
     except Exception as exc:

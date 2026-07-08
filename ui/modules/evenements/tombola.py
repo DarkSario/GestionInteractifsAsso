@@ -7,15 +7,9 @@ from typing import Any
 
 import customtkinter as ctk
 
-from db.models.tombola import (
-    add_carnet,
-    add_lot,
-    enregistrer_gagnant,
-    generer_pv_tirage,
-    get_carnets_evenement,
-    get_lots_evenement,
-    get_stats_tombola,
-)
+from db.models.tombola import (add_carnet, add_lot, enregistrer_gagnant,
+                               generer_pv_tirage, get_carnets_evenement,
+                               get_lots_evenement, get_stats_tombola)
 from ui.components.dialogs import afficher_erreur, afficher_info
 
 
@@ -45,9 +39,9 @@ class TombolaView(ctk.CTkFrame):
         self._build_tab_tirage(self._tabs.tab("🎲 Tirage"))
 
     def _build_tab_carnets(self, parent: Any) -> None:
-        ctk.CTkButton(parent, text="+ Ajouter un carnet", command=self._ajouter_carnet).pack(
-            anchor="w", padx=8, pady=(8, 6)
-        )
+        ctk.CTkButton(
+            parent, text="+ Ajouter un carnet", command=self._ajouter_carnet
+        ).pack(anchor="w", padx=8, pady=(8, 6))
         self._tree_carnets = ttk.Treeview(
             parent,
             columns=("numeros", "prix", "vendeur", "statut", "encaisse"),
@@ -90,12 +84,12 @@ class TombolaView(ctk.CTkFrame):
         self._tree_lots.pack(fill="both", expand=True, padx=8, pady=4)
 
     def _build_tab_tirage(self, parent: Any) -> None:
-        ctk.CTkButton(parent, text="🎲 Lancer le tirage", command=self._lancer_tirage).pack(
-            anchor="w", padx=8, pady=(8, 6)
-        )
-        ctk.CTkButton(parent, text="📄 Exporter PV de tirage", command=self._export_pv).pack(
-            anchor="w", padx=8, pady=(0, 8)
-        )
+        ctk.CTkButton(
+            parent, text="🎲 Lancer le tirage", command=self._lancer_tirage
+        ).pack(anchor="w", padx=8, pady=(8, 6))
+        ctk.CTkButton(
+            parent, text="📄 Exporter PV de tirage", command=self._export_pv
+        ).pack(anchor="w", padx=8, pady=(0, 8))
         self._txt_tirage = ctk.CTkTextbox(parent, height=260)
         self._txt_tirage.pack(fill="both", expand=True, padx=8, pady=4)
 
@@ -120,9 +114,12 @@ class TombolaView(ctk.CTkFrame):
 
         carnets = get_carnets_evenement(self._evenement_id)
         for c in carnets:
-            vendeur = c.get("vendeur_nom_externe") or " ".join(
-                p for p in [c.get("vendeur_prenom"), c.get("vendeur_nom")] if p
-            ).strip()
+            vendeur = (
+                c.get("vendeur_nom_externe")
+                or " ".join(
+                    p for p in [c.get("vendeur_prenom"), c.get("vendeur_nom")] if p
+                ).strip()
+            )
             try:
                 numeros = f"{int(c['numero_debut']):03d}-{int(c['numero_fin']):03d}"
             except (TypeError, ValueError):
@@ -171,7 +168,9 @@ class TombolaView(ctk.CTkFrame):
             )
         non_attribues = [lot for lot in lots if lot.get("statut") == "en_attente"]
         for lot in non_attribues:
-            self._txt_tirage.insert("end", f"Lot {lot['numero']} — {lot['description']}\n")
+            self._txt_tirage.insert(
+                "end", f"Lot {lot['numero']} — {lot['description']}\n"
+            )
 
     def _ajouter_lot(self) -> None:
         if not self._check_evenement():
@@ -179,7 +178,9 @@ class TombolaView(ctk.CTkFrame):
         numero = simpledialog.askinteger("Nouveau lot", "Numéro du lot :", parent=self)
         if not numero:
             return
-        description = simpledialog.askstring("Nouveau lot", "Description :", parent=self)
+        description = simpledialog.askstring(
+            "Nouveau lot", "Description :", parent=self
+        )
         if not description:
             return
         add_lot(self._evenement_id, numero, description, 0, "achete", None, None, None)
@@ -199,7 +200,9 @@ class TombolaView(ctk.CTkFrame):
         if not self._check_evenement():
             return
         lots = [
-            lot for lot in get_lots_evenement(self._evenement_id) if lot.get("statut") == "en_attente"
+            lot
+            for lot in get_lots_evenement(self._evenement_id)
+            if lot.get("statut") == "en_attente"
         ]
         if not lots:
             afficher_info(self, "Tirage", "Aucun lot en attente.")
@@ -238,4 +241,6 @@ class TombolaView(ctk.CTkFrame):
             )
         self._txt_tirage.delete("1.0", "end")
         self._txt_tirage.insert("1.0", "\n".join(texte))
-        afficher_info(self, "PV de tirage", "Le contenu du PV est affiché dans l'onglet Tirage.")
+        afficher_info(
+            self, "PV de tirage", "Le contenu du PV est affiché dans l'onglet Tirage."
+        )

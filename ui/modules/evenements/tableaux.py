@@ -7,20 +7,12 @@ from typing import Any
 
 import customtkinter as ctk
 
-from db.models.tableaux import (
-    add_colonne,
-    add_ligne,
-    add_tableau,
-    apply_template,
-    calculer_totaux,
-    dupliquer_tableau,
-    get_all_templates,
-    get_colonnes_tableau,
-    get_lignes_tableau,
-    get_tableaux_evenement,
-    save_template,
-    set_cellule,
-)
+from db.models.tableaux import (add_colonne, add_ligne, add_tableau,
+                                apply_template, calculer_totaux,
+                                dupliquer_tableau, get_all_templates,
+                                get_colonnes_tableau, get_lignes_tableau,
+                                get_tableaux_evenement, save_template,
+                                set_cellule)
 from ui.components.dialogs import afficher_info
 
 
@@ -43,8 +35,12 @@ class TableauxView(ctk.CTkFrame):
         top = ctk.CTkFrame(self, fg_color="transparent")
         top.pack(fill="x", padx=8, pady=(8, 4))
 
-        ctk.CTkButton(top, text="+ Nouveau tableau", command=self._nouveau_tableau).pack(side="left")
-        ctk.CTkButton(top, text="📂 Depuis template", command=self._depuis_template).pack(side="left", padx=8)
+        ctk.CTkButton(
+            top, text="+ Nouveau tableau", command=self._nouveau_tableau
+        ).pack(side="left")
+        ctk.CTkButton(
+            top, text="📂 Depuis template", command=self._depuis_template
+        ).pack(side="left", padx=8)
 
         self._tree_tableaux = ttk.Treeview(
             self,
@@ -61,10 +57,18 @@ class TableauxView(ctk.CTkFrame):
 
         actions = ctk.CTkFrame(self, fg_color="transparent")
         actions.pack(fill="x", padx=8, pady=(4, 2))
-        ctk.CTkButton(actions, text="+ Ligne", command=self._ajouter_ligne).pack(side="left")
-        ctk.CTkButton(actions, text="⚙️ Colonnes", command=self._ajouter_colonne).pack(side="left", padx=8)
-        ctk.CTkButton(actions, text="💾 Template", command=self._sauver_template).pack(side="left", padx=8)
-        ctk.CTkButton(actions, text="📋 Dupliquer", command=self._dupliquer_tableau).pack(side="left", padx=8)
+        ctk.CTkButton(actions, text="+ Ligne", command=self._ajouter_ligne).pack(
+            side="left"
+        )
+        ctk.CTkButton(actions, text="⚙️ Colonnes", command=self._ajouter_colonne).pack(
+            side="left", padx=8
+        )
+        ctk.CTkButton(actions, text="💾 Template", command=self._sauver_template).pack(
+            side="left", padx=8
+        )
+        ctk.CTkButton(
+            actions, text="📋 Dupliquer", command=self._dupliquer_tableau
+        ).pack(side="left", padx=8)
 
         self._lbl_totaux = ctk.CTkLabel(self, text="Totaux : —")
         self._lbl_totaux.pack(anchor="w", padx=8, pady=(2, 4))
@@ -88,9 +92,13 @@ class TableauxView(ctk.CTkFrame):
 
         tableaux = get_tableaux_evenement(self._evenement_id)
         for t in tableaux:
-            self._tree_tableaux.insert("", "end", iid=str(t["id"]), values=(t["nom"], t["nb_lignes"]))
+            self._tree_tableaux.insert(
+                "", "end", iid=str(t["id"]), values=(t["nom"], t["nb_lignes"])
+            )
 
-        if self._tableau_id and any(str(self._tableau_id) == i for i in self._tree_tableaux.get_children()):
+        if self._tableau_id and any(
+            str(self._tableau_id) == i for i in self._tree_tableaux.get_children()
+        ):
             self._tree_tableaux.selection_set(str(self._tableau_id))
             self._charger_tableau(self._tableau_id)
 
@@ -118,7 +126,9 @@ class TableauxView(ctk.CTkFrame):
         for c in colonnes:
             key = f"col_{c['id']}"
             self._tree_lignes.heading(key, text=c["nom"])
-            self._tree_lignes.column(key, width=int(c.get("largeur") or 150), anchor="center")
+            self._tree_lignes.column(
+                key, width=int(c.get("largeur") or 150), anchor="center"
+            )
 
         self._tree_lignes.delete(*self._tree_lignes.get_children())
         for ligne in lignes:
@@ -181,7 +191,9 @@ class TableauxView(ctk.CTkFrame):
             parent=self,
             initialvalue="texte",
         )
-        add_colonne(self._tableau_id, nom, (type_colonne or "texte").strip(), None, 0, 0, 150)
+        add_colonne(
+            self._tableau_id, nom, (type_colonne or "texte").strip(), None, 0, 0, 150
+        )
         self._charger_tableau(self._tableau_id)
 
     def _ajouter_ligne(self) -> None:
@@ -191,7 +203,9 @@ class TableauxView(ctk.CTkFrame):
         ligne_id = add_ligne(self._tableau_id, None, "normal", 0)
         colonnes = get_colonnes_tableau(self._tableau_id)
         for col in colonnes:
-            valeur = simpledialog.askstring("Nouvelle ligne", f"{col['nom']} :", parent=self)
+            valeur = simpledialog.askstring(
+                "Nouvelle ligne", f"{col['nom']} :", parent=self
+            )
             if valeur:
                 set_cellule(ligne_id, int(col["id"]), valeur)
         self._charger_tableau(self._tableau_id)
@@ -200,7 +214,9 @@ class TableauxView(ctk.CTkFrame):
         if not self._tableau_id:
             afficher_info(self, "Template", "Sélectionnez d'abord un tableau.")
             return
-        nom = simpledialog.askstring("Sauvegarder template", "Nom du template :", parent=self)
+        nom = simpledialog.askstring(
+            "Sauvegarder template", "Nom du template :", parent=self
+        )
         if not nom:
             return
         save_template(nom, None, self._tableau_id)

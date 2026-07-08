@@ -39,7 +39,9 @@ def valider_carnet(numero_debut, numero_fin, prix_carnet) -> list[str]:
         fin = None
 
     if debut is not None and fin is not None and fin < debut:
-        erreurs.append("Le numéro de fin doit être supérieur ou égal au numéro de début.")
+        erreurs.append(
+            "Le numéro de fin doit être supérieur ou égal au numéro de début."
+        )
 
     try:
         prix = float(str(prix_carnet).replace(",", "."))
@@ -63,7 +65,9 @@ def calculer_stats_tombola(carnets: list[dict], lots: list[dict]) -> dict:
     vendus = sum(quantite(c) for c in carnets if c.get("statut") == "vendu")
     retournes = sum(quantite(c) for c in carnets if c.get("statut") == "retourne")
     perdus = sum(quantite(c) for c in carnets if c.get("statut") == "perdu")
-    montant_total = round(sum(float(c.get("montant_encaisse") or 0) for c in carnets), 2)
+    montant_total = round(
+        sum(float(c.get("montant_encaisse") or 0) for c in carnets), 2
+    )
     lots_attribues = sum(1 for lot in lots if lot.get("statut") == "attribue")
 
     return {
@@ -100,7 +104,9 @@ def generer_contenu_pv(evenement: dict, lots: list[dict]) -> str:
             description = lot.get("description") or "Sans description"
             gagnant = lot.get("numero_gagnant") or "—"
             statut = lot.get("statut") or "en_attente"
-            lignes.append(f"- Lot n°{numero} : {description} | Gagnant: {gagnant} | Statut: {statut}")
+            lignes.append(
+                f"- Lot n°{numero} : {description} | Gagnant: {gagnant} | Statut: {statut}"
+            )
 
     lignes.extend(["", "Fin du procès-verbal."])
     return "\n".join(lignes)
