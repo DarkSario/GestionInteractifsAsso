@@ -21,6 +21,7 @@ from core.exports import (
     export_liste_benevoles_pdf,
     export_pv_tirage_pdf,
     generer_nom_fichier,
+    slugifier_nom,
 )
 from db.models.evenements import get_evenement_by_id, get_parametre
 from db.models.tombola import get_lots_evenement
@@ -205,7 +206,6 @@ class ExportDialog(ctk.CTkToplevel):
                 erreurs.append(f"Échec export Excel bilan : {nom}")
 
         if self._var_pdf_pv.get():
-            from core.exports import slugifier_nom
             slug = slugifier_nom(nom_ev)
             nom = f"pv_tirage_{slug}_{date_str}.pdf"
             chemin = os.path.join(dossier, nom)
@@ -215,7 +215,6 @@ class ExportDialog(ctk.CTkToplevel):
                 erreurs.append(f"Échec export PV tirage : {nom}")
 
         if self._var_pdf_benevoles.get():
-            from core.exports import slugifier_nom
             slug = slugifier_nom(nom_ev)
             nom = f"benevoles_{slug}_{date_str}.pdf"
             chemin = os.path.join(dossier, nom)
@@ -225,7 +224,6 @@ class ExportDialog(ctk.CTkToplevel):
                 erreurs.append(f"Échec export bénévoles PDF : {nom}")
 
         if self._var_excel_benevoles.get():
-            from core.exports import slugifier_nom
             slug = slugifier_nom(nom_ev)
             nom = f"benevoles_{slug}_{date_str}.xlsx"
             chemin = os.path.join(dossier, nom)

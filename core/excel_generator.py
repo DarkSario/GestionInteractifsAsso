@@ -6,6 +6,7 @@ Aucun import tkinter/customtkinter.
 
 from __future__ import annotations
 
+import re
 from typing import TYPE_CHECKING
 
 from openpyxl import Workbook
@@ -168,7 +169,7 @@ class ExcelEvenement:
                     continue
                 # Nom d'onglet : max 31 chars, caractères spéciaux interdits
                 nom_onglet = str(tableau.get("nom") or "Tableau")[:31]
-                nom_onglet = nom_onglet.replace("/", "-").replace("\\", "-").replace("?", "").replace("*", "").replace("[", "").replace("]", "").replace(":", "")
+                nom_onglet = re.sub(r"[/\\?*\[\]:]", "", nom_onglet)
                 ws_tab = wb.create_sheet(nom_onglet)
                 self._construire_tableau_perso(ws_tab, tableau, colonnes, lignes)
 
