@@ -112,11 +112,22 @@ class FicheEvenement(ctk.CTkToplevel):
     def _build_ui(self) -> None:
         fonts = app_theme.FONTS
 
+        # Barre supérieure : titre + bouton exporter
+        frame_top = ctk.CTkFrame(self, fg_color="transparent")
+        frame_top.pack(fill="x", padx=16, pady=(14, 4))
+
         ctk.CTkLabel(
-            self,
+            frame_top,
             text="🎪 Fiche événement",
             font=fonts.get("title"),
-        ).pack(anchor="w", padx=16, pady=(14, 6))
+        ).pack(side="left")
+
+        ctk.CTkButton(
+            frame_top,
+            text="📤 Exporter",
+            width=130,
+            command=self._ouvrir_export,
+        ).pack(side="right")
 
         self._tabs = ctk.CTkTabview(self)
         self._tabs.pack(fill="both", expand=True, padx=16, pady=(0, 14))
@@ -136,6 +147,18 @@ class FicheEvenement(ctk.CTkToplevel):
         self._build_onglet_tombola(self._tabs.tab("🎰 Tombola"))
         self._build_onglet_stands(self._tabs.tab("🏪 Stands"))
         self._build_onglet_tableaux(self._tabs.tab("📊 Tableaux"))
+
+    def _ouvrir_export(self) -> None:
+        """Ouvre le dialogue d'export de l'événement."""
+        if not self._evenement_id:
+            from ui.components.dialogs import afficher_erreur
+
+            afficher_erreur(self, "Erreur", "Veuillez d'abord sauvegarder l'événement.")
+            return
+        from ui.modules.evenements.export_dialog import ExportDialog
+
+        dialog = ExportDialog(self, self._evenement_id)
+        self.wait_window(dialog)
 
     # ══════════════════════════════════════════════════════════════════════════
     # Onglet Général

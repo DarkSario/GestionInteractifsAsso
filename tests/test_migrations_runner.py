@@ -70,6 +70,7 @@ def test_run_migrations_creates_expected_tables(tmp_db) -> None:
         "0004_buvette.sql",
         "0005_evenements.sql",
         "0006_evenements_5b.sql",
+        "0007_export_config.sql",
     ]
 
 
@@ -87,4 +88,4 @@ def test_run_migrations_is_idempotent(tmp_db) -> None:
         conn.close()
         set_db_file("")
 
-    assert count == 6
+    assert count == 7
