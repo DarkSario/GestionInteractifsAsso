@@ -940,11 +940,10 @@ class _BaseDialog(ctk.CTkToplevel):
         raise NotImplementedError
 
 
-def _combo(parent: Any, values: list[str], initial: str = "", width: int = 220) -> ttk.Combobox:
+def _combo(parent: Any, values: list[str], initial: str = "", width: int = 220) -> tuple[ttk.Combobox, tk.StringVar]:
     var = tk.StringVar(value=initial)
     cb = ttk.Combobox(parent, textvariable=var, values=values, width=width // 8, state="readonly")
-    cb._var = var  # type: ignore[attr-defined]
-    return cb
+    return cb, var
 
 
 class DialogDon(_BaseDialog):
@@ -968,7 +967,7 @@ class DialogDon(_BaseDialog):
         self._add_field(frame, "Source *", 1, ctk.CTkEntry(frame, textvariable=self._source_var, width=220))
         self._add_field(frame, "Montant (€) *", 2, ctk.CTkEntry(frame, textvariable=self._montant_var, width=220))
 
-        self._type_cb = _combo(frame, TYPES_DON, init.get("type") or TYPES_DON[0])
+        self._type_cb, self._type_var = _combo(frame, TYPES_DON, init.get("type") or TYPES_DON[0])
         self._add_field(frame, "Type", 3, self._type_cb)
 
         self._add_field(frame, "Justificatif", 4, ctk.CTkEntry(frame, textvariable=self._justif_var, width=220))
@@ -981,7 +980,7 @@ class DialogDon(_BaseDialog):
             "date": self._date_var.get().strip(),
             "source": self._source_var.get().strip(),
             "montant": self._montant_var.get().strip(),
-            "type_don": self._type_cb._var.get(),  # type: ignore[attr-defined]
+            "type_don": self._type_var.get(),
             "justificatif": self._justif_var.get().strip(),
             "commentaire": self._commentaire_var.get().strip(),
         }
@@ -1009,18 +1008,18 @@ class DialogDepense(_BaseDialog):
         self._add_field(frame, "Date (AAAA-MM-JJ) *", 0, ctk.CTkEntry(frame, textvariable=self._date_var, width=220))
         self._add_field(frame, "Montant (€) *", 1, ctk.CTkEntry(frame, textvariable=self._montant_var, width=220))
 
-        self._categorie_cb = _combo(frame, CATEGORIES_DEPENSE, init.get("categorie") or CATEGORIES_DEPENSE[0])
+        self._categorie_cb, self._categorie_var = _combo(frame, CATEGORIES_DEPENSE, init.get("categorie") or CATEGORIES_DEPENSE[0])
         self._add_field(frame, "Catégorie *", 2, self._categorie_cb)
 
         self._add_field(frame, "Fournisseur", 3, ctk.CTkEntry(frame, textvariable=self._fournisseur_var, width=220))
 
-        self._paiement_cb = _combo(frame, MOYENS_PAIEMENT, init.get("moyen_paiement") or MOYENS_PAIEMENT[0])
+        self._paiement_cb, self._paiement_var = _combo(frame, MOYENS_PAIEMENT, init.get("moyen_paiement") or MOYENS_PAIEMENT[0])
         self._add_field(frame, "Paiement", 4, self._paiement_cb)
 
         self._add_field(frame, "N° chèque", 5, ctk.CTkEntry(frame, textvariable=self._no_cheque_var, width=220))
         self._add_field(frame, "N° facture", 6, ctk.CTkEntry(frame, textvariable=self._no_facture_var, width=220))
 
-        self._statut_cb = _combo(frame, STATUTS_REGLEMENT, init.get("statut_reglement") or STATUTS_REGLEMENT[0])
+        self._statut_cb, self._statut_var = _combo(frame, STATUTS_REGLEMENT, init.get("statut_reglement") or STATUTS_REGLEMENT[0])
         self._add_field(frame, "Statut règlement", 7, self._statut_cb)
 
         self._add_field(frame, "Commentaire", 8, ctk.CTkEntry(frame, textvariable=self._commentaire_var, width=220))
@@ -1031,12 +1030,12 @@ class DialogDepense(_BaseDialog):
         self.result = {
             "date_depense": self._date_var.get().strip(),
             "montant": self._montant_var.get().strip(),
-            "categorie": self._categorie_cb._var.get(),  # type: ignore[attr-defined]
+            "categorie": self._categorie_var.get(),
             "fournisseur": self._fournisseur_var.get().strip(),
-            "moyen_paiement": self._paiement_cb._var.get(),  # type: ignore[attr-defined]
+            "moyen_paiement": self._paiement_var.get(),
             "numero_cheque": self._no_cheque_var.get().strip(),
             "numero_facture": self._no_facture_var.get().strip(),
-            "statut_reglement": self._statut_cb._var.get(),  # type: ignore[attr-defined]
+            "statut_reglement": self._statut_var.get(),
             "commentaire": self._commentaire_var.get().strip(),
         }
         self.destroy()
@@ -1062,7 +1061,7 @@ class DialogBanque(_BaseDialog):
 
         self._add_field(frame, "Date (AAAA-MM-JJ) *", 0, ctk.CTkEntry(frame, textvariable=self._date_var, width=220))
 
-        self._type_cb = _combo(frame, TYPES_MOUVEMENT_BANQUE, init.get("type") or TYPES_MOUVEMENT_BANQUE[0])
+        self._type_cb, self._type_var = _combo(frame, TYPES_MOUVEMENT_BANQUE, init.get("type") or TYPES_MOUVEMENT_BANQUE[0])
         self._add_field(frame, "Type *", 1, self._type_cb)
 
         self._add_field(frame, "Montant (€) *", 2, ctk.CTkEntry(frame, textvariable=self._montant_var, width=220))
@@ -1076,7 +1075,7 @@ class DialogBanque(_BaseDialog):
     def _valider(self) -> None:
         self.result = {
             "date": self._date_var.get().strip(),
-            "type_mouvement": self._type_cb._var.get(),  # type: ignore[attr-defined]
+            "type_mouvement": self._type_var.get(),
             "montant": self._montant_var.get().strip(),
             "reference": self._reference_var.get().strip(),
             "banque": self._banque_var.get().strip(),
