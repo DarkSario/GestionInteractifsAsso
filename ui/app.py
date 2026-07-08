@@ -80,7 +80,7 @@ class MainApp(ctk.CTk):
 
         menu_modules = tk.Menu(menubar, tearoff=0)
         menu_modules.add_command(label="Adhérents", command=self._ouvrir_membres)
-        menu_modules.add_command(label="Trésorerie", command=self._todo)
+        menu_modules.add_command(label="Trésorerie", command=self._ouvrir_tresorerie)
         menu_modules.add_command(label="Événements", command=self._ouvrir_evenements)
         menu_modules.add_command(label="Buvette", command=self._ouvrir_buvette)
         menu_modules.add_command(label="Stock", command=self._ouvrir_stock)
@@ -138,7 +138,7 @@ class MainApp(ctk.CTk):
 
         modules = [
             ("👥 Adhérents", self._ouvrir_membres),
-            ("💰 Trésorerie", self._todo),
+            ("💰 Trésorerie", self._ouvrir_tresorerie),
             ("📅 Événements", self._ouvrir_evenements),
             ("🍺 Buvette", self._ouvrir_buvette),
             ("📦 Stock", self._ouvrir_stock),
@@ -195,6 +195,13 @@ class MainApp(ctk.CTk):
             "En construction",
             "Ce module n'est pas encore disponible.\nIl sera implémenté prochainement.",
         )
+
+    def _ouvrir_tresorerie(self) -> None:
+        """Ouvre la fenêtre de gestion de la trésorerie."""
+        from ui.modules.tresorerie.liste import ListeTresorerie
+
+        fenetre = ListeTresorerie(self)
+        fenetre.grab_set()
 
     def _ouvrir_evenements(self) -> None:
         """Ouvre la fenêtre de gestion des événements."""
