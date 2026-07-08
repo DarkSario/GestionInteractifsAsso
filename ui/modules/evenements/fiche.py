@@ -48,6 +48,9 @@ from db.models.membres import get_all_membres
 from db.models.fournisseurs import get_all_fournisseurs
 from ui import theme as app_theme
 from ui.components.dialogs import afficher_erreur, afficher_info, demander_confirmation
+from ui.modules.evenements.stands import StandsView
+from ui.modules.evenements.tableaux import TableauxView
+from ui.modules.evenements.tombola import TombolaView
 
 STATUTS_EVENEMENT = ["planifie", "en_cours", "termine", "annule"]
 LABELS_STATUT = {
@@ -123,11 +126,17 @@ class FicheEvenement(ctk.CTkToplevel):
         self._tabs.add("🎫 Billetterie")
         self._tabs.add("💸 Dépenses")
         self._tabs.add("👥 Bénévoles")
+        self._tabs.add("🎰 Tombola")
+        self._tabs.add("🏪 Stands")
+        self._tabs.add("📊 Tableaux")
 
         self._build_onglet_general(self._tabs.tab("📋 Général"))
         self._build_onglet_billetterie(self._tabs.tab("🎫 Billetterie"))
         self._build_onglet_depenses(self._tabs.tab("💸 Dépenses"))
         self._build_onglet_benevoles(self._tabs.tab("👥 Bénévoles"))
+        self._build_onglet_tombola(self._tabs.tab("🎰 Tombola"))
+        self._build_onglet_stands(self._tabs.tab("🏪 Stands"))
+        self._build_onglet_tableaux(self._tabs.tab("📊 Tableaux"))
 
     # ══════════════════════════════════════════════════════════════════════════
     # Onglet Général
@@ -264,6 +273,9 @@ class FicheEvenement(ctk.CTkToplevel):
         self._charger_billetterie()
         self._charger_depenses()
         self._charger_benevoles()
+        self._tombola_view.set_evenement_id(self._evenement_id)
+        self._stands_view.set_evenement_id(self._evenement_id)
+        self._tableaux_view.set_evenement_id(self._evenement_id)
 
     def _sauvegarder_general(self) -> None:
         nom = self._var_nom.get().strip()
@@ -314,6 +326,9 @@ class FicheEvenement(ctk.CTkToplevel):
             return
 
         self._actualiser_resume_financier()
+        self._tombola_view.set_evenement_id(self._evenement_id)
+        self._stands_view.set_evenement_id(self._evenement_id)
+        self._tableaux_view.set_evenement_id(self._evenement_id)
 
     def _actualiser_resume_financier(self) -> None:
         if not self._evenement_id:
@@ -940,6 +955,22 @@ class FicheEvenement(ctk.CTkToplevel):
         if demander_confirmation(self, "Supprimer", "Supprimer ce bénévole de l'événement ?"):
             delete_benevole(benevole_id)
             self._charger_benevoles()
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # Onglets Phase 5b
+    # ══════════════════════════════════════════════════════════════════════════
+
+    def _build_onglet_tombola(self, parent: Any) -> None:
+        self._tombola_view = TombolaView(parent, self._evenement_id)
+        self._tombola_view.pack(fill="both", expand=True)
+
+    def _build_onglet_stands(self, parent: Any) -> None:
+        self._stands_view = StandsView(parent, self._evenement_id)
+        self._stands_view.pack(fill="both", expand=True)
+
+    def _build_onglet_tableaux(self, parent: Any) -> None:
+        self._tableaux_view = TableauxView(parent, self._evenement_id)
+        self._tableaux_view.pack(fill="both", expand=True)
 
     # ── Helpers ───────────────────────────────────────────────────────────────
 
