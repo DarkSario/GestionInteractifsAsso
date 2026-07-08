@@ -5,7 +5,6 @@ import traceback
 
 from ui.app import MainApp
 from ui.screens.welcome import WelcomeScreen
-from ui.theme import load_theme
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -15,7 +14,6 @@ def main() -> None:
     """Lance l'application principale."""
     logger.info("=== Démarrage de l'application ===")
     try:
-        load_theme()
         welcome = WelcomeScreen()
         db_path = welcome.run()
         if not db_path:
