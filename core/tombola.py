@@ -64,7 +64,7 @@ def calculer_stats_tombola(carnets: list[dict], lots: list[dict]) -> dict:
     retournes = sum(quantite(c) for c in carnets if c.get("statut") == "retourne")
     perdus = sum(quantite(c) for c in carnets if c.get("statut") == "perdu")
     montant_total = round(sum(float(c.get("montant_encaisse") or 0) for c in carnets), 2)
-    lots_attribues = sum(1 for l in lots if l.get("statut") == "attribue")
+    lots_attribues = sum(1 for lot in lots if lot.get("statut") == "attribue")
 
     return {
         "total_carnets": total_carnets,

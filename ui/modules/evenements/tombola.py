@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import tkinter as tk
 from tkinter import simpledialog, ttk
 from typing import Any
 
@@ -158,21 +157,21 @@ class TombolaView(ctk.CTkFrame):
             return
 
         lots = get_lots_evenement(self._evenement_id)
-        for l in lots:
+        for lot in lots:
             self._tree_lots.insert(
                 "",
                 "end",
                 values=(
-                    l.get("numero"),
-                    l.get("description"),
-                    self._fmt(float(l.get("valeur_estimee") or 0)),
-                    "Sponsorisé" if l.get("type_lot") == "sponsorise" else "Acheté",
-                    str(l.get("statut") or "").replace("_", " ").title(),
+                    lot.get("numero"),
+                    lot.get("description"),
+                    self._fmt(float(lot.get("valeur_estimee") or 0)),
+                    "Sponsorisé" if lot.get("type_lot") == "sponsorise" else "Acheté",
+                    str(lot.get("statut") or "").replace("_", " ").title(),
                 ),
             )
-        non_attribues = [l for l in lots if l.get("statut") == "en_attente"]
-        for l in non_attribues:
-            self._txt_tirage.insert("end", f"Lot {l['numero']} — {l['description']}\n")
+        non_attribues = [lot for lot in lots if lot.get("statut") == "en_attente"]
+        for lot in non_attribues:
+            self._txt_tirage.insert("end", f"Lot {lot['numero']} — {lot['description']}\n")
 
     def _ajouter_lot(self) -> None:
         if not self._check_evenement():
@@ -199,7 +198,9 @@ class TombolaView(ctk.CTkFrame):
     def _lancer_tirage(self) -> None:
         if not self._check_evenement():
             return
-        lots = [l for l in get_lots_evenement(self._evenement_id) if l.get("statut") == "en_attente"]
+        lots = [
+            lot for lot in get_lots_evenement(self._evenement_id) if lot.get("statut") == "en_attente"
+        ]
         if not lots:
             afficher_info(self, "Tirage", "Aucun lot en attente.")
             return

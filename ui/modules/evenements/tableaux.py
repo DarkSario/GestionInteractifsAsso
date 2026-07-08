@@ -121,13 +121,13 @@ class TableauxView(ctk.CTkFrame):
             self._tree_lignes.column(key, width=int(c.get("largeur") or 150), anchor="center")
 
         self._tree_lignes.delete(*self._tree_lignes.get_children())
-        for l in lignes:
-            cellules = l.get("cellules") or {}
+        for ligne in lignes:
+            cellules = ligne.get("cellules") or {}
             valeurs = [
-                l.get("statut_ligne", "normal"),
+                ligne.get("statut_ligne", "normal"),
                 *[(cellules.get(str(c["id"])) or "") for c in colonnes],
             ]
-            self._tree_lignes.insert("", "end", iid=str(l["id"]), values=valeurs)
+            self._tree_lignes.insert("", "end", iid=str(ligne["id"]), values=valeurs)
 
         totaux = calculer_totaux(tableau_id)
         if not totaux:

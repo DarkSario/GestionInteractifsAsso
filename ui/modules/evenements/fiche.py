@@ -12,7 +12,6 @@ import customtkinter as ctk
 from core.evenements import (
     calculer_bilan_evenement,
     calculer_frais_sumup,
-    calculer_montant_net,
     generer_numero_billet,
     valider_evenement,
     valider_tarif,
@@ -587,10 +586,10 @@ class FicheEvenement(ctk.CTkToplevel):
         taux_str = get_parametre("taux_sumup") or "1.75"
         taux = float(taux_str)
 
-        lignes = [l for l in data["lignes"] if int(l["quantite"]) > 0]
+        lignes = [ligne for ligne in data["lignes"] if int(ligne["quantite"]) > 0]
         montant_total = sum(
-            int(l["quantite"]) * float(str(l["prix_unitaire"]).replace(",", "."))
-            for l in lignes
+            int(ligne["quantite"]) * float(str(ligne["prix_unitaire"]).replace(",", "."))
+            for ligne in lignes
         )
         frais = calculer_frais_sumup(montant_total, taux) if data["mode_paiement"] == "sumup" else 0.0
         montant_net = montant_total - frais
@@ -629,8 +628,8 @@ class FicheEvenement(ctk.CTkToplevel):
         vente_id = int(vals[0])
         lignes = get_lignes_vente(vente_id)
         texte = "\n".join(
-            f"  {l['tarif_nom']}  ×{l['quantite']}  = {l['sous_total']:.2f} €"
-            for l in lignes
+            f"  {ligne['tarif_nom']}  ×{ligne['quantite']}  = {ligne['sous_total']:.2f} €"
+            for ligne in lignes
         )
         afficher_info(self, "Détail de la vente", texte or "Aucune ligne.")
 
@@ -659,8 +658,6 @@ class FicheEvenement(ctk.CTkToplevel):
     # ══════════════════════════════════════════════════════════════════════════
 
     def _build_onglet_depenses(self, parent: Any) -> None:
-        fonts = app_theme.FONTS
-
         frame = ctk.CTkFrame(parent)
         frame.pack(fill="both", expand=True, padx=10, pady=10)
 
@@ -799,8 +796,6 @@ class FicheEvenement(ctk.CTkToplevel):
     # ══════════════════════════════════════════════════════════════════════════
 
     def _build_onglet_benevoles(self, parent: Any) -> None:
-        fonts = app_theme.FONTS
-
         frame = ctk.CTkFrame(parent)
         frame.pack(fill="both", expand=True, padx=10, pady=10)
 

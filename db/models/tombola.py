@@ -267,7 +267,7 @@ def get_stats_tombola(evenement_id: int) -> dict:
     retournes = sum(_quantite_carnet(c) for c in carnets if c.get("statut") == "retourne")
     perdus = sum(_quantite_carnet(c) for c in carnets if c.get("statut") == "perdu")
     montant_total = round(sum(float(c.get("montant_encaisse") or 0) for c in carnets), 2)
-    lots_attribues = sum(1 for l in lots if l.get("statut") == "attribue")
+    lots_attribues = sum(1 for lot in lots if lot.get("statut") == "attribue")
 
     return {
         "total_carnets": total_carnets,
@@ -286,7 +286,10 @@ def generer_pv_tirage(evenement_id: int) -> dict:
         "nom": f"Événement #{evenement_id}",
     }
     lots = get_lots_evenement(evenement_id)
-    lots_tries = sorted(lots, key=lambda l: (int(l.get("numero") or 0), int(l.get("id") or 0)))
+    lots_tries = sorted(
+        lots,
+        key=lambda lot: (int(lot.get("numero") or 0), int(lot.get("id") or 0)),
+    )
     return {
         "evenement": evenement,
         "date_generation": datetime.now().strftime("%Y-%m-%d %H:%M"),

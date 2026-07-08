@@ -300,8 +300,8 @@ def get_lignes_tableau(tableau_id: int) -> list[dict]:
             (tableau_id,),
         ).fetchall()
         resultat: list[dict] = []
-        for l in lignes:
-            ligne = dict(l)
+        for ligne_row in lignes:
+            ligne = dict(ligne_row)
             cellules = conn.execute(
                 """
                 SELECT colonne_id, valeur
