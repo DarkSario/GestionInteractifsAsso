@@ -31,6 +31,12 @@ def test_run_migrations_creates_expected_tables(tmp_db) -> None:
         "config",
         "membres",
         "evenements",
+        "evenement_tarifs",
+        "evenement_ventes",
+        "evenement_vente_lignes",
+        "evenement_billets",
+        "evenement_benevoles",
+        "parametres",
         "mouvements_stock",
         "retrocessions_ecoles",
         "unites",
@@ -53,6 +59,7 @@ def test_run_migrations_creates_expected_tables(tmp_db) -> None:
         "0002_membres_remboursements.sql",
         "0003_stock.sql",
         "0004_buvette.sql",
+        "0005_evenements.sql",
     ]
 
 
@@ -70,4 +77,4 @@ def test_run_migrations_is_idempotent(tmp_db) -> None:
         conn.close()
         set_db_file("")
 
-    assert count == 4
+    assert count == 5
