@@ -4,6 +4,7 @@ import customtkinter as ctk
 
 from config.settings import APP_NAME, APP_VERSION
 from ui import theme as app_theme
+from ui.theme import load_theme
 from ui.screens.create_db import CreateDatabaseDialog
 from ui.screens.open_db import open_existing_database
 
@@ -12,7 +13,8 @@ class WelcomeScreen(ctk.CTk):
     """Fenêtre d'accueil avant ouverture de la fenêtre principale."""
 
     def __init__(self) -> None:
-        super().__init__()
+        super().__init__()          # ← fenêtre racine créée ici
+        load_theme()                # ← CTkFont maintenant OK
         self.result_path: str | None = None
 
         self.title(APP_NAME)
@@ -24,7 +26,7 @@ class WelcomeScreen(ctk.CTk):
         self.after(10, self._center_window)
 
     def _build(self) -> None:
-        fonts = app_theme.FONTS
+        fonts = app_theme.FONTS     # ← FONTS est maintenant rempli
 
         container = ctk.CTkFrame(self, corner_radius=16)
         container.pack(fill="both", expand=True, padx=24, pady=24)
