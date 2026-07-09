@@ -1,5 +1,7 @@
 """Fenêtre principale de l'application (CustomTkinter)."""
 
+from __future__ import annotations
+
 from datetime import datetime
 
 import customtkinter as ctk
@@ -89,7 +91,9 @@ class MainApp(ctk.CTk):
         menu_modules.add_command(label="Stock", command=self._ouvrir_stock)
         menubar.add_cascade(label="Modules", menu=menu_modules)
 
-        menubar.add_command(label="Exports", command=self._todo)
+        menu_exports = tk.Menu(menubar, tearoff=0)
+        menu_exports.add_command(label="📋 Bilan AG", command=self._ouvrir_bilan_ag)
+        menubar.add_cascade(label="Exports", menu=menu_exports)
         menubar.add_command(label="🏠 Tableau de bord", command=self._ouvrir_dashboard)
         menubar.add_command(label="Journal général", command=self._todo)
 
@@ -98,6 +102,7 @@ class MainApp(ctk.CTk):
         menu_admin.add_separator()
         menu_admin.add_command(label="Référentiels Stock", command=self._ouvrir_referentiels_stock)
         menu_admin.add_separator()
+        menu_admin.add_command(label="🖋️ Polices PDF", command=self._ouvrir_polices_pdf)
         menu_admin.add_command(label="Apparence", command=self._ouvrir_theme_editor)
         menu_admin.add_separator()
         menu_admin.add_command(label="Sauvegarde", command=self._todo)
@@ -261,6 +266,22 @@ class MainApp(ctk.CTk):
         from ui.modules.tresorerie.cloture import GestionExercices
 
         fenetre = GestionExercices(self)
+        fenetre.grab_set()
+
+
+
+    def _ouvrir_bilan_ag(self) -> None:
+        """Ouvre la fenêtre de génération du bilan AG."""
+        from ui.modules.exports.bilan_ag import BilanAGDialog
+
+        fenetre = BilanAGDialog(self)
+        fenetre.grab_set()
+
+    def _ouvrir_polices_pdf(self) -> None:
+        """Ouvre la fenêtre de gestion des polices PDF."""
+        from ui.modules.administration.polices import GestionPolices
+
+        fenetre = GestionPolices(self)
         fenetre.grab_set()
 
     def _ouvrir_mdp_decloture(self) -> None:

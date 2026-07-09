@@ -13,6 +13,7 @@ from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 
+from core.exports import montant_signe_operation
 from utils.logger import get_logger
 
 if TYPE_CHECKING:
@@ -516,3 +517,305 @@ class ExcelBenevoles:
         except Exception as exc:
             logger.error("ExcelBenevoles.generer: %s", exc)
             return False
+
+
+
+# ── Style commun Excel Phase 9 ────────────────────────────────────────────────
+
+STYLE_EN_TETE_P9 = PatternFill("solid", fgColor="F0F0F0")
+STYLE_TOTAL_P9 = PatternFill("solid", fgColor="E0E0E0")
+FONT_GRAS_P9 = Font(bold=True)
+
+
+
+def _ecrire_entete_colonne_p9(ws, row: int, colonnes: list[str]) -> None:
+    """Écrit une ligne d'en-tête Phase 9."""
+    for col_idx, nom in enumerate(colonnes, start=1):
+        cell = ws.cell(row=row, column=col_idx, value=nom)
+        cell.font = FONT_GRAS_P9
+        cell.fill = STYLE_EN_TETE_P9
+        cell.alignment = _ALIGN_CENTER
+
+
+
+def _appliquer_ligne_total_p9(ws, row: int, nb_cols: int) -> None:
+    """Applique le style de total Phase 9 sur une ligne complète."""
+    for col_idx in range(1, nb_cols + 1):
+        cell = ws.cell(row=row, column=col_idx)
+        cell.font = FONT_GRAS_P9
+        cell.fill = STYLE_TOTAL_P9
+
+
+
+class ExcelAdherents:
+    """Génère un export Excel des adhérents."""
+
+    def __init__(self, config_asso: "ConfigAsso") -> None:
+        self._config = config_asso
+
+    def generer(self, chemin_sortie: str) -> bool:
+        """Génère le classeur Excel des adhérents."""
+        try:
+            from collections import Counter
+
+            from db.models.membres import get_all_membres
+
+            membres = get_all_membres(include_archives=True)
+
+            wb = Workbook()
+            ws_membres = wb.active
+            ws_membres.title = "Membres"
+
+            headers = ["Nom", "Prénom", "Statut", "Téléphone", "Email", "Date adhésion"]
+            _ecrire_entete_colonne_p9(ws_membres, 1, headers)
+
+            for row_idx, membre in enumerate(membres, start=2):
+                ws_membres.cell(row=row_idx, column=1, value=membre.get("nom") or "")
+                ws_membres.cell(row=row_idx, column=2, value=membre.get("prenom") or "")
+                ws_membres.cell(row=row_idx, column=3, value=membre.get("statut") or "")
+                ws_membres.cell(row=row_idx, column=4, value=membre.get("telephone") or "")
+                ws_membres.cell(row=row_idx, column=5, value=membre.get("email") or "")
+                ws_membres.cell(row=row_idx, column=6, value=_formater_date(membre.get("date_adhesion")))
+
+            if ws_membres.max_row >= 1:
+                ws_membres.auto_filter.ref = ws_membres.dimensions
+            _ajuster_largeurs(ws_membres)
+
+            ws_resume = wb.create_sheet("Résumé")
+            _ecrire_entete_colonne_p9(ws_resume, 1, ["Indicateur", "Valeur"])
+
+            statuts = Counter((membre.get("statut") or "Sans statut") for membre in membres)
+            nb_total = len(membres)
+            nb_actifs = sum(1 for membre in membres if not bool(membre.get("statut_archive")))
+
+            resume_rows = [
+                ("Nombre total de membres", nb_total),
+                ("Nombre de membres actifs", nb_actifs),
+            ]
+            for row_idx, (label, value) in enumerate(resume_rows, start=2):
+                ws_resume.cell(row=row_idx, column=1, value=label)
+                ws_resume.cell(row=row_idx, column=2, value=value)
+
+            row = 5
+            _ecrire_entete_colonne_p9(ws_resume, row, ["Statut", "Nombre"])
+            row += 1
+            for statut, total in sorted(statuts.items(), key=lambda item: item[0].lower()):
+                ws_resume.cell(row=row, column=1, value=statut)
+                ws_resume.cell(row=row, column=2, value=total)
+                row += 1
+
+            _ajuster_largeurs(ws_resume)
+            wb.save(chemin_sortie)
+            return True
+        except Exception as exc:
+            logger.error("ExcelAdherents.generer: %s", exc)
+            return False
+
+
+class ExcelTresorerie:
+    """Génère un export Excel de la trésorerie."""
+
+    def __init__(self, config_asso: "ConfigAsso", date_debut: str = '', date_fin: str = '') -> None:
+        self._config = config_asso
+        self._date_debut = date_debut
+        self._date_fin = date_fin
+
+    def generer(self, chemin_sortie: str) -> bool:
+        """Génère le classeur Excel de trésorerie."""
+        try:
+            from db.models import tresorerie as treso_model
+
+            # Compatibilité avec plusieurs variantes du modèle trésorerie.
+            get_all_operations = getattr(treso_model, 'get_all_operations', None)
+            if callable(get_all_operations):
+                operations = get_all_operations(self._date_debut, self._date_fin)
+            else:
+                operations = treso_model.get_operations(
+                    date_debut=self._date_debut or None,
+                    date_fin=self._date_fin or None,
+                )
+            comptes = treso_model.get_all_comptes(actif_only=False)
+
+            wb = Workbook()
+            ws_ops = wb.active
+            ws_ops.title = "Opérations"
+            self._construire_operations(ws_ops, operations)
+
+            ws_categories = wb.create_sheet("Par catégorie")
+            self._construire_par_categorie(ws_categories, operations)
+
+            ws_comptes = wb.create_sheet("Par compte")
+            self._construire_par_compte(ws_comptes, comptes)
+
+            wb.save(chemin_sortie)
+            return True
+        except Exception as exc:
+            logger.error("ExcelTresorerie.generer: %s", exc)
+            return False
+
+    def _construire_operations(self, ws, operations: list[dict]) -> None:
+        headers = ["Date", "Libellé", "Type", "Catégorie", "Compte", "Montant", "Statut"]
+        _ecrire_entete_colonne_p9(ws, 1, headers)
+
+        total = 0.0
+        for row_idx, operation in enumerate(operations, start=2):
+            montant_signe = montant_signe_operation(operation)
+            total += montant_signe
+            ws.cell(row=row_idx, column=1, value=_formater_date(operation.get('date_operation')))
+            ws.cell(row=row_idx, column=2, value=operation.get('libelle') or '')
+            ws.cell(row=row_idx, column=3, value=operation.get('type_operation') or '')
+            ws.cell(row=row_idx, column=4, value=operation.get('categorie_nom') or 'Sans catégorie')
+            ws.cell(row=row_idx, column=5, value=operation.get('compte_nom') or '')
+            cell_montant = ws.cell(row=row_idx, column=6, value=round(montant_signe, 2))
+            cell_montant.number_format = '#,##0.00'
+            ws.cell(row=row_idx, column=7, value=operation.get('statut') or '')
+
+        total_row = max(2, ws.max_row + 1)
+        ws.cell(row=total_row, column=1, value='Total')
+        cell_total = ws.cell(row=total_row, column=6, value=round(total, 2))
+        cell_total.number_format = '#,##0.00'
+        _appliquer_ligne_total_p9(ws, total_row, len(headers))
+
+        if ws.max_row >= 1:
+            ws.auto_filter.ref = f"A1:G{max(1, total_row - 1)}"
+        _ajuster_largeurs(ws)
+
+    def _construire_par_categorie(self, ws, operations: list[dict]) -> None:
+        from collections import defaultdict
+
+        headers = ["Catégorie", "Recettes", "Dépenses", "Solde"]
+        _ecrire_entete_colonne_p9(ws, 1, headers)
+
+        categories: dict[str, dict[str, float]] = defaultdict(lambda: {"recettes": 0.0, "depenses": 0.0})
+        for operation in operations:
+            categorie = operation.get('categorie_nom') or 'Sans catégorie'
+            montant_signe = montant_signe_operation(operation)
+            if montant_signe >= 0:
+                categories[categorie]['recettes'] += montant_signe
+            else:
+                categories[categorie]['depenses'] += abs(montant_signe)
+
+        total_recettes = 0.0
+        total_depenses = 0.0
+        row = 2
+        for categorie, montants in sorted(categories.items(), key=lambda item: item[0].lower()):
+            recettes = round(montants['recettes'], 2)
+            depenses = round(montants['depenses'], 2)
+            solde = round(recettes - depenses, 2)
+            total_recettes += recettes
+            total_depenses += depenses
+            ws.cell(row=row, column=1, value=categorie)
+            for col_idx, valeur in ((2, recettes), (3, depenses), (4, solde)):
+                cell = ws.cell(row=row, column=col_idx, value=valeur)
+                cell.number_format = '#,##0.00'
+            row += 1
+
+        ws.cell(row=row, column=1, value='Total')
+        totaux_colonnes = (
+            (2, round(total_recettes, 2)),
+            (3, round(total_depenses, 2)),
+            (4, round(total_recettes - total_depenses, 2)),
+        )
+        for col_idx, valeur in totaux_colonnes:
+            cell = ws.cell(row=row, column=col_idx, value=valeur)
+            cell.number_format = '#,##0.00'
+        _appliquer_ligne_total_p9(ws, row, len(headers))
+        _ajuster_largeurs(ws)
+
+    def _construire_par_compte(self, ws, comptes: list[dict]) -> None:
+        headers = ["Compte", "Type", "Solde"]
+        _ecrire_entete_colonne_p9(ws, 1, headers)
+
+        total = 0.0
+        for row_idx, compte in enumerate(comptes, start=2):
+            solde = round(float(compte.get('solde_actuel') or 0), 2)
+            total += solde
+            ws.cell(row=row_idx, column=1, value=compte.get('nom') or '')
+            ws.cell(row=row_idx, column=2, value=compte.get('type_compte') or '')
+            cell_solde = ws.cell(row=row_idx, column=3, value=solde)
+            cell_solde.number_format = '#,##0.00'
+
+        total_row = max(2, ws.max_row + 1)
+        ws.cell(row=total_row, column=1, value='Total')
+        cell_total = ws.cell(row=total_row, column=3, value=round(total, 2))
+        cell_total.number_format = '#,##0.00'
+        _appliquer_ligne_total_p9(ws, total_row, len(headers))
+        _ajuster_largeurs(ws)
+
+
+class ExcelStock:
+    """Génère un export Excel du stock."""
+
+    def __init__(self, config_asso: "ConfigAsso") -> None:
+        self._config = config_asso
+
+    def generer(self, chemin_sortie: str) -> bool:
+        """Génère le classeur Excel du stock."""
+        try:
+            from db.models import stock as stock_model
+
+            articles = stock_model.get_all_articles(include_archives=True)
+            # Compatibilité avec plusieurs variantes du modèle stock.
+            get_mouvements_stock = getattr(stock_model, 'get_mouvements_stock', None)
+            if callable(get_mouvements_stock):
+                mouvements = get_mouvements_stock()
+            else:
+                mouvements = stock_model.get_all_mouvements(limit=5000)
+
+            wb = Workbook()
+            ws_articles = wb.active
+            ws_articles.title = 'Articles'
+            self._construire_articles(ws_articles, articles)
+
+            ws_mouvements = wb.create_sheet('Mouvements')
+            self._construire_mouvements(ws_mouvements, mouvements)
+
+            wb.save(chemin_sortie)
+            return True
+        except Exception as exc:
+            logger.error('ExcelStock.generer: %s', exc)
+            return False
+
+    @staticmethod
+    def _statut_stock(article: dict) -> str:
+        if bool(article.get('statut_archive')):
+            return 'Archivé'
+        quantite = float(article.get('quantite') or 0)
+        seuil = float(article.get('seuil_alerte') or 0)
+        if quantite <= 0:
+            return 'Rupture'
+        if seuil and quantite <= seuil:
+            return 'Alerte'
+        return 'OK'
+
+    def _construire_articles(self, ws, articles: list[dict]) -> None:
+        headers = ["Désignation", "Catégorie", "Quantité", "Unité", "Seuil", "Statut stock"]
+        _ecrire_entete_colonne_p9(ws, 1, headers)
+
+        for row_idx, article in enumerate(articles, start=2):
+            ws.cell(row=row_idx, column=1, value=article.get('nom') or '')
+            ws.cell(row=row_idx, column=2, value=article.get('categorie_nom') or '')
+            ws.cell(row=row_idx, column=3, value=article.get('quantite') or 0)
+            ws.cell(row=row_idx, column=4, value=article.get('unite_nom') or '')
+            ws.cell(row=row_idx, column=5, value=article.get('seuil_alerte') or 0)
+            ws.cell(row=row_idx, column=6, value=self._statut_stock(article))
+
+        if ws.max_row >= 1:
+            ws.auto_filter.ref = ws.dimensions
+        _ajuster_largeurs(ws)
+
+    def _construire_mouvements(self, ws, mouvements: list[dict]) -> None:
+        headers = ["Date", "Article", "Type mouvement", "Quantité", "Fournisseur", "N° facture"]
+        _ecrire_entete_colonne_p9(ws, 1, headers)
+
+        for row_idx, mouvement in enumerate(mouvements, start=2):
+            ws.cell(row=row_idx, column=1, value=_formater_date(mouvement.get('date')))
+            ws.cell(row=row_idx, column=2, value=mouvement.get('article_nom') or mouvement.get('stock_nom') or '')
+            ws.cell(row=row_idx, column=3, value=mouvement.get('type') or '')
+            ws.cell(row=row_idx, column=4, value=mouvement.get('quantite') or 0)
+            ws.cell(row=row_idx, column=5, value=mouvement.get('fournisseur_nom') or '')
+            ws.cell(row=row_idx, column=6, value=mouvement.get('numero_facture') or '')
+
+        if ws.max_row >= 1:
+            ws.auto_filter.ref = ws.dimensions
+        _ajuster_largeurs(ws)
