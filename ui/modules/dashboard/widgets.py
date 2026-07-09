@@ -64,7 +64,6 @@ class BandeauAlertes(ctk.CTkFrame):
     def __init__(self, parent, alertes: list[dict], **kwargs) -> None:
         super().__init__(parent, corner_radius=0, **kwargs)
         self._alertes = alertes
-        self._on_click_callbacks: dict[int, callable] = {}
 
         if not alertes:
             # Masquer le bandeau en ne l'affichant pas

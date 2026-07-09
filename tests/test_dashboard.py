@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import date
+
 import pytest
 
 from db.connection import set_db_file
@@ -250,8 +252,6 @@ def test_calculer_progression_subventions():
 
 
 def test_get_resume_mois_courant():
-    from datetime import date
-
     result = get_resume_mois_courant()
     today = date.today()
     assert str(today.year) in result

@@ -130,10 +130,10 @@ class MainApp(ctk.CTk):
         )
         self._dashboard_frame.pack(fill="both", expand=True)
 
-    # ── Page d'accueil (conservée pour _refresh_ui) ───────────────────────────
+    # ── Page d'accueil (conservée pour compatibilité) ─────────────────────────
 
     def _build_home(self) -> None:
-        """Construit la page d'accueil (remplacée par _build_dashboard)."""
+        """Construit la page d'accueil (délègue vers _build_dashboard)."""
         self._build_dashboard()
 
     # ── Barre de statut ──────────────────────────────────────────────────────

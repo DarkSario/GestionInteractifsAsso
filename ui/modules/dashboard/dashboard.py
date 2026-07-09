@@ -354,8 +354,6 @@ class DashboardFrame(ctk.CTkFrame):
                 ),
                 font=ctk.CTkFont(size=12),
             ).pack(anchor="w", padx=10, pady=(0, 8))
-        else:
-            ctk.CTkLabel(self._scroll if not bilan else frame_ev, text="").pack()
 
         # Nb bénévoles total sur les prochains événements
         nb_benv_total = d.get("nb_benevoles", 0)
@@ -467,8 +465,7 @@ class DashboardFrame(ctk.CTkFrame):
         if date_sauv:
             try:
                 dt_str = date_sauv[:10]
-                from datetime import datetime as _dt  # noqa: PLC0415
-                dt = _dt.strptime(dt_str, "%Y-%m-%d")
+                dt = datetime.strptime(dt_str, "%Y-%m-%d")
                 date_sauv_fmt = dt.strftime("%d/%m/%Y")
             except ValueError:
                 date_sauv_fmt = date_sauv
