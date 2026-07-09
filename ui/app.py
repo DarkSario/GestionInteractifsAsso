@@ -34,7 +34,7 @@ class MainApp(ctk.CTk):
         self._build_menu()
         self._build_dashboard()
         self._build_status_bar()
-        threading.Thread(target=self._verifier_sauvegarde_auto_async, daemon=True).start()
+        self.after(250, self._demarrer_verification_sauvegarde_auto)
 
         self.bind("<Control-comma>", lambda e: self._ouvrir_parametres())
 
@@ -179,6 +179,10 @@ class MainApp(ctk.CTk):
             verifier_sauvegarde_auto()
         except Exception as exc:  # noqa: BLE001
             logger.exception("Erreur thread sauvegarde auto : %s", exc)
+
+    def _demarrer_verification_sauvegarde_auto(self) -> None:
+        """Démarre le thread de vérification après initialisation de l'UI."""
+        threading.Thread(target=self._verifier_sauvegarde_auto_async, daemon=True).start()
 
     # ── Actions ──────────────────────────────────────────────────────────────
 

@@ -735,7 +735,6 @@ def get_info_derniere_sauvegarde() -> dict:
         try:
             from db.models.parametres_globaux import get_parametre  # noqa: PLC0415
 
-            chemin = get_parametre("sauvegarde_dossier", "")
             derniere_date_str = get_parametre("derniere_sauvegarde", "")
         except Exception:  # noqa: BLE001
             chemin = ""

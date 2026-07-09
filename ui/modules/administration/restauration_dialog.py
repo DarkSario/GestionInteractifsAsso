@@ -7,7 +7,7 @@ from typing import Any
 import customtkinter as ctk
 
 from ui import theme as app_theme
-from ui.components.dialogs import afficher_erreur, afficher_info, demander_confirmation
+from ui.components.dialogs import afficher_erreur, afficher_info
 from utils.backup import (
     redemarrer_application,
     restaurer_sauvegarde,
@@ -105,15 +105,9 @@ class RestaurationDialog(ctk.CTkToplevel):
             afficher_erreur(self, "Échec de la restauration", resultat["message"])
             return
 
-        if demander_confirmation(
+        afficher_info(
             self,
             "Restauration réussie",
-            "La restauration a réussi.\n\n"
-            "L'application doit redémarrer pour appliquer les changements.\n"
-            "Redémarrer maintenant ?",
-        ):
-            redemarrer_application()
-            return
-
-        afficher_info(self, "Restauration réussie", "L'application devra être redémarrée manuellement.")
-        self.destroy()
+            "La restauration a réussi.\n\nL'application va maintenant redémarrer.",
+        )
+        redemarrer_application()

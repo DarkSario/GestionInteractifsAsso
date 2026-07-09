@@ -280,14 +280,9 @@ class ImportBaseDialog(ctk.CTkToplevel):
             afficher_erreur(self, "Échec de l'import", resultat["message"])
             return
 
-        if demander_confirmation(
+        afficher_info(
             self,
             "Import réussi",
-            "L'import a réussi.\n\nL'application doit redémarrer pour appliquer les changements.\n"
-            "Redémarrer maintenant ?",
-        ):
-            redemarrer_application()
-            return
-
-        afficher_info(self, "Import réussi", "L'application devra être redémarrée manuellement.")
-        self.destroy()
+            "L'import a réussi.\n\nL'application va maintenant redémarrer.",
+        )
+        redemarrer_application()
