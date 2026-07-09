@@ -517,6 +517,7 @@ def _ajouter_config_au_zip(archive: zipfile.ZipFile) -> None:
 
 
 def _restaurer_config_depuis_archive(archive_path: Path) -> None:
+    base_dir = CONFIG_DIR.resolve()
     with zipfile.ZipFile(archive_path) as archive:
         for nom in archive.namelist():
             rel = PurePosixPath(nom)
@@ -525,7 +526,12 @@ def _restaurer_config_depuis_archive(archive_path: Path) -> None:
             if rel.is_absolute() or any(part == ".." for part in rel.parts):
                 logger.warning("Entrée ZIP ignorée (chemin suspect) : %s", nom)
                 continue
-            destination = APP_ROOT.joinpath(*rel.parts)
+            destination = CONFIG_DIR.joinpath(*rel.parts[1:]).resolve()
+            try:
+                destination.relative_to(base_dir)
+            except ValueError:
+                logger.warning("Entrée ZIP ignorée (hors config/) : %s", nom)
+                continue
             destination.parent.mkdir(parents=True, exist_ok=True)
             with archive.open(nom) as src, destination.open("wb") as dst:
                 shutil.copyfileobj(src, dst)

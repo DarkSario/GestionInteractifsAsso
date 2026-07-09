@@ -34,7 +34,7 @@ class MainApp(ctk.CTk):
         self._build_menu()
         self._build_dashboard()
         self._build_status_bar()
-        threading.Thread(target=verifier_sauvegarde_auto, daemon=True).start()
+        threading.Thread(target=self._verifier_sauvegarde_auto_async, daemon=True).start()
 
         self.bind("<Control-comma>", lambda e: self._ouvrir_parametres())
 
@@ -171,6 +171,14 @@ class MainApp(ctk.CTk):
             anchor="e",
         )
         self._status_balance_label.pack(side="right", padx=10)
+
+    @staticmethod
+    def _verifier_sauvegarde_auto_async() -> None:
+        """Lance la vérification de sauvegarde auto avec journalisation."""
+        try:
+            verifier_sauvegarde_auto()
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("Erreur thread sauvegarde auto : %s", exc)
 
     # ── Actions ──────────────────────────────────────────────────────────────
 
