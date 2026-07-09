@@ -99,7 +99,7 @@ class BasePDF:
             taille_base_raw = get_parametre("pdf_taille_base", "11") or "11"
             couleur_accent_raw = get_parametre("pdf_couleur_accent", "#000000") or "#000000"
 
-            self._taille_base = max(8, int(float(taille_base_raw)))
+            self._taille_base = max(8, min(72, int(float(taille_base_raw))))
             try:
                 self._couleur_accent = colors.HexColor(couleur_accent_raw)
             except Exception:

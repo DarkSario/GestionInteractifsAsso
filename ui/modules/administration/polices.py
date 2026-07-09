@@ -209,7 +209,7 @@ class GestionPolices(ctk.CTkToplevel):
             from reportlab.lib.pagesizes import A4
             from reportlab.pdfgen import canvas
 
-            chemin = CONFIG_DIR / "apercu_polices_pdf.pdf"
+            chemin = CONFIG_DIR / "apercu_polices.pdf"
             pdf = canvas.Canvas(str(chemin), pagesize=A4)
             pdf.setFont("Helvetica-Bold", 18)
             pdf.drawString(60, 780, "Aperçu PDF")

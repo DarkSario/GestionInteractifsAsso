@@ -160,6 +160,25 @@ def generer_nom_fichier(nom_evenement: str, date: str, extension: str) -> str:
     return f"bilan_{slug}_{date}.{extension}"
 
 
+def montant_signe_operation(operation: dict) -> float:
+    """Retourne le montant signé d'une opération de trésorerie.
+
+    Recettes : positif. Dépenses et virements sortants : négatif.
+    Opérations non validées : 0.
+    """
+    montant = float(operation.get("montant") or 0)
+    if operation.get("statut") != "valide":
+        return 0.0
+    type_operation = operation.get("type_operation")
+    if type_operation == "recette":
+        return montant
+    if type_operation == "depense":
+        return -montant
+    if type_operation == "virement_interne":
+        return montant if operation.get("source_module") == "virement_entrant" else -montant
+    return montant
+
+
 
 def export_bilan_ag_pdf(exercice: str, chemin_sortie: str,
                         sections: dict | None = None,
@@ -355,15 +374,8 @@ def export_tresorerie_excel(chemin_sortie: str, compte_id: int | None = None,
         lignes = []
         total = 0.0
         for operation in operations:
-            montant = float(operation.get('montant') or 0)
-            if operation.get('type_operation') == 'depense':
-                total -= montant
-                montant = -montant
-            elif operation.get('type_operation') == 'virement_interne' and operation.get('source_module') != 'virement_entrant':
-                total -= montant
-                montant = -montant
-            else:
-                total += montant
+            montant = montant_signe_operation(operation)
+            total += montant
             lignes.append([
                 operation.get('date_operation') or '',
                 operation.get('compte_nom') or '',

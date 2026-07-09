@@ -5,6 +5,7 @@ from __future__ import annotations
 from reportlab.lib.units import cm
 from reportlab.platypus import Paragraph, Spacer
 
+from core.exports import montant_signe_operation
 from core.pdf_base import BasePDF
 from utils.logger import get_logger
 
@@ -19,20 +20,6 @@ class PdfReleverCompte(BasePDF):
         self._compte_id = compte_id
         self._date_debut = date_debut or ""
         self._date_fin = date_fin or ""
-
-    @staticmethod
-    def _montant_signe(operation: dict) -> float:
-        montant = float(operation.get("montant") or 0)
-        if operation.get("statut") != "valide":
-            return 0.0
-        type_operation = operation.get("type_operation")
-        if type_operation == "recette":
-            return montant
-        if type_operation == "depense":
-            return -montant
-        if type_operation == "virement_interne":
-            return montant if operation.get("source_module") == "virement_entrant" else -montant
-        return 0.0
 
     def _construire_contenu(self) -> list:
         from db.models.tresorerie import get_compte_by_id, get_operations
@@ -49,7 +36,7 @@ class PdfReleverCompte(BasePDF):
         for operation in operations:
             date_operation = str(operation.get("date_operation") or "")
             if self._date_debut and date_operation < self._date_debut:
-                solde_depart += self._montant_signe(operation)
+                solde_depart += montant_signe_operation(operation)
                 continue
             if self._date_fin and date_operation > self._date_fin:
                 continue
@@ -81,7 +68,7 @@ class PdfReleverCompte(BasePDF):
         solde_courant = solde_depart
 
         for operation in filtrees:
-            montant_signe = self._montant_signe(operation)
+            montant_signe = montant_signe_operation(operation)
             solde_courant += montant_signe
             if montant_signe >= 0:
                 total_credits += montant_signe

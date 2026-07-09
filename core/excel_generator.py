@@ -13,6 +13,7 @@ from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 
+from core.exports import montant_signe_operation
 from utils.logger import get_logger
 
 if TYPE_CHECKING:
@@ -652,27 +653,13 @@ class ExcelTresorerie:
             logger.error("ExcelTresorerie.generer: %s", exc)
             return False
 
-    @staticmethod
-    def _montant_signe(operation: dict) -> float:
-        montant = float(operation.get('montant') or 0)
-        if operation.get('statut') != 'valide':
-            return 0.0
-        type_operation = operation.get('type_operation')
-        if type_operation == 'recette':
-            return montant
-        if type_operation == 'depense':
-            return -montant
-        if type_operation == 'virement_interne':
-            return montant if operation.get('source_module') == 'virement_entrant' else -montant
-        return montant
-
     def _construire_operations(self, ws, operations: list[dict]) -> None:
         headers = ["Date", "Libellé", "Type", "Catégorie", "Compte", "Montant", "Statut"]
         _ecrire_entete_colonne_p9(ws, 1, headers)
 
         total = 0.0
         for row_idx, operation in enumerate(operations, start=2):
-            montant_signe = self._montant_signe(operation)
+            montant_signe = montant_signe_operation(operation)
             total += montant_signe
             ws.cell(row=row_idx, column=1, value=_formater_date(operation.get('date_operation')))
             ws.cell(row=row_idx, column=2, value=operation.get('libelle') or '')
@@ -702,7 +689,7 @@ class ExcelTresorerie:
         categories: dict[str, dict[str, float]] = defaultdict(lambda: {"recettes": 0.0, "depenses": 0.0})
         for operation in operations:
             categorie = operation.get('categorie_nom') or 'Sans catégorie'
-            montant_signe = self._montant_signe(operation)
+            montant_signe = montant_signe_operation(operation)
             if montant_signe >= 0:
                 categories[categorie]['recettes'] += montant_signe
             else:
@@ -724,7 +711,12 @@ class ExcelTresorerie:
             row += 1
 
         ws.cell(row=row, column=1, value='Total')
-        for col_idx, valeur in ((2, round(total_recettes, 2)), (3, round(total_depenses, 2)), (4, round(total_recettes - total_depenses, 2))):
+        totaux_colonnes = (
+            (2, round(total_recettes, 2)),
+            (3, round(total_depenses, 2)),
+            (4, round(total_recettes - total_depenses, 2)),
+        )
+        for col_idx, valeur in totaux_colonnes:
             cell = ws.cell(row=row, column=col_idx, value=valeur)
             cell.number_format = '#,##0.00'
         _appliquer_ligne_total_p9(ws, row, len(headers))
