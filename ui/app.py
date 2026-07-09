@@ -30,6 +30,8 @@ class MainApp(ctk.CTk):
         self._build_home()
         self._build_status_bar()
 
+        self.bind("<Control-comma>", lambda e: self._ouvrir_parametres())
+
         logger.info("Fenêtre principale initialisée")
 
     def _load_config(self) -> dict[str, str | float]:
@@ -91,8 +93,9 @@ class MainApp(ctk.CTk):
         menubar.add_command(label="Journal général", command=self._todo)
 
         menu_admin = tk.Menu(menubar, tearoff=0)
+        menu_admin.add_command(label="⚙️ Paramètres", command=self._ouvrir_parametres)
+        menu_admin.add_separator()
         menu_admin.add_command(label="Référentiels Stock", command=self._ouvrir_referentiels_stock)
-        menu_admin.add_command(label="⚙️ Infos association", command=self._ouvrir_config_asso)
         menu_admin.add_separator()
         menu_admin.add_command(label="Apparence", command=self._ouvrir_theme_editor)
         menu_admin.add_separator()
@@ -231,6 +234,13 @@ class MainApp(ctk.CTk):
         from ui.modules.buvette.liste import ListeBuvette
 
         fenetre = ListeBuvette(self)
+        fenetre.grab_set()
+
+    def _ouvrir_parametres(self) -> None:
+        """Ouvre la fenêtre des paramètres globaux de l'application."""
+        from ui.modules.administration.parametres import ParametresApp
+
+        fenetre = ParametresApp(self)
         fenetre.grab_set()
 
     def _ouvrir_config_asso(self) -> None:
