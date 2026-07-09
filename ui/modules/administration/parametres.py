@@ -1,10 +1,11 @@
 """Fenêtre de paramètres globaux de l'application (Phase 7).
 
-4 onglets :
+Cinq onglets :
 - 🏢 Association  : Infos asso + exercice courant
 - 💰 Financier    : Taux SumUp, comptes, modes de paiement
 - 📅 Événements   : Classes scolaires + types d'événements
 - 🖥️ Système      : Thème, sauvegarde auto, dossiers
+- 📄 Exports & PDF: Paramètres PDF et polices
 """
 
 from __future__ import annotations
@@ -26,6 +27,8 @@ from core.parametres import (
     valider_nom_liste,
 )
 from db.models.parametres_globaux import (
+    get_parametre,
+    set_parametre,
     add_classe,
     add_type_evenement,
     delete_classe,
@@ -39,11 +42,17 @@ from db.models.parametres_globaux import (
     update_classe,
     update_type_evenement,
 )
+from db.models.polices import get_all_polices
 from ui import theme as app_theme
 from ui.components.dialogs import afficher_erreur, afficher_info, demander_confirmation
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
+
+try:
+    from tkcolorpicker import askcolor as _askcolor
+except ImportError:
+    from tkinter.colorchooser import askcolor as _askcolor
 
 
 class ParametresApp(ctk.CTkToplevel):
@@ -78,11 +87,13 @@ class ParametresApp(ctk.CTkToplevel):
         self._tabview.add("💰 Financier")
         self._tabview.add("📅 Événements")
         self._tabview.add("🖥️ Système")
+        self._tabview.add("📄 Exports & PDF")
 
         self._build_tab_asso()
         self._build_tab_financier()
         self._build_tab_evenements()
         self._build_tab_systeme()
+        self._build_tab_exports_pdf()
 
     # ── Onglet Association ────────────────────────────────────────────────────
 
@@ -841,6 +852,146 @@ class ParametresApp(ctk.CTkToplevel):
         app_theme_mod.load_theme()
 
         afficher_info(self, "Succès", "Les paramètres système ont été enregistrés.")
+
+
+
+    # ── Onglet Exports & PDF ───────────────────────────────────────────────────
+
+    def _build_tab_exports_pdf(self) -> None:
+        tab = self._tabview.tab("📄 Exports & PDF")
+        fonts = app_theme.FONTS
+
+        frame = ctk.CTkScrollableFrame(tab, fg_color="transparent")
+        frame.pack(fill="both", expand=True, padx=4, pady=4)
+
+        ctk.CTkLabel(frame, text="Paramètres PDF", font=fonts.get("subtitle")).pack(
+            anchor="w", pady=(8, 4)
+        )
+
+        self._pdf_polices = get_all_polices(actif_only=True)
+        valeurs_polices = [police["nom"] for police in self._pdf_polices] or ["Helvetica"]
+
+        self._pdf_police_titre_var = ctk.StringVar(
+            value=get_parametre("pdf_police_titre", valeurs_polices[0])
+        )
+        self._pdf_police_corps_var = ctk.StringVar(
+            value=get_parametre("pdf_police_corps", valeurs_polices[0])
+        )
+        self._pdf_taille_base_var = ctk.StringVar(value=get_parametre("pdf_taille_base", "11"))
+        self._pdf_couleur_accent_var = ctk.StringVar(
+            value=get_parametre("pdf_couleur_accent", "#1f6aa5")
+        )
+
+        f_titre = ctk.CTkFrame(frame, fg_color="transparent")
+        f_titre.pack(fill="x", pady=3)
+        ctk.CTkLabel(f_titre, text="Police titres", width=150, anchor="ne").pack(side="left", padx=(0, 8))
+        self._combo_pdf_police_titre = ctk.CTkOptionMenu(
+            f_titre,
+            variable=self._pdf_police_titre_var,
+            values=valeurs_polices,
+            width=240,
+        )
+        self._combo_pdf_police_titre.pack(side="left")
+
+        f_corps = ctk.CTkFrame(frame, fg_color="transparent")
+        f_corps.pack(fill="x", pady=3)
+        ctk.CTkLabel(f_corps, text="Police corps", width=150, anchor="ne").pack(side="left", padx=(0, 8))
+        self._combo_pdf_police_corps = ctk.CTkOptionMenu(
+            f_corps,
+            variable=self._pdf_police_corps_var,
+            values=valeurs_polices,
+            width=240,
+        )
+        self._combo_pdf_police_corps.pack(side="left")
+
+        f_taille = ctk.CTkFrame(frame, fg_color="transparent")
+        f_taille.pack(fill="x", pady=3)
+        ctk.CTkLabel(f_taille, text="Taille base", width=150, anchor="ne").pack(side="left", padx=(0, 8))
+        self._pdf_taille_base_entry = ctk.CTkEntry(
+            f_taille,
+            textvariable=self._pdf_taille_base_var,
+            width=120,
+        )
+        self._pdf_taille_base_entry.pack(side="left")
+
+        f_couleur = ctk.CTkFrame(frame, fg_color="transparent")
+        f_couleur.pack(fill="x", pady=3)
+        ctk.CTkLabel(f_couleur, text="Couleur accent", width=150, anchor="ne").pack(side="left", padx=(0, 8))
+        self._pdf_couleur_entry = ctk.CTkEntry(
+            f_couleur,
+            textvariable=self._pdf_couleur_accent_var,
+            width=160,
+        )
+        self._pdf_couleur_entry.pack(side="left")
+        self._pdf_couleur_btn = ctk.CTkButton(
+            f_couleur,
+            text="🎨 Choisir",
+            width=110,
+            command=self._choisir_couleur_pdf,
+        )
+        self._pdf_couleur_btn.pack(side="left", padx=(6, 0))
+
+        ctk.CTkButton(
+            frame,
+            text="🖋️ Gérer les polices...",
+            width=180,
+            command=self._ouvrir_polices_pdf,
+        ).pack(anchor="w", padx=(158, 0), pady=(8, 0))
+
+        f_btn = ctk.CTkFrame(frame, fg_color="transparent")
+        f_btn.pack(fill="x", pady=(14, 4))
+        ctk.CTkButton(
+            f_btn,
+            text="💾 Enregistrer",
+            width=150,
+            command=self._enregistrer_pdf,
+        ).pack(side="right")
+
+        self._maj_apercu_couleur_pdf()
+
+    def _choisir_couleur_pdf(self) -> None:
+        result = _askcolor(color=self._pdf_couleur_accent_var.get(), parent=self)
+        couleur = result[1] if result else None
+        if couleur:
+            self._pdf_couleur_accent_var.set(couleur)
+            self._maj_apercu_couleur_pdf()
+
+    def _maj_apercu_couleur_pdf(self) -> None:
+        try:
+            self._pdf_couleur_btn.configure(fg_color=self._pdf_couleur_accent_var.get())
+        except Exception:
+            self._pdf_couleur_btn.configure(
+                fg_color=app_theme.COLORS.get("primary", "#1f6aa5")
+            )
+
+    def _ouvrir_polices_pdf(self) -> None:
+        from ui.modules.administration.polices import GestionPolices
+
+        dialog = GestionPolices(self)
+        self.wait_window(dialog)
+        self._pdf_polices = get_all_polices(actif_only=True)
+        valeurs_polices = [police["nom"] for police in self._pdf_polices] or ["Helvetica"]
+        self._combo_pdf_police_titre.configure(values=valeurs_polices)
+        self._combo_pdf_police_corps.configure(values=valeurs_polices)
+        if self._pdf_police_titre_var.get() not in valeurs_polices:
+            self._pdf_police_titre_var.set(valeurs_polices[0])
+        if self._pdf_police_corps_var.get() not in valeurs_polices:
+            self._pdf_police_corps_var.set(valeurs_polices[0])
+
+    def _enregistrer_pdf(self) -> None:
+        try:
+            taille = int(self._pdf_taille_base_var.get().strip())
+            if taille <= 0:
+                raise ValueError
+        except ValueError:
+            afficher_erreur(self, "Erreur", "La taille de base doit être un entier positif.")
+            return
+
+        set_parametre("pdf_police_titre", self._pdf_police_titre_var.get().strip())
+        set_parametre("pdf_police_corps", self._pdf_police_corps_var.get().strip())
+        set_parametre("pdf_taille_base", str(taille))
+        set_parametre("pdf_couleur_accent", self._pdf_couleur_accent_var.get().strip())
+        afficher_info(self, "Succès", "Les paramètres PDF ont été enregistrés.")
 
     # ── Utilitaires ───────────────────────────────────────────────────────────
 
