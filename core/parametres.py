@@ -17,7 +17,7 @@ from utils.logger import get_logger
 logger = get_logger(__name__)
 
 _NOM_MAX_LEN = 100
-_NOM_RE = re.compile(r"^[a-zA-ZÀ-ÿ0-9 '\-\.\(\)]+$")
+_NOM_RE = re.compile(r"^[a-zA-ZÀ-ÿ0-9 '\-.()]+$")
 
 
 # ── Validation ────────────────────────────────────────────────────────────────

@@ -834,8 +834,6 @@ class ParametresApp(ctk.CTkToplevel):
         # Appliquer le thème immédiatement
         ctk.set_appearance_mode(theme_mode)
         from ui import theme as app_theme_mod
-        import json
-        from config.settings import THEME_FILE
 
         theme_data = app_theme_mod.get_theme()
         theme_data["appearance_mode"] = theme_mode
