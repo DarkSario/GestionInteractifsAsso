@@ -21,13 +21,14 @@ class MainApp(ctk.CTk):
             set_db_file(db_path)
 
         self._config = self._load_config()
+        self._dashboard_frame = None
 
         self.title(f"{APP_NAME} v{APP_VERSION}")
-        self.geometry("1100x700")
+        self.geometry("1200x800")
         self.minsize(900, 600)
 
         self._build_menu()
-        self._build_home()
+        self._build_dashboard()
         self._build_status_bar()
 
         self.bind("<Control-comma>", lambda e: self._ouvrir_parametres())
@@ -89,7 +90,7 @@ class MainApp(ctk.CTk):
         menubar.add_cascade(label="Modules", menu=menu_modules)
 
         menubar.add_command(label="Exports", command=self._todo)
-        menubar.add_command(label="Tableau de bord", command=self._todo)
+        menubar.add_command(label="🏠 Tableau de bord", command=self._ouvrir_dashboard)
         menubar.add_command(label="Journal général", command=self._todo)
 
         menu_admin = tk.Menu(menubar, tearoff=0)
@@ -110,60 +111,30 @@ class MainApp(ctk.CTk):
 
         self.configure(menu=menubar)
 
-    # ── Page d'accueil ───────────────────────────────────────────────────────
+    # ── Tableau de bord (page d'accueil) ────────────────────────────────────
+
+    def _build_dashboard(self) -> None:
+        """Construit et affiche le tableau de bord comme page d'accueil."""
+        from ui.modules.dashboard.dashboard import DashboardFrame
+
+        if self._dashboard_frame is not None:
+            try:
+                self._dashboard_frame.annuler_actualisation()
+                self._dashboard_frame.destroy()
+            except Exception:  # noqa: BLE001
+                pass
+
+        self._dashboard_frame = DashboardFrame(
+            self,
+            navigation_callback=self._naviguer,
+        )
+        self._dashboard_frame.pack(fill="both", expand=True)
+
+    # ── Page d'accueil (conservée pour _refresh_ui) ───────────────────────────
 
     def _build_home(self) -> None:
-        """Construit la page d'accueil."""
-        fonts = app_theme.FONTS
-        colors = app_theme.COLORS
-
-        self._frame_home = ctk.CTkFrame(self, fg_color="transparent")
-        self._frame_home.pack(fill="both", expand=True, padx=30, pady=20)
-
-        ctk.CTkLabel(
-            self._frame_home,
-            text=str(self._config["nom_asso"]),
-            font=fonts.get("title"),
-        ).pack(pady=(20, 5))
-
-        ctk.CTkLabel(
-            self._frame_home,
-            text=f"Exercice en cours : {self._config['exercice']}",
-            font=fonts.get("subtitle"),
-        ).pack(pady=(0, 5))
-
-        ctk.CTkLabel(
-            self._frame_home,
-            text=f"Période : {self._format_period()}",
-            font=fonts.get("normal"),
-        ).pack(pady=(0, 30))
-
-        frame_buttons = ctk.CTkFrame(self._frame_home, fg_color="transparent")
-        frame_buttons.pack()
-
-        modules = [
-            ("👥 Adhérents", self._ouvrir_membres),
-            ("💰 Trésorerie", self._ouvrir_tresorerie),
-            ("📅 Événements", self._ouvrir_evenements),
-            ("🍺 Buvette", self._ouvrir_buvette),
-            ("📦 Stock", self._ouvrir_stock),
-            ("📊 Tableau de bord", self._todo),
-            ("📤 Exports", self._todo),
-            ("📋 Journal général", self._todo),
-        ]
-
-        for i, (label, cmd) in enumerate(modules):
-            row, col = divmod(i, 4)
-            ctk.CTkButton(
-                frame_buttons,
-                text=label,
-                width=200,
-                height=60,
-                command=cmd,
-                fg_color=colors.get("primary", "#1f6aa5"),
-                hover_color=colors.get("secondary", "#144870"),
-                font=fonts.get("bold"),
-            ).grid(row=row, column=col, padx=10, pady=10)
+        """Construit la page d'accueil (remplacée par _build_dashboard)."""
+        self._build_dashboard()
 
     # ── Barre de statut ──────────────────────────────────────────────────────
 
@@ -200,6 +171,34 @@ class MainApp(ctk.CTk):
             "En construction",
             "Ce module n'est pas encore disponible.\nIl sera implémenté prochainement.",
         )
+
+    def _ouvrir_dashboard(self) -> None:
+        """Reconstruit et affiche le tableau de bord."""
+        self._build_dashboard()
+
+    def _naviguer(self, destination: str, extra=None) -> None:
+        """Callback de navigation depuis le dashboard vers les modules.
+
+        Args:
+            destination: Identifiant du module (ex. 'stock', 'membres').
+            extra: Paramètre optionnel (ex. id d'un événement).
+        """
+        routes = {
+            "stock": self._ouvrir_stock,
+            "membres": self._ouvrir_membres,
+            "tresorerie": self._ouvrir_tresorerie,
+            "evenements": self._ouvrir_evenements,
+            "buvette": self._ouvrir_buvette,
+            "exercices": self._ouvrir_gestion_exercices,
+            "parametres": self._ouvrir_parametres,
+        }
+        action = routes.get(destination)
+        if action:
+            action()
+        elif destination == "evenement" and extra:
+            self._ouvrir_evenements()
+        elif destination == "sauvegarde":
+            self._todo()
 
     def _ouvrir_tresorerie(self) -> None:
         """Ouvre la fenêtre de gestion de la trésorerie."""
@@ -282,10 +281,10 @@ class MainApp(ctk.CTk):
         self._refresh_ui()
 
     def _refresh_ui(self) -> None:
-        """Rafraîchit les couleurs et polices de la page d'accueil."""
-        self._frame_home.destroy()
-        self._status_bar.destroy()
-        self._build_home()
+        """Rafraîchit l'interface après un changement de thème."""
+        self._build_dashboard()
+        if hasattr(self, "_status_bar"):
+            self._status_bar.destroy()
         self._build_status_bar()
 
     def _format_period(self) -> str:
