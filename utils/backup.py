@@ -468,7 +468,9 @@ def _copier_base_sqlite(source: Path, destination: Path) -> None:
     destination.parent.mkdir(parents=True, exist_ok=True)
     if destination.exists():
         destination.unlink()
-    with sqlite3.connect(source) as src_conn, sqlite3.connect(destination) as dst_conn:
+    with sqlite3.connect(source, timeout=10) as src_conn, sqlite3.connect(
+        destination, timeout=10
+    ) as dst_conn:
         src_conn.backup(dst_conn)
 
 
@@ -523,7 +525,7 @@ def _restaurer_config_depuis_archive(archive_path: Path) -> None:
             rel = PurePosixPath(nom)
             if not rel.parts or rel.parts[0] != "config" or nom.endswith("/"):
                 continue
-            if rel.is_absolute() or any(part == ".." for part in rel.parts):
+            if rel.is_absolute():
                 logger.warning("Entrée ZIP ignorée (chemin suspect) : %s", nom)
                 continue
             destination = CONFIG_DIR.joinpath(*rel.parts[1:]).resolve()
@@ -563,7 +565,7 @@ def _supprimer_fichiers_sqlite_associes(db_path: Path) -> None:
 
 
 def _verifier_schema_compatible(chemin_db: Path) -> dict:
-    conn = sqlite3.connect(f"file:{chemin_db}?mode=ro", uri=True)
+    conn = sqlite3.connect(f"file:{chemin_db}?mode=ro", uri=True, timeout=10)
     try:
         tables = {
             row[0]
