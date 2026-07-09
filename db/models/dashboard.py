@@ -712,14 +712,33 @@ def get_info_derniere_sauvegarde() -> dict:
     Returns:
         {date, nb_jours_depuis, chemin}
     """
+    chemin = ""
+    derniere_date_str = ""
     try:
-        from db.models.parametres_globaux import get_parametre  # noqa: PLC0415
-
-        chemin = get_parametre("dossier_sauvegarde", "")
-        derniere_date_str = get_parametre("derniere_sauvegarde", "")
+        conn = get_connection()
+        try:
+            row = conn.execute(
+                """
+                SELECT chemin_complet, created_at
+                FROM sauvegardes
+                WHERE statut = 'ok'
+                ORDER BY datetime(created_at) DESC, id DESC
+                LIMIT 1
+                """
+            ).fetchone()
+        finally:
+            conn.close()
+        if row:
+            chemin = row["chemin_complet"] or ""
+            derniere_date_str = row["created_at"] or ""
     except Exception:  # noqa: BLE001
-        chemin = ""
-        derniere_date_str = ""
+        try:
+            from db.models.parametres_globaux import get_parametre  # noqa: PLC0415
+
+            derniere_date_str = get_parametre("derniere_sauvegarde", "")
+        except Exception:  # noqa: BLE001
+            chemin = ""
+            derniere_date_str = ""
 
     nb_jours: int | None = None
     if derniere_date_str:

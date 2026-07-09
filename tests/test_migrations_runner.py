@@ -64,6 +64,7 @@ def test_run_migrations_creates_expected_tables(tmp_db) -> None:
         "exercices",
         "exercices_log",
         "polices_pdf",
+        "sauvegardes",
     }.issubset(tables)
     assert {
         "nom_asso",
@@ -84,6 +85,7 @@ def test_run_migrations_creates_expected_tables(tmp_db) -> None:
         "0009_cloture.sql",
         "0010_parametres_globaux.sql",
         "0011_exports.sql",
+        "0012_sauvegardes.sql",
     ]
 
 
@@ -101,4 +103,4 @@ def test_run_migrations_is_idempotent(tmp_db) -> None:
         conn.close()
         set_db_file("")
 
-    assert count == 11
+    assert count == 12

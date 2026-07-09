@@ -9,7 +9,6 @@ import re
 
 from db.models.parametres_globaux import (
     get_parametre,
-    get_all_parametres,
     set_parametre,
 )
 from utils.logger import get_logger
@@ -96,7 +95,8 @@ def get_config_systeme() -> dict:
     """Retourne la configuration système.
 
     Clés retournées : sauvegarde_auto, sauvegarde_frequence,
-    sauvegarde_dossier, export_dossier_defaut, theme_mode, derniere_sauvegarde.
+    sauvegarde_dossier, export_dossier_defaut, theme_mode, derniere_sauvegarde,
+    sauvegarde_rotation_max, sauvegarde_compression, sauvegarde_inclure_config.
     """
     return {
         "sauvegarde_auto": get_parametre("sauvegarde_auto", "0"),
@@ -105,6 +105,9 @@ def get_config_systeme() -> dict:
         "export_dossier_defaut": get_parametre("export_dossier_defaut", ""),
         "theme_mode": get_parametre("theme_mode", "dark"),
         "derniere_sauvegarde": get_parametre("derniere_sauvegarde", ""),
+        "sauvegarde_rotation_max": get_parametre("sauvegarde_rotation_max", "10"),
+        "sauvegarde_compression": get_parametre("sauvegarde_compression", "1"),
+        "sauvegarde_inclure_config": get_parametre("sauvegarde_inclure_config", "1"),
     }
 
 
@@ -112,7 +115,8 @@ def set_config_systeme(**kwargs) -> bool:
     """Enregistre un ou plusieurs paramètres système.
 
     Clés acceptées : sauvegarde_auto, sauvegarde_frequence,
-    sauvegarde_dossier, export_dossier_defaut, theme_mode, derniere_sauvegarde.
+    sauvegarde_dossier, export_dossier_defaut, theme_mode, derniere_sauvegarde,
+    sauvegarde_rotation_max, sauvegarde_compression, sauvegarde_inclure_config.
     Retourne True si tous les paramètres ont été enregistrés sans erreur.
     """
     cles_autorisees = {
@@ -122,6 +126,9 @@ def set_config_systeme(**kwargs) -> bool:
         "export_dossier_defaut",
         "theme_mode",
         "derniere_sauvegarde",
+        "sauvegarde_rotation_max",
+        "sauvegarde_compression",
+        "sauvegarde_inclure_config",
     }
     ok = True
     for cle, valeur in kwargs.items():
