@@ -522,7 +522,7 @@ def _restaurer_config_depuis_archive(archive_path: Path) -> None:
             rel = PurePosixPath(nom)
             if not rel.parts or rel.parts[0] != "config" or nom.endswith("/"):
                 continue
-            if any(part == ".." for part in rel.parts):
+            if rel.is_absolute() or any(part == ".." for part in rel.parts):
                 logger.warning("Entrée ZIP ignorée (chemin suspect) : %s", nom)
                 continue
             destination = APP_ROOT.joinpath(*rel.parts)

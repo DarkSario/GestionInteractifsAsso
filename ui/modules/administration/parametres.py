@@ -44,8 +44,8 @@ from db.models.parametres_globaux import (
 )
 from db.models.polices import get_all_polices
 from ui import theme as app_theme
-from ui.components.dialogs import afficher_erreur, afficher_info
-from utils.backup import sauvegarder_maintenant, demander_confirmation
+from ui.components.dialogs import afficher_erreur, afficher_info, demander_confirmation
+from utils.backup import sauvegarder_maintenant
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
