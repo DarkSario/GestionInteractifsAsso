@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import threading
 from datetime import datetime
 
 import customtkinter as ctk
@@ -9,6 +10,7 @@ import customtkinter as ctk
 from config.settings import APP_NAME, APP_VERSION
 from db.connection import get_db_file, get_connection, set_db_file
 from ui import theme as app_theme
+from utils.backup import verifier_sauvegarde_auto
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -32,6 +34,7 @@ class MainApp(ctk.CTk):
         self._build_menu()
         self._build_dashboard()
         self._build_status_bar()
+        threading.Thread(target=verifier_sauvegarde_auto, daemon=True).start()
 
         self.bind("<Control-comma>", lambda e: self._ouvrir_parametres())
 
@@ -83,6 +86,13 @@ class MainApp(ctk.CTk):
 
         menubar = tk.Menu(self)
 
+        menu_fichier = tk.Menu(menubar, tearoff=0)
+        menu_fichier.add_command(label="📤 Exporter la base", command=self._ouvrir_export_base)
+        menu_fichier.add_command(label="📥 Importer une base", command=self._ouvrir_import_base)
+        menu_fichier.add_separator()
+        menu_fichier.add_command(label="Quitter", command=self.destroy)
+        menubar.add_cascade(label="Fichier", menu=menu_fichier)
+
         menu_modules = tk.Menu(menubar, tearoff=0)
         menu_modules.add_command(label="Adhérents", command=self._ouvrir_membres)
         menu_modules.add_command(label="Trésorerie", command=self._ouvrir_tresorerie)
@@ -105,14 +115,11 @@ class MainApp(ctk.CTk):
         menu_admin.add_command(label="🖋️ Polices PDF", command=self._ouvrir_polices_pdf)
         menu_admin.add_command(label="Apparence", command=self._ouvrir_theme_editor)
         menu_admin.add_separator()
-        menu_admin.add_command(label="Sauvegarde", command=self._todo)
-        menu_admin.add_command(label="Restauration", command=self._todo)
+        menu_admin.add_command(label="💾 Sauvegardes", command=self._ouvrir_sauvegardes)
         menu_admin.add_separator()
         menu_admin.add_command(label="📅 Gestion des exercices", command=self._ouvrir_gestion_exercices)
         menu_admin.add_command(label="🔐 Mot de passe déclôture", command=self._ouvrir_mdp_decloture)
         menubar.add_cascade(label="Administration", menu=menu_admin)
-
-        menubar.add_command(label="Quitter", command=self.destroy)
 
         self.configure(menu=menubar)
 
@@ -203,7 +210,7 @@ class MainApp(ctk.CTk):
         elif destination == "evenement" and extra:
             self._ouvrir_evenements()
         elif destination == "sauvegarde":
-            self._todo()
+            self._ouvrir_sauvegardes()
 
     def _ouvrir_tresorerie(self) -> None:
         """Ouvre la fenêtre de gestion de la trésorerie."""
@@ -247,6 +254,13 @@ class MainApp(ctk.CTk):
         fenetre = ParametresApp(self)
         fenetre.grab_set()
 
+    def _ouvrir_sauvegardes(self) -> None:
+        """Ouvre la fenêtre de gestion des sauvegardes."""
+        from ui.modules.administration.sauvegardes import SauvegardesApp
+
+        fenetre = SauvegardesApp(self)
+        fenetre.grab_set()
+
     def _ouvrir_config_asso(self) -> None:
         """Ouvre le dialogue de configuration des informations de l'association."""
         from ui.modules.evenements.config_asso_dialog import ConfigAssoDialog
@@ -276,6 +290,20 @@ class MainApp(ctk.CTk):
 
         fenetre = BilanAGDialog(self)
         fenetre.grab_set()
+
+    def _ouvrir_export_base(self) -> None:
+        """Ouvre le dialogue d'export de la base."""
+        from ui.modules.administration.import_export_dialog import ExportBaseDialog
+
+        dialog = ExportBaseDialog(self)
+        dialog.grab_set()
+
+    def _ouvrir_import_base(self) -> None:
+        """Ouvre le dialogue d'import de base."""
+        from ui.modules.administration.import_export_dialog import ImportBaseDialog
+
+        dialog = ImportBaseDialog(self)
+        dialog.grab_set()
 
     def _ouvrir_polices_pdf(self) -> None:
         """Ouvre la fenêtre de gestion des polices PDF."""

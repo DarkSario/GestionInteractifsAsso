@@ -12,13 +12,14 @@ import customtkinter as ctk
 
 from core.dashboard import get_donnees_dashboard
 from ui import theme as app_theme
+from ui.components.dialogs import afficher_erreur, afficher_info
 from ui.modules.dashboard.widgets import (
     BarreProgression,
     BandeauAlertes,
     CarteKPI,
     GraphiqueEvolution,
-    ListeAlertes,
 )
+from utils.backup import sauvegarder_maintenant
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -495,8 +496,17 @@ class DashboardFrame(ctk.CTkFrame):
 
     def _sauvegarder(self) -> None:
         """Déclenche une sauvegarde manuelle."""
-        if self._navigation_callback:
-            self._navigation_callback("sauvegarde")
+        resultat = sauvegarder_maintenant()
+        if not resultat["succes"]:
+            afficher_erreur(self, "Erreur de sauvegarde", resultat["message"])
+            return
+
+        afficher_info(
+            self,
+            "Sauvegarde réussie",
+            f"Sauvegarde créée :\n{resultat['chemin']}",
+        )
+        self._charger_donnees()
 
     # ── Actualisation automatique ─────────────────────────────────────────────
 

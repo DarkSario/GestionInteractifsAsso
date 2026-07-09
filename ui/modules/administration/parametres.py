@@ -44,7 +44,8 @@ from db.models.parametres_globaux import (
 )
 from db.models.polices import get_all_polices
 from ui import theme as app_theme
-from ui.components.dialogs import afficher_erreur, afficher_info, demander_confirmation
+from ui.components.dialogs import afficher_erreur, afficher_info
+from utils.backup import sauvegarder_maintenant, demander_confirmation
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -781,9 +782,7 @@ class ParametresApp(ctk.CTkToplevel):
 
         derniere = config.get("derniere_sauvegarde", "")
         if derniere:
-            self._derniere_sauvegarde_label.configure(
-                text=f"Dernière sauvegarde : {derniere}"
-            )
+            self._derniere_sauvegarde_label.configure(text=self._format_texte_derniere_sauvegarde(derniere))
 
     def _choisir_dossier_sauvegarde(self) -> None:
         dossier = filedialog.askdirectory(parent=self, title="Choisir le dossier de sauvegarde")
@@ -796,31 +795,22 @@ class ParametresApp(ctk.CTkToplevel):
             self._export_dossier_var.set(dossier)
 
     def _sauvegarder_maintenant(self) -> None:
-        from db.connection import get_db_file
-        from pathlib import Path
-        from utils.backup import backup_db
-
-        db_path_str = get_db_file()
-        if not db_path_str:
-            afficher_erreur(self, "Erreur", "Aucune base de données active.")
+        resultat = sauvegarder_maintenant()
+        if not resultat["succes"]:
+            afficher_erreur(self, "Erreur de sauvegarde", resultat["message"])
             return
-        db_path = Path(db_path_str)
-        dossier_str = self._sauvegarde_dossier_var.get().strip()
-        backup_dir = Path(dossier_str) if dossier_str else None
-        try:
-            backup_path = backup_db(db_path, backup_dir)
-            now_str = datetime.now().strftime("%d/%m/%Y à %Hh%M")
-            set_config_systeme(derniere_sauvegarde=now_str)
+
+        derniere = get_config_systeme().get("derniere_sauvegarde", "")
+        if derniere:
             self._derniere_sauvegarde_label.configure(
-                text=f"Dernière sauvegarde : {now_str}"
+                text=self._format_texte_derniere_sauvegarde(derniere)
             )
-            afficher_info(
-                self,
-                "Sauvegarde réussie",
-                f"Base de données sauvegardée :\n{backup_path}",
-            )
-        except Exception as exc:
-            afficher_erreur(self, "Erreur de sauvegarde", str(exc))
+
+        afficher_info(
+            self,
+            "Sauvegarde réussie",
+            f"Base de données sauvegardée :\n{resultat['chemin']}",
+        )
 
     def _enregistrer_systeme(self) -> None:
         theme_mode = self._theme_mode_var.get()
@@ -852,6 +842,14 @@ class ParametresApp(ctk.CTkToplevel):
         app_theme_mod.load_theme()
 
         afficher_info(self, "Succès", "Les paramètres système ont été enregistrés.")
+
+    @staticmethod
+    def _format_texte_derniere_sauvegarde(valeur: str) -> str:
+        try:
+            dt = datetime.fromisoformat(valeur)
+            return f"Dernière sauvegarde : {dt.strftime('%d/%m/%Y à %Hh%M')}"
+        except ValueError:
+            return f"Dernière sauvegarde : {valeur}"
 
 
 
