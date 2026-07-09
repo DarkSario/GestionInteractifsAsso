@@ -19,6 +19,23 @@ COULEURS = {
 }
 
 
+def _periode_contient_cloture() -> bool:
+    """Vérifie si des opérations rapprochées existent (période clôturée présente)."""
+    try:
+        from db.connection import get_connection
+
+        conn = get_connection()
+        try:
+            row = conn.execute(
+                "SELECT COUNT(*) AS nb FROM tresorerie_operations WHERE statut = 'rapproche'"
+            ).fetchone()
+        finally:
+            conn.close()
+        return (row["nb"] if row else 0) > 0
+    except Exception:
+        return False
+
+
 def build_tab_operations(parent: ctk.CTkFrame, _root: Any) -> None:
     fonts = app_theme.FONTS
     colors = app_theme.COLORS
@@ -43,6 +60,17 @@ def build_tab_operations(parent: ctk.CTkFrame, _root: Any) -> None:
         width=110,
         command=lambda: None,
     ).pack(side="right", padx=(0, 8))
+
+    # Bandeau "Période clôturée" si applicable
+    if _periode_contient_cloture():
+        bandeau = ctk.CTkFrame(parent, fg_color="#fff3e0", corner_radius=6)
+        bandeau.pack(fill="x", padx=12, pady=(0, 4))
+        ctk.CTkLabel(
+            bandeau,
+            text="🔒 Période clôturée — Les opérations affichées sont en lecture seule",
+            font=fonts.get("bold"),
+            text_color="#e65100",
+        ).pack(padx=12, pady=6)
 
     table_frame = ctk.CTkFrame(parent)
     table_frame.pack(fill="both", expand=True, padx=12, pady=6)

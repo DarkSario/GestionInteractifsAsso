@@ -99,7 +99,8 @@ class MainApp(ctk.CTk):
         menu_admin.add_command(label="Sauvegarde", command=self._todo)
         menu_admin.add_command(label="Restauration", command=self._todo)
         menu_admin.add_separator()
-        menu_admin.add_command(label="Clôture d'exercice", command=self._todo)
+        menu_admin.add_command(label="📅 Gestion des exercices", command=self._ouvrir_gestion_exercices)
+        menu_admin.add_command(label="🔐 Mot de passe déclôture", command=self._ouvrir_mdp_decloture)
         menubar.add_cascade(label="Administration", menu=menu_admin)
 
         menubar.add_command(label="Quitter", command=self.destroy)
@@ -244,6 +245,20 @@ class MainApp(ctk.CTk):
         from ui.modules.stock.referentiels import Referentiels
 
         fenetre = Referentiels(self)
+        fenetre.grab_set()
+
+    def _ouvrir_gestion_exercices(self) -> None:
+        """Ouvre la fenêtre de gestion des exercices."""
+        from ui.modules.tresorerie.cloture import GestionExercices
+
+        fenetre = GestionExercices(self)
+        fenetre.grab_set()
+
+    def _ouvrir_mdp_decloture(self) -> None:
+        """Ouvre la fenêtre de changement du mot de passe de déclôture."""
+        from ui.modules.administration.mdp_decloture import MdpDecloture
+
+        fenetre = MdpDecloture(self)
         fenetre.grab_set()
 
     def _ouvrir_theme_editor(self) -> None:
