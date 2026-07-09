@@ -117,7 +117,7 @@ def cloturer_exercice(exercice_id: int, solde_cloture: float) -> bool:
             """
             UPDATE tresorerie_operations
             SET statut = 'rapproche'
-            WHERE statut IN ('valide', 'en_attente')
+            WHERE statut = 'valide'
               AND date_operation BETWEEN ? AND ?
             """,
             (exercice["date_debut"], exercice["date_fin"]),

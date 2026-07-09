@@ -123,6 +123,25 @@ def test_operations_gelees_apres_cloture(tmp_db):
     set_db_file("")
 
 
+def test_operations_degelees_apres_decloture(tmp_db):
+    _setup(tmp_db)
+    compte_id = _compte_principal_id()
+    cat_r = _categorie_recette_id()
+
+    ex_id = add_exercice("2025", "civile", "2025-01-01", "2025-12-31", 0.0)
+    op_id = _add_op(compte_id, "recette", "Op test", 500.0, "2025-05-01", cat_r)
+
+    cloturer_exercice(ex_id, 500.0)
+    op = get_operation_by_id(op_id)
+    assert op["statut"] == "rapproche"
+
+    decloturer_exercice(ex_id)
+    op = get_operation_by_id(op_id)
+    assert op is not None
+    assert op["statut"] == "valide", f"Statut attendu 'valide', obtenu '{op['statut']}'"
+    set_db_file("")
+
+
 def test_decloture_mot_de_passe_correct(tmp_db):
     _setup(tmp_db)
     ex_id = add_exercice("2025", "civile", "2025-01-01", "2025-12-31", 0.0)

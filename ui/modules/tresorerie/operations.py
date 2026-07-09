@@ -20,16 +20,18 @@ COULEURS = {
 
 
 def _periode_contient_cloture() -> bool:
-    """Vérifie si des opérations affichées appartiennent à un exercice clôturé."""
+    """Vérifie si des opérations rapprochées existent (période clôturée présente)."""
     try:
-        from db.models.cloture import is_periode_cloturee
+        from db.connection import get_connection
 
-        operations = get_operations()
-        return any(
-            is_periode_cloturee(str(op.get("date_operation") or ""))
-            for op in operations
-            if op.get("statut") == "rapproche"
-        )
+        conn = get_connection()
+        try:
+            row = conn.execute(
+                "SELECT COUNT(*) AS nb FROM tresorerie_operations WHERE statut = 'rapproche'"
+            ).fetchone()
+        finally:
+            conn.close()
+        return (row["nb"] if row else 0) > 0
     except Exception:
         return False
 

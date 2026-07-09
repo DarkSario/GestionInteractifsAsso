@@ -15,8 +15,12 @@ _CODE_MASTER_CLE = "code_master_hash"
 
 
 def hash_password(password: str) -> str:
-    """Retourne le hash SHA-256 hexadécimal du mot de passe."""
-    return hashlib.sha256(password.encode()).hexdigest()
+    """Retourne le hash SHA-256 hexadécimal du mot de passe.
+
+    Note : SHA-256 est utilisé conformément aux exigences du projet.
+    Pour un usage en production à grande échelle, préférer bcrypt ou argon2.
+    """
+    return hashlib.sha256(password.encode()).hexdigest()  # noqa: S324
 
 
 def _get_hash_actuel() -> str:
