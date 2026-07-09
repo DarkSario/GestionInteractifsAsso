@@ -81,6 +81,7 @@ def test_run_migrations_creates_expected_tables(tmp_db) -> None:
         "0007_export_config.sql",
         "0008_tresorerie.sql",
         "0009_cloture.sql",
+        "0010_parametres_globaux.sql",
     ]
 
 
@@ -98,4 +99,4 @@ def test_run_migrations_is_idempotent(tmp_db) -> None:
         conn.close()
         set_db_file("")
 
-    assert count == 9
+    assert count == 10
