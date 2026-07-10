@@ -1,7 +1,11 @@
 """Tests du système d'initialisation et de migrations SQLite."""
 
+from pathlib import Path
+
 from db.connection import get_connection, set_db_file
 from db.migrations.runner import run_migrations
+
+MIGRATIONS_DIR = Path(__file__).resolve().parents[1] / "db" / "migrations"
 
 
 def test_run_migrations_creates_expected_tables(tmp_db) -> None:
@@ -65,6 +69,14 @@ def test_run_migrations_creates_expected_tables(tmp_db) -> None:
         "exercices_log",
         "polices_pdf",
         "sauvegardes",
+        "stock_tags",
+        "stock_article_tags",
+        "stock_lots",
+        "stock_lot_tags",
+        "stock_inventaires",
+        "stock_inventaire_lignes",
+        "buvette_couts_evenement",
+        "evenement_budget",
     }.issubset(tables)
     assert {
         "nom_asso",
@@ -73,20 +85,11 @@ def test_run_migrations_creates_expected_tables(tmp_db) -> None:
         "date_fin",
         "solde_ouverture",
     }.issubset(config_columns)
-    assert [row["nom"] for row in migration_rows] == [
-        "0001_init.sql",
-        "0002_membres_remboursements.sql",
-        "0003_stock.sql",
-        "0004_buvette.sql",
-        "0005_evenements.sql",
-        "0006_evenements_5b.sql",
-        "0007_export_config.sql",
-        "0008_tresorerie.sql",
-        "0009_cloture.sql",
-        "0010_parametres_globaux.sql",
-        "0011_exports.sql",
-        "0012_sauvegardes.sql",
-    ]
+    expected_migrations = sorted(
+        p.name
+        for p in MIGRATIONS_DIR.glob("*.sql")
+    )
+    assert [row["nom"] for row in migration_rows] == expected_migrations
 
 
 def test_run_migrations_is_idempotent(tmp_db) -> None:
@@ -103,4 +106,5 @@ def test_run_migrations_is_idempotent(tmp_db) -> None:
         conn.close()
         set_db_file("")
 
-    assert count == 12
+    expected_count = len(list(MIGRATIONS_DIR.glob("*.sql")))
+    assert count == expected_count

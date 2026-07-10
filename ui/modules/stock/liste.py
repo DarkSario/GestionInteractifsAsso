@@ -9,6 +9,7 @@ from typing import Any
 import customtkinter as ctk
 
 from db.models.categories import get_all_categories
+from core.stock_v2 import get_article_tags
 from db.models.stock import archiver_article, get_all_articles
 from ui import theme as app_theme
 from ui.components.dialogs import demander_confirmation
@@ -74,6 +75,16 @@ class ListeStock(ctk.CTkToplevel):
             command=self._ouvrir_formulaire_ajout,
         ).pack(side="right", padx=5)
 
+        ctk.CTkButton(
+            frame_header,
+            text="📦 Entrée",
+            width=110,
+            font=fonts.get("normal"),
+            fg_color=colors.get("primary", "#1f6aa5"),
+            hover_color=colors.get("secondary", "#144870"),
+            command=self._ouvrir_formulaire_entree,
+        ).pack(side="right", padx=5)
+
         # Barre de recherche et filtres
         frame_search = ctk.CTkFrame(self, fg_color="transparent")
         frame_search.pack(fill="x", padx=15, pady=5)
@@ -125,7 +136,7 @@ class ListeStock(ctk.CTkToplevel):
         self._label_total.pack(fill="x", padx=15, pady=(0, 10))
 
     def _build_treeview(self, parent: ctk.CTkFrame) -> ttk.Treeview:
-        columns = ("id", "nom", "categorie", "quantite", "seuil", "unite", "prix")
+        columns = ("id", "nom", "categorie", "quantite", "seuil", "unite", "prix", "tags")
 
         style = ttk.Style()
         appearance = ctk.get_appearance_mode()
@@ -177,6 +188,7 @@ class ListeStock(ctk.CTkToplevel):
         tree.heading("seuil", text="Seuil")
         tree.heading("unite", text="Unité")
         tree.heading("prix", text="Prix (€)")
+        tree.heading("tags", text="Tags")
 
         tree.column("id", width=50, anchor="center", stretch=False)
         tree.column("nom", width=230)
@@ -185,6 +197,7 @@ class ListeStock(ctk.CTkToplevel):
         tree.column("seuil", width=70, anchor="center")
         tree.column("unite", width=120)
         tree.column("prix", width=90, anchor="e")
+        tree.column("tags", width=220)
 
         scrollbar = ttk.Scrollbar(frame_tree, orient="vertical", command=tree.yview)
         tree.configure(yscrollcommand=scrollbar.set)
@@ -218,6 +231,16 @@ class ListeStock(ctk.CTkToplevel):
             fg_color=colors.get("primary", "#1f6aa5"),
             hover_color=colors.get("secondary", "#144870"),
             command=self._ouvrir_mouvements,
+        ).pack(side="left", padx=5)
+
+        ctk.CTkButton(
+            frame_actions,
+            text="📦 Lots",
+            width=100,
+            font=fonts.get("normal"),
+            fg_color=colors.get("primary", "#1f6aa5"),
+            hover_color=colors.get("secondary", "#144870"),
+            command=self._ouvrir_lots,
         ).pack(side="left", padx=5)
 
         ctk.CTkButton(
@@ -329,6 +352,7 @@ class ListeStock(ctk.CTkToplevel):
                     seuil,
                     a.get("unite_nom", "") or "",
                     prix_str,
+                    ", ".join(t.get("nom", "") for t in get_article_tags(a["id"])) or "—",
                 ),
                 tags=(tag,),
             )
@@ -369,6 +393,15 @@ class ListeStock(ctk.CTkToplevel):
         self._charger_categories()
         self._charger_articles()
 
+    def _ouvrir_formulaire_entree(self) -> None:
+        from ui.modules.stock.formulaire_entree import FormulaireEntreeMarchandise
+
+        form = FormulaireEntreeMarchandise(self)
+        form.grab_set()
+        self.wait_window(form)
+        self._charger_categories()
+        self._charger_articles()
+
     def _modifier_selection(self) -> None:
         article = self._get_article_selectionne()
         if not article:
@@ -388,6 +421,17 @@ class ListeStock(ctk.CTkToplevel):
         from ui.modules.stock.mouvements import MouvementsStock
 
         fenetre = MouvementsStock(self, article=article)
+        fenetre.grab_set()
+        self.wait_window(fenetre)
+        self._charger_articles()
+
+    def _ouvrir_lots(self) -> None:
+        article = self._get_article_selectionne()
+        if not article:
+            return
+        from ui.modules.stock.liste_lots import ListeLotsArticle
+
+        fenetre = ListeLotsArticle(self, article=article)
         fenetre.grab_set()
         self.wait_window(fenetre)
         self._charger_articles()
