@@ -2,13 +2,21 @@
 
 from __future__ import annotations
 
+from datetime import datetime
+from tkinter import simpledialog
 from tkinter import ttk
 from typing import Any
 
 import customtkinter as ctk
 
 from core.tresorerie import formater_montant
-from db.models.tresorerie import get_operations, get_stats_tresorerie
+from db.models.tresorerie import (
+    add_operation,
+    get_all_categories,
+    get_all_comptes,
+    get_operations,
+    get_stats_tresorerie,
+)
 from ui import theme as app_theme
 
 
@@ -51,14 +59,14 @@ def build_tab_operations(parent: ctk.CTkFrame, _root: Any) -> None:
         width=110,
         fg_color=colors.get("primary", "#1f6aa5"),
         hover_color=colors.get("secondary", "#144870"),
-        command=lambda: None,
+        command=lambda: _ajouter_operation(parent, _root, "recette"),
     ).pack(side="right")
 
     ctk.CTkButton(
         frame_header,
         text="+ Dépense",
         width=110,
-        command=lambda: None,
+        command=lambda: _ajouter_operation(parent, _root, "depense"),
     ).pack(side="right", padx=(0, 8))
 
     # Bandeau "Période clôturée" si applicable
@@ -135,3 +143,45 @@ def build_tab_operations(parent: ctk.CTkFrame, _root: Any) -> None:
         ),
         font=fonts.get("bold"),
     ).pack(anchor="w", padx=12, pady=(0, 10))
+
+
+def _ajouter_operation(parent: ctk.CTkFrame, root: Any, operation_type: str) -> None:
+    comptes = get_all_comptes(actif_only=True)
+    if not comptes:
+        return
+    compte_id = int(comptes[0]["id"])
+    libelle = simpledialog.askstring(
+        "Nouvelle opération",
+        "Libellé :",
+        parent=root,
+        initialvalue="Recette" if operation_type == "recette" else "Dépense",
+    )
+    if not libelle:
+        return
+    montant_str = simpledialog.askstring("Nouvelle opération", "Montant (€) :", parent=root, initialvalue="0")
+    try:
+        montant = float((montant_str or "0").replace(",", "."))
+    except ValueError:
+        return
+    categories = get_all_categories(operation_type)
+    categorie_id = int(categories[0]["id"]) if categories else None
+    add_operation(
+        compte_id=compte_id,
+        type_operation=operation_type,
+        libelle=libelle.strip(),
+        montant=montant,
+        date_operation=datetime.now().strftime("%Y-%m-%d"),
+        categorie_id=categorie_id,
+        mode_paiement="autre",
+        numero_facture=None,
+        evenement_id=None,
+        fournisseur_id=None,
+        statut="valide",
+        est_automatique=0,
+        source_module="manuel",
+        source_id=None,
+        commentaire=None,
+    )
+    for widget in parent.winfo_children():
+        widget.destroy()
+    build_tab_operations(parent, root)

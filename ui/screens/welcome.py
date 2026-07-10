@@ -23,7 +23,7 @@ class WelcomeScreen(ctk.CTk):
         self.protocol("WM_DELETE_WINDOW", self._quit_application)
 
         self._build()
-        self.after(10, self._center_window)
+        self._after_center_id = self.after(10, self._center_window)
 
     def _build(self) -> None:
         fonts = app_theme.FONTS     # ← FONTS est maintenant rempli
@@ -76,6 +76,15 @@ class WelcomeScreen(ctk.CTk):
     def _quit_application(self) -> None:
         self.result_path = None
         self.destroy()
+
+    def destroy(self) -> None:
+        if getattr(self, "_after_center_id", None):
+            try:
+                self.after_cancel(self._after_center_id)
+            except Exception:  # noqa: BLE001
+                pass
+            self._after_center_id = None
+        super().destroy()
 
     def run(self) -> str | None:
         self.mainloop()

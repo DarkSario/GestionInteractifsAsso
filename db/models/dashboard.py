@@ -53,6 +53,30 @@ def _fetch_scalar(query: str, params: tuple = (), default: Any = 0) -> Any:
         conn.close()
 
 
+def _sum_evenement_ventes_net(
+    *,
+    evenement_id: int | None = None,
+    debut: str | None = None,
+    fin: str | None = None,
+) -> float:
+    query = """
+        SELECT COALESCE(SUM(montant_net), 0)
+        FROM evenement_ventes
+        WHERE statut = 'valide'
+    """
+    params: list[Any] = []
+    if evenement_id is not None:
+        query += " AND evenement_id = ?"
+        params.append(evenement_id)
+    if debut is not None:
+        query += " AND date >= ?"
+        params.append(debut)
+    if fin is not None:
+        query += " AND date < ?"
+        params.append(fin)
+    return float(_fetch_scalar(query, tuple(params), 0))
+
+
 # ── Trésorerie ────────────────────────────────────────────────────────────────
 
 
@@ -139,7 +163,7 @@ def get_recettes_depenses_mois(annee: int, mois: int) -> dict:
     else:
         fin = f"{annee}-{mois + 1:02d}-01"
 
-    total_recettes = float(
+    total_recettes_treso = float(
         _fetch_scalar(
             """
             SELECT COALESCE(SUM(montant), 0)
@@ -153,7 +177,7 @@ def get_recettes_depenses_mois(annee: int, mois: int) -> dict:
             0,
         )
     )
-    total_depenses = float(
+    total_depenses_treso = float(
         _fetch_scalar(
             """
             SELECT COALESCE(SUM(montant), 0)
@@ -167,6 +191,21 @@ def get_recettes_depenses_mois(annee: int, mois: int) -> dict:
             0,
         )
     )
+    total_recettes_billetterie = _sum_evenement_ventes_net(debut=debut, fin=fin)
+    total_depenses_evenement = float(
+        _fetch_scalar(
+            """
+            SELECT COALESCE(SUM(montant), 0)
+            FROM evenement_depenses
+            WHERE date >= ?
+              AND date < ?
+            """,
+            (debut, fin),
+            0,
+        )
+    )
+    total_recettes = total_recettes_treso + total_recettes_billetterie
+    total_depenses = total_depenses_treso + total_depenses_evenement
     return {
         "total_recettes": round(total_recettes, 2),
         "total_depenses": round(total_depenses, 2),
@@ -438,12 +477,16 @@ def get_bilan_dernier_evenement() -> dict | None:
         return None
 
     ev_id = ev["id"]
-    recettes = float(
+    recettes = _sum_evenement_ventes_net(evenement_id=ev_id)
+    recettes_stands = float(
         _fetch_scalar(
             """
-            SELECT COALESCE(SUM(montant), 0)
-            FROM evenement_ventes
+            SELECT COALESCE(SUM(montant_location), 0)
+            FROM evenement_stands
             WHERE evenement_id = ?
+              AND type_stand = 'location'
+              AND COALESCE(type_location, 'recette') = 'recette'
+              AND statut != 'annule'
             """,
             (ev_id,),
             0,
@@ -460,6 +503,22 @@ def get_bilan_dernier_evenement() -> dict | None:
             0,
         )
     )
+    depenses_stands = float(
+        _fetch_scalar(
+            """
+            SELECT COALESCE(SUM(montant_location), 0)
+            FROM evenement_stands
+            WHERE evenement_id = ?
+              AND type_stand = 'location'
+              AND COALESCE(type_location, 'recette') = 'depense'
+              AND statut != 'annule'
+            """,
+            (ev_id,),
+            0,
+        )
+    )
+    recettes += recettes_stands
+    depenses += depenses_stands
     return {
         "nom": ev["nom"],
         "date": ev.get("date", ""),

@@ -649,7 +649,7 @@ class FicheEvenement(ctk.CTkToplevel):
         )
         frais = (
             calculer_frais_sumup(montant_total, taux)
-            if data["mode_paiement"] == "sumup"
+            if data["mode_paiement"] in {"sumup", "carte"}
             else 0.0
         )
         montant_net = montant_total - frais
@@ -1266,13 +1266,13 @@ class _DialogVente(ctk.CTkToplevel):
         taux_str = get_parametre("taux_sumup") or "1.75"
         taux = float(taux_str)
         mode = MODES_INV.get(self._var_mode.get(), "especes")
-        frais = calculer_frais_sumup(total, taux) if mode == "sumup" else 0.0
+        frais = calculer_frais_sumup(total, taux) if mode in {"sumup", "carte"} else 0.0
         net = total - frais
 
         self._lbl_total.configure(
             text=f"Montant total : {total:,.2f} €".replace(",", " ").replace(".", ",")
         )
-        if mode == "sumup":
+        if mode in {"sumup", "carte"}:
             self._lbl_frais.configure(
                 text=f"Frais SumUp ({taux}%) : {frais:,.2f} €".replace(
                     ",", " "

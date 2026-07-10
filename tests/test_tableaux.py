@@ -119,7 +119,7 @@ def test_get_valeurs_liste():
     set_parametre("classes_scolaires", '["CP","CE1"]')
     set_parametre("statuts_perso", '["En attente","Payé"]')
 
-    assert get_valeurs_liste("liste_paiement", "") == ["Espèces", "Chèque", "Carte", "SumUp"]
+    assert get_valeurs_liste("liste_paiement", "") == ["Espèces", "Carte", "Chèque", "SumUp", "Virement"]
     assert get_valeurs_liste("liste_classes", "") == ["CP", "CE1"]
     assert get_valeurs_liste("liste_statut", "") == ["En attente", "Payé"]
     assert get_valeurs_liste("liste_perso", "A;B; C") == ["A", "B", "C"]

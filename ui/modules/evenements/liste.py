@@ -98,7 +98,7 @@ class ListeEvenements(ctk.CTkToplevel):
 
         self._tree = ttk.Treeview(
             frame_table,
-            columns=("id", "nom", "type", "date", "statut"),
+            columns=("id", "nom", "type", "date", "recettes", "depenses", "statut"),
             show="headings",
             height=18,
         )
@@ -106,12 +106,16 @@ class ListeEvenements(ctk.CTkToplevel):
         self._tree.heading("nom", text="Nom")
         self._tree.heading("type", text="Type")
         self._tree.heading("date", text="Date début")
+        self._tree.heading("recettes", text="Recettes")
+        self._tree.heading("depenses", text="Dépenses")
         self._tree.heading("statut", text="Statut")
 
         self._tree.column("id", width=55, anchor="center", stretch=False)
         self._tree.column("nom", width=330)
         self._tree.column("type", width=160)
         self._tree.column("date", width=110, anchor="center")
+        self._tree.column("recettes", width=120, anchor="e")
+        self._tree.column("depenses", width=120, anchor="e")
         self._tree.column("statut", width=110, anchor="center")
 
         for code, couleur in COULEURS_STATUT.items():
@@ -183,6 +187,8 @@ class ListeEvenements(ctk.CTkToplevel):
                     evt["nom"] or "",
                     evt["type"] or "",
                     date_affich,
+                    self._format_montant(evt.get("total_recettes", 0)),
+                    self._format_montant(evt.get("total_depenses", 0)),
                     statut_label_evt,
                 ),
                 tags=(tag,),
@@ -231,3 +237,11 @@ class ListeEvenements(ctk.CTkToplevel):
             return datetime.strptime(value, "%Y-%m-%d").strftime("%d/%m/%Y")
         except (ValueError, TypeError):
             return value or ""
+
+    @staticmethod
+    def _format_montant(value: float | int | str) -> str:
+        try:
+            montant = float(value or 0)
+        except (TypeError, ValueError):
+            montant = 0.0
+        return f"{montant:,.2f} €".replace(",", " ").replace(".", ",")

@@ -26,6 +26,7 @@ class MainApp(ctk.CTk):
 
         self._config = self._load_config()
         self._dashboard_frame = None
+        self._after_sauvegarde_id: str | None = None
 
         self.title(f"{APP_NAME} v{APP_VERSION}")
         self.geometry("1200x800")
@@ -34,7 +35,7 @@ class MainApp(ctk.CTk):
         self._build_menu()
         self._build_dashboard()
         self._build_status_bar()
-        self.after(250, self._demarrer_verification_sauvegarde_auto)
+        self._after_sauvegarde_id = self.after(250, self._demarrer_verification_sauvegarde_auto)
 
         self.bind("<Control-comma>", lambda e: self._ouvrir_parametres())
 
@@ -182,6 +183,7 @@ class MainApp(ctk.CTk):
 
     def _demarrer_verification_sauvegarde_auto(self) -> None:
         """Démarre le thread de vérification après initialisation de l'UI."""
+        self._after_sauvegarde_id = None
         threading.Thread(target=self._verifier_sauvegarde_auto_async, daemon=True).start()
 
     # ── Actions ──────────────────────────────────────────────────────────────
@@ -369,3 +371,18 @@ class MainApp(ctk.CTk):
         except (TypeError, ValueError):
             amount = 0.0
         return f"{amount:,.2f} €".replace(",", " ").replace(".", ",")
+
+    def destroy(self) -> None:
+        """Annule les callbacks planifiés avant destruction de la fenêtre."""
+        if self._after_sauvegarde_id:
+            try:
+                self.after_cancel(self._after_sauvegarde_id)
+            except Exception:  # noqa: BLE001
+                pass
+            self._after_sauvegarde_id = None
+        if self._dashboard_frame is not None:
+            try:
+                self._dashboard_frame.annuler_actualisation()
+            except Exception:  # noqa: BLE001
+                pass
+        super().destroy()

@@ -32,7 +32,7 @@ def _event_id() -> int:
 
 def test_stands_crud():
     evt_id = _event_id()
-    stand_id = add_stand(evt_id, "A1", "Stand gâteaux", "benevole", None, "Marie", 0, 0, None)
+    stand_id = add_stand(evt_id, "A1", "Stand gâteaux", "benevole", None, "Marie", 0, "recette", 0, None)
     assert stand_id > 0
 
     stands = get_stands_evenement(evt_id)
@@ -61,7 +61,7 @@ def test_liste_attente():
 
 def test_finaliser_location_stand():
     evt_id = _event_id()
-    stand_id = add_stand(evt_id, "B3", "Emplacement VG", "location", None, "M. Durand", 15.0, 1, None)
+    stand_id = add_stand(evt_id, "B3", "Emplacement VG", "location", None, "M. Durand", 15.0, "recette", 1, None)
 
     assert finaliser_location_stand(stand_id)
 
@@ -70,9 +70,11 @@ def test_finaliser_location_stand():
 
     conn = get_connection()
     try:
-        rows = conn.execute("SELECT source, montant, type FROM dons_subventions").fetchall()
+        rows = conn.execute(
+            "SELECT type_operation, montant, source_module FROM tresorerie_operations WHERE source_module = 'stands'"
+        ).fetchall()
     finally:
         conn.close()
     assert len(rows) == 1
-    assert rows[0]["source"] == "Stand"
+    assert rows[0]["type_operation"] == "recette"
     assert rows[0]["montant"] == 15.0

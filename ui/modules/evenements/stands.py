@@ -57,9 +57,11 @@ class StandsView(ctk.CTkFrame):
             self._tree.column(col, width=width, anchor="center")
         self._tree.pack(fill="both", expand=True, padx=8, pady=4)
 
-        ctk.CTkButton(self, text="💸 Finaliser location sélectionnée", command=self._finaliser_location).pack(
+        self._btn_finaliser = ctk.CTkButton(self, text="💸 Finaliser location sélectionnée", command=self._finaliser_location)
+        self._btn_finaliser.pack(
             anchor="w", padx=8, pady=(4, 0)
         )
+        self._tree.bind("<<TreeviewSelect>>", self._on_select_stand)
 
         self._lbl_stats = ctk.CTkLabel(self, text="Stats : —")
         self._lbl_stats.pack(anchor="w", padx=8, pady=(4, 8))
@@ -93,7 +95,7 @@ class StandsView(ctk.CTkFrame):
                     s.get("numero_emplacement") or "—",
                     s.get("nom_stand"),
                     responsable or "—",
-                    "Bénévole" if s.get("type_stand") == "benevole" else "Location",
+                    self._format_type_stand(s),
                     self._fmt(float(s.get("montant_location") or 0)) if s.get("type_stand") == "location" else "—",
                 ),
             )
@@ -106,9 +108,12 @@ class StandsView(ctk.CTkFrame):
             text=(
                 "Stats : "
                 f"{stats['total']} stands | {stats['benevoles']} bénévoles | "
-                f"{stats['locations']} locations | {self._fmt(stats['montant_locations'])} recette location"
+                f"{stats['locations']} locations | "
+                f"{self._fmt(stats['montant_locations'])} recettes | "
+                f"{self._fmt(stats['montant_locations_depenses'])} dépenses"
             )
         )
+        self._on_select_stand()
 
     def _ajouter_stand(self) -> None:
         if not self._check_evenement():
@@ -127,7 +132,17 @@ class StandsView(ctk.CTkFrame):
         if type_stand not in {"benevole", "location"}:
             type_stand = "benevole"
         montant = 0.0
+        type_location = "recette"
         if type_stand == "location":
+            type_location_txt = simpledialog.askstring(
+                "Type location",
+                "Type (recette/depense) :",
+                parent=self,
+                initialvalue="recette",
+            )
+            type_location = (type_location_txt or "recette").strip().lower()
+            if type_location not in {"recette", "depense"}:
+                type_location = "recette"
             valeur = simpledialog.askstring("Location", "Montant de location :", parent=self, initialvalue="0")
             try:
                 montant = float((valeur or "0").replace(",", "."))
@@ -142,6 +157,7 @@ class StandsView(ctk.CTkFrame):
             None,
             None,
             montant,
+            type_location,
             0,
             None,
         )
@@ -161,10 +177,28 @@ class StandsView(ctk.CTkFrame):
             return
         ok = finaliser_location_stand(stand_id)
         if ok:
-            afficher_info(self, "Location", "Recette de location enregistrée.")
+            afficher_info(self, "Location", "Location comptabilisée.")
         else:
             afficher_info(self, "Location", "Impossible de finaliser cette location.")
         self.refresh()
+
+    def _on_select_stand(self, _event: Any | None = None) -> None:
+        selected = self._tree.selection()
+        if not selected:
+            self._btn_finaliser.configure(text="💸 Finaliser location sélectionnée")
+            return
+        valeurs = self._tree.item(selected[0], "values")
+        type_txt = str(valeurs[3]) if valeurs else ""
+        if "🔴" in type_txt:
+            self._btn_finaliser.configure(text="💸 Finaliser la dépense sélectionnée")
+        else:
+            self._btn_finaliser.configure(text="💸 Finaliser la recette sélectionnée")
+
+    @staticmethod
+    def _format_type_stand(stand: dict) -> str:
+        if stand.get("type_stand") == "benevole":
+            return "Bénévole"
+        return "🔴 Dépense" if (stand.get("type_location") or "recette") == "depense" else "🟢 Recette"
 
     def _ouvrir_attente(self) -> None:
         if not self._check_evenement():
