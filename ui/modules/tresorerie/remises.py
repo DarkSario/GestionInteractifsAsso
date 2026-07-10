@@ -2,17 +2,18 @@
 
 from __future__ import annotations
 
-from tkinter import ttk
+from datetime import datetime
+from tkinter import simpledialog, ttk
 from typing import Any
 
 import customtkinter as ctk
 
 from core.tresorerie import formater_montant
-from db.models.tresorerie import get_remises
+from db.models.tresorerie import add_remise_cheque, get_all_comptes, get_remises
 from ui import theme as app_theme
 
 
-def build_tab_remises(parent: ctk.CTkFrame, _root: Any) -> None:
+def build_tab_remises(parent: ctk.CTkFrame, root: Any) -> None:
     fonts = app_theme.FONTS
     colors = app_theme.COLORS
 
@@ -31,7 +32,7 @@ def build_tab_remises(parent: ctk.CTkFrame, _root: Any) -> None:
         width=160,
         fg_color=colors.get("primary", "#1f6aa5"),
         hover_color=colors.get("secondary", "#144870"),
-        command=lambda: None,
+        command=lambda: _ajouter_remise(parent, root),
     ).pack(side="right")
 
     table_frame = ctk.CTkFrame(parent)
@@ -43,7 +44,6 @@ def build_tab_remises(parent: ctk.CTkFrame, _root: Any) -> None:
         show="headings",
         height=14,
     )
-
     tree.heading("date", text="Date")
     tree.heading("reference", text="Référence")
     tree.heading("compte", text="Compte")
@@ -76,3 +76,20 @@ def build_tab_remises(parent: ctk.CTkFrame, _root: Any) -> None:
                 remise.get("statut") or "",
             ),
         )
+
+
+def _ajouter_remise(parent: ctk.CTkFrame, root: Any) -> None:
+    comptes = get_all_comptes(actif_only=True)
+    if not comptes:
+        return
+    compte_id = int(comptes[0]["id"])
+    reference = simpledialog.askstring("Nouvelle remise", "Référence :", parent=root, initialvalue="")
+    add_remise_cheque(
+        compte_id=compte_id,
+        date_remise=datetime.now().strftime("%Y-%m-%d"),
+        reference=reference or "",
+        commentaire=None,
+    )
+    for widget in parent.winfo_children():
+        widget.destroy()
+    build_tab_remises(parent, root)

@@ -143,8 +143,8 @@ def test_export_pdf_evenement_introuvable(tmp_path: Path):
 def test_export_pv_tirage(tmp_path: Path):
     """PV avec lots → PDF généré."""
     evt_id = _creer_evenement()
-    add_lot(evt_id, 1, "Panier garni", 30.0, "achete", None, None, None)
-    add_lot(evt_id, 2, "Bon cadeau", 50.0, "sponsorise", None, "MagasinX", None)
+    add_lot(evt_id, 1, "Panier garni", 30.0, 30.0, "achete", None, None, None)
+    add_lot(evt_id, 2, "Bon cadeau", 50.0, 50.0, "sponsorise", None, "MagasinX", None)
 
     chemin = str(tmp_path / "pv_tirage.pdf")
     from core.exports import export_pv_tirage_pdf
@@ -224,7 +224,7 @@ def test_export_excel_avec_tombola(tmp_path: Path):
     from openpyxl import load_workbook
 
     evt_id = _creer_evenement()
-    add_lot(evt_id, 1, "Lot 1", 20.0, "achete", None, None, None)
+    add_lot(evt_id, 1, "Lot 1", 20.0, 20.0, "achete", None, None, None)
 
     chemin = str(tmp_path / "bilan_tombola.xlsx")
     from core.exports import export_bilan_evenement_excel

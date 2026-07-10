@@ -16,7 +16,7 @@ from utils.logger import get_logger
 logger = get_logger(__name__)
 
 _NOM_MAX_LEN = 100
-_NOM_RE = re.compile(r"^[a-zA-ZÀ-ÿ0-9 '\-.()]+$")
+_NOM_RE = re.compile(r"^[a-zA-ZÀ-ÿ0-9 '/\-.()]+$")
 
 
 # ── Validation ────────────────────────────────────────────────────────────────
@@ -36,7 +36,7 @@ def valider_nom_liste(nom: str) -> list[str]:
     elif not _NOM_RE.match(nom):
         erreurs.append(
             "Le nom contient des caractères non autorisés "
-            "(lettres, chiffres, espaces, tirets, apostrophes, points et parenthèses uniquement)."
+            "(lettres, chiffres, espaces, slash, tirets, apostrophes, points et parenthèses uniquement)."
         )
     return erreurs
 

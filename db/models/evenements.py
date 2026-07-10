@@ -17,26 +17,36 @@ def get_all_evenements(statut: str | None = None) -> list[dict]:
     """Retourne tous les événements, optionnellement filtrés par statut."""
     conn = get_connection()
     try:
-        if statut:
-            rows = conn.execute(
-                """
-                SELECT id, nom, type, description, date_debut, date_fin,
-                       statut, budget_previsionnel, bilan_fin, created_at
-                FROM evenements
-                WHERE statut = ?
-                ORDER BY date_debut DESC
-                """,
-                (statut,),
-            ).fetchall()
-        else:
-            rows = conn.execute(
-                """
-                SELECT id, nom, type, description, date_debut, date_fin,
-                       statut, budget_previsionnel, bilan_fin, created_at
-                FROM evenements
-                ORDER BY date_debut DESC
-                """
-            ).fetchall()
+        where = "WHERE e.statut = ?" if statut else ""
+        params = (statut,) if statut else ()
+        rows = conn.execute(
+            f"""
+            SELECT e.id, e.nom, e.type, e.description, e.date_debut, e.date_fin,
+                   e.statut, e.budget_previsionnel, e.bilan_fin, e.created_at,
+                   (
+                       COALESCE((SELECT SUM(v.montant_net) FROM evenement_ventes v
+                                 WHERE v.evenement_id = e.id AND v.statut = 'valide'), 0)
+                     + COALESCE((SELECT SUM(s.montant_location) FROM evenement_stands s
+                                 WHERE s.evenement_id = e.id
+                                   AND s.type_stand = 'location'
+                                   AND COALESCE(s.type_location, 'recette') = 'recette'
+                                   AND s.statut != 'annule'), 0)
+                   ) AS total_recettes,
+                   (
+                       COALESCE((SELECT SUM(d.montant) FROM evenement_depenses d
+                                 WHERE d.evenement_id = e.id), 0)
+                     + COALESCE((SELECT SUM(s.montant_location) FROM evenement_stands s
+                                 WHERE s.evenement_id = e.id
+                                   AND s.type_stand = 'location'
+                                   AND COALESCE(s.type_location, 'recette') = 'depense'
+                                   AND s.statut != 'annule'), 0)
+                   ) AS total_depenses
+            FROM evenements e
+            {where}
+            ORDER BY e.date_debut DESC
+            """,
+            params,
+        ).fetchall()
         return [dict(r) for r in rows]
     finally:
         conn.close()

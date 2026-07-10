@@ -32,7 +32,7 @@ class CreateDatabaseDialog(ctk.CTkToplevel):
         self.protocol("WM_DELETE_WINDOW", self._on_cancel)
 
         self._build()
-        self.after(10, self._center_window)
+        self._after_center_id = self.after(10, self._center_window)
 
     def _build(self) -> None:
         fonts = app_theme.FONTS
@@ -195,6 +195,15 @@ class CreateDatabaseDialog(ctk.CTkToplevel):
     def _on_cancel(self) -> None:
         self.result_path = None
         self.destroy()
+
+    def destroy(self) -> None:
+        if getattr(self, "_after_center_id", None):
+            try:
+                self.after_cancel(self._after_center_id)
+            except Exception:  # noqa: BLE001
+                pass
+            self._after_center_id = None
+        super().destroy()
 
     def _center_window(self) -> None:
         self.update_idletasks()

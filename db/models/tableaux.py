@@ -12,6 +12,25 @@ from utils.logger import get_logger
 
 logger = get_logger(__name__)
 
+_TYPES_COLONNES_VALIDES = {
+    "texte",
+    "nombre",
+    "montant",
+    "date",
+    "checkbox",
+    "liste_paiement",
+    "liste_classes",
+    "liste_membres",
+    "liste_fournisseurs",
+    "liste_statut",
+    "liste_perso",
+}
+
+
+def _normaliser_type_colonne(type_colonne: str | None) -> str:
+    brut = str(type_colonne or "texte").strip().lower()
+    return brut if brut in _TYPES_COLONNES_VALIDES else "texte"
+
 
 # ── Tableaux ─────────────────────────────────────────────────────────────────
 
@@ -198,7 +217,7 @@ def add_colonne(
             (
                 tableau_id,
                 nom,
-                type_colonne,
+                _normaliser_type_colonne(type_colonne),
                 liste_perso_valeurs,
                 1 if afficher_total else 0,
                 ordre or 0,
@@ -239,6 +258,8 @@ def update_colonne(colonne_id, **kwargs) -> bool:
     try:
         total_changes = 0
         for key, value in kwargs.items():
+            if key == "type_colonne":
+                value = _normaliser_type_colonne(str(value))
             cur = conn.execute(_UPDATE_COLONNE_SQL[key], (value, colonne_id))
             total_changes += cur.rowcount
         conn.commit()
@@ -567,7 +588,7 @@ def get_liste_statuts_perso() -> list[str]:
 
 def get_liste_paiements() -> list[str]:
     """Retourne les modes de paiement disponibles pour les listes."""
-    return ["Espèces", "Chèque", "Carte", "SumUp"]
+    return ["Espèces", "Carte", "Chèque", "SumUp", "Virement"]
 
 
 def get_liste_membres() -> list[str]:

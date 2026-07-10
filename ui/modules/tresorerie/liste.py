@@ -8,6 +8,7 @@ import customtkinter as ctk
 
 from ui import theme as app_theme
 from ui.modules.tresorerie.comptes import build_tab_comptes
+from ui.modules.tresorerie.depot_especes import build_tab_depot_especes
 from ui.modules.tresorerie.operations import build_tab_operations
 from ui.modules.tresorerie.remises import build_tab_remises
 from ui.modules.tresorerie.subventions import build_tab_subventions
@@ -41,8 +42,10 @@ class ListeTresorerie(ctk.CTkToplevel):
         tab_operations = tabs.add("📋 Opérations")
         tab_remises = tabs.add("🏦 Remises chèques")
         tab_subventions = tabs.add("🎁 Subventions")
+        tab_depot = tabs.add("💵 Dépôt Espèces")
 
         build_tab_comptes(tab_comptes, self)
         build_tab_operations(tab_operations, self)
         build_tab_remises(tab_remises, self)
         build_tab_subventions(tab_subventions, self)
+        build_tab_depot_especes(tab_depot, self)

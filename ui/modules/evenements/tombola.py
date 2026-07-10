@@ -12,9 +12,12 @@ from db.models.tombola import (
     add_lot,
     enregistrer_gagnant,
     generer_pv_tirage,
+    get_config_tombola_evenement,
     get_carnets_evenement,
     get_lots_evenement,
     get_stats_tombola,
+    update_config_tombola_evenement,
+    update_lot,
 )
 from ui.components.dialogs import afficher_erreur, afficher_info
 
@@ -45,9 +48,19 @@ class TombolaView(ctk.CTkFrame):
         self._build_tab_tirage(self._tabs.tab("🎲 Tirage"))
 
     def _build_tab_carnets(self, parent: Any) -> None:
+        cfg = ctk.CTkFrame(parent, fg_color="transparent")
+        cfg.pack(fill="x", padx=8, pady=(8, 4))
+        ctk.CTkLabel(cfg, text="Prix ticket (€)").pack(side="left")
+        self._var_prix_ticket = ctk.StringVar(value="0")
+        ctk.CTkEntry(cfg, textvariable=self._var_prix_ticket, width=90).pack(side="left", padx=(6, 14))
+        ctk.CTkLabel(cfg, text="Prix carnet (€)").pack(side="left")
+        self._var_prix_carnet = ctk.StringVar(value="0")
+        ctk.CTkEntry(cfg, textvariable=self._var_prix_carnet, width=90).pack(side="left", padx=6)
+        ctk.CTkButton(cfg, text="💾 Enregistrer", width=120, command=self._sauver_config).pack(side="left", padx=(8, 0))
+
         ctk.CTkButton(
             parent, text="+ Ajouter un carnet", command=self._ajouter_carnet
-        ).pack(anchor="w", padx=8, pady=(8, 6))
+        ).pack(anchor="w", padx=8, pady=(4, 6))
         self._tree_carnets = ttk.Treeview(
             parent,
             columns=("numeros", "prix", "vendeur", "statut", "encaisse"),
@@ -69,8 +82,16 @@ class TombolaView(ctk.CTkFrame):
         self._lbl_stats.pack(anchor="w", padx=8, pady=(2, 8))
 
     def _build_tab_lots(self, parent: Any) -> None:
-        ctk.CTkButton(parent, text="+ Ajouter un lot", command=self._ajouter_lot).pack(
-            anchor="w", padx=8, pady=(8, 6)
+        actions = ctk.CTkFrame(parent, fg_color="transparent")
+        actions.pack(fill="x", padx=8, pady=(8, 6))
+        ctk.CTkButton(actions, text="+ Ajouter un lot", command=self._ajouter_lot).pack(
+            side="left"
+        )
+        ctk.CTkButton(actions, text="🔁 Modifier statut", command=self._modifier_statut_lot).pack(
+            side="left", padx=8
+        )
+        ctk.CTkButton(actions, text="✏️ Modifier valeur", command=self._modifier_valeur_lot).pack(
+            side="left"
         )
         self._tree_lots = ttk.Treeview(
             parent,
@@ -117,6 +138,9 @@ class TombolaView(ctk.CTkFrame):
         if not self._evenement_id:
             self._lbl_stats.configure(text="Stats : sauvegardez d'abord l'événement")
             return
+        config = get_config_tombola_evenement(self._evenement_id)
+        self._var_prix_ticket.set(str(config["prix_ticket"]).replace(".", ","))
+        self._var_prix_carnet.set(str(config["prix_carnet"]).replace(".", ","))
 
         carnets = get_carnets_evenement(self._evenement_id)
         for c in carnets:
@@ -164,15 +188,16 @@ class TombolaView(ctk.CTkFrame):
             self._tree_lots.insert(
                 "",
                 "end",
+                iid=str(lot["id"]),
                 values=(
                     lot.get("numero"),
                     lot.get("description"),
-                    self._fmt(float(lot.get("valeur_estimee") or 0)),
+                    self._fmt(float(lot.get("valeur_lot") or lot.get("valeur_estimee") or 0)),
                     "Sponsorisé" if lot.get("type_lot") == "sponsorise" else "Acheté",
                     str(lot.get("statut") or "").replace("_", " ").title(),
                 ),
             )
-        non_attribues = [lot for lot in lots if lot.get("statut") == "en_attente"]
+        non_attribues = [lot for lot in lots if lot.get("statut") in {"en_attente", "disponible"}]
         for lot in non_attribues:
             self._txt_tirage.insert(
                 "end", f"Lot {lot['numero']} — {lot['description']}\n"
@@ -189,7 +214,12 @@ class TombolaView(ctk.CTkFrame):
         )
         if not description:
             return
-        add_lot(self._evenement_id, numero, description, 0, "achete", None, None, None)
+        valeur = simpledialog.askstring("Nouveau lot", "Valeur du lot (€) :", parent=self, initialvalue="0")
+        try:
+            valeur_lot = float((valeur or "0").replace(",", "."))
+        except ValueError:
+            valeur_lot = 0.0
+        add_lot(self._evenement_id, numero, description, valeur_lot, valeur_lot, "achete", None, None, None)
         self._refresh_lots()
 
     def _ajouter_carnet(self) -> None:
@@ -208,7 +238,7 @@ class TombolaView(ctk.CTkFrame):
         lots = [
             lot
             for lot in get_lots_evenement(self._evenement_id)
-            if lot.get("statut") == "en_attente"
+            if lot.get("statut") in {"en_attente", "disponible"}
         ]
         if not lots:
             afficher_info(self, "Tirage", "Aucun lot en attente.")
@@ -250,3 +280,54 @@ class TombolaView(ctk.CTkFrame):
         afficher_info(
             self, "PV de tirage", "Le contenu du PV est affiché dans l'onglet Tirage."
         )
+
+    def _sauver_config(self) -> None:
+        if not self._check_evenement():
+            return
+        try:
+            prix_ticket = float(self._var_prix_ticket.get().replace(",", "."))
+            prix_carnet = float(self._var_prix_carnet.get().replace(",", "."))
+        except ValueError:
+            afficher_erreur(self, "Configuration tombola", "Montants invalides.")
+            return
+        update_config_tombola_evenement(self._evenement_id, prix_ticket, prix_carnet)
+        afficher_info(self, "Configuration tombola", "Tarifs tombola enregistrés.")
+
+    def _modifier_statut_lot(self) -> None:
+        if not self._check_evenement():
+            return
+        selected = self._tree_lots.selection()
+        if not selected:
+            return
+        lot_id = int(selected[0])
+        statut = simpledialog.askstring(
+            "Modifier statut lot",
+            "Nouveau statut (disponible/reserve/gagne/remis) :",
+            parent=self,
+            initialvalue="disponible",
+        )
+        statut = (statut or "").strip().lower()
+        if statut not in {"disponible", "reserve", "gagne", "remis"}:
+            return
+        update_lot(lot_id, statut=statut)
+        self._refresh_lots()
+
+    def _modifier_valeur_lot(self) -> None:
+        if not self._check_evenement():
+            return
+        selected = self._tree_lots.selection()
+        if not selected:
+            return
+        lot_id = int(selected[0])
+        valeur = simpledialog.askstring(
+            "Modifier valeur lot",
+            "Nouvelle valeur (€) :",
+            parent=self,
+            initialvalue="0",
+        )
+        try:
+            valeur_float = float((valeur or "0").replace(",", "."))
+        except ValueError:
+            return
+        update_lot(lot_id, valeur_lot=valeur_float, valeur_estimee=valeur_float)
+        self._refresh_lots()

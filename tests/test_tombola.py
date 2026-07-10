@@ -33,17 +33,17 @@ def _event_id() -> int:
 
 def test_lots_crud():
     evt_id = _event_id()
-    lot_id = add_lot(evt_id, 1, "Panier garni", 30.0, "achete", None, None, None)
+    lot_id = add_lot(evt_id, 1, "Panier garni", 30.0, 30.0, "achete", None, None, None)
     assert lot_id > 0
 
     lots = get_lots_evenement(evt_id)
     assert len(lots) == 1
     assert lots[0]["description"] == "Panier garni"
 
-    assert update_lot(lot_id, description="Panier premium", statut="attribue")
+    assert update_lot(lot_id, description="Panier premium", statut="gagne")
     lots = get_lots_evenement(evt_id)
     assert lots[0]["description"] == "Panier premium"
-    assert lots[0]["statut"] == "attribue"
+    assert lots[0]["statut"] == "gagne"
 
 
 def test_carnets_crud():
@@ -63,12 +63,12 @@ def test_carnets_crud():
 
 def test_enregistrer_gagnant():
     evt_id = _event_id()
-    lot_id = add_lot(evt_id, 7, "Coffret", 45.0, "sponsorise", None, "Sponsor X", None)
+    lot_id = add_lot(evt_id, 7, "Coffret", 45.0, 45.0, "sponsorise", None, "Sponsor X", None)
 
     assert enregistrer_gagnant(lot_id, "042")
     lot = get_lots_evenement(evt_id)[0]
     assert lot["numero_gagnant"] == "042"
-    assert lot["statut"] == "attribue"
+    assert lot["statut"] == "gagne"
 
 
 def test_stats_tombola():
@@ -78,9 +78,9 @@ def test_stats_tombola():
     update_carnet(c1, statut="vendu", montant_encaisse=100.0)
     update_carnet(c2, statut="perdu", montant_encaisse=0.0)
 
-    add_lot(evt_id, 1, "Bon d'achat", 50.0, "achete", None, None, None)
-    l2 = add_lot(evt_id, 2, "Panier", 25.0, "achete", None, None, None)
-    update_lot(l2, statut="attribue")
+    add_lot(evt_id, 1, "Bon d'achat", 50.0, 50.0, "achete", None, None, None)
+    l2 = add_lot(evt_id, 2, "Panier", 25.0, 25.0, "achete", None, None, None)
+    update_lot(l2, statut="gagne")
 
     stats = get_stats_tombola(evt_id)
     assert stats["total_carnets"] == 100

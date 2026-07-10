@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import json
 from tkinter import simpledialog, ttk
 from typing import Any
 
 import customtkinter as ctk
 
+from core.tableaux import get_valeurs_liste
 from db.models.tableaux import (
     add_colonne,
     add_ligne,
@@ -22,6 +24,20 @@ from db.models.tableaux import (
     set_cellule,
 )
 from ui.components.dialogs import afficher_info
+
+_OPTIONS_TYPES_COLONNE = [
+    ("Texte libre", "texte"),
+    ("Nombre", "nombre"),
+    ("Montant (€)", "montant"),
+    ("Date", "date"),
+    ("Case à cocher", "checkbox"),
+    ("Liste — Mode de paiement", "liste_paiement"),
+    ("Liste — Classes scolaires", "liste_classes"),
+    ("Liste — Membres", "liste_membres"),
+    ("Liste — Fournisseurs", "liste_fournisseurs"),
+    ("Liste — Statut personnalisé", "liste_statut"),
+    ("Liste personnalisée (valeurs libres)", "liste_perso"),
+]
 
 
 class TableauxView(ctk.CTkFrame):
@@ -190,17 +206,18 @@ class TableauxView(ctk.CTkFrame):
         if not self._tableau_id:
             afficher_info(self, "Colonnes", "Sélectionnez d'abord un tableau.")
             return
-        nom = simpledialog.askstring("Nouvelle colonne", "Nom :", parent=self)
-        if not nom:
+        dialog = _DialogColonne(self)
+        self.wait_window(dialog)
+        if not dialog.result:
             return
-        type_colonne = simpledialog.askstring(
-            "Nouvelle colonne",
-            "Type de colonne (ex: texte, nombre, montant, liste_paiement) :",
-            parent=self,
-            initialvalue="texte",
-        )
         add_colonne(
-            self._tableau_id, nom, (type_colonne or "texte").strip(), None, 0, 0, 150
+            self._tableau_id,
+            dialog.result["nom"],
+            dialog.result["type_colonne"],
+            dialog.result.get("liste_perso_valeurs"),
+            0,
+            0,
+            150,
         )
         self._charger_tableau(self._tableau_id)
 
@@ -208,12 +225,14 @@ class TableauxView(ctk.CTkFrame):
         if not self._tableau_id:
             afficher_info(self, "Lignes", "Sélectionnez d'abord un tableau.")
             return
-        ligne_id = add_ligne(self._tableau_id, None, "normal", 0)
         colonnes = get_colonnes_tableau(self._tableau_id)
+        dialog = _DialogLigne(self, colonnes)
+        self.wait_window(dialog)
+        if dialog.result is None:
+            return
+        ligne_id = add_ligne(self._tableau_id, None, "normal", 0)
         for col in colonnes:
-            valeur = simpledialog.askstring(
-                "Nouvelle ligne", f"{col['nom']} :", parent=self
-            )
+            valeur = dialog.result.get(int(col["id"]), "")
             if valeur:
                 set_cellule(ligne_id, int(col["id"]), valeur)
         self._charger_tableau(self._tableau_id)
@@ -229,3 +248,91 @@ class TableauxView(ctk.CTkFrame):
             return
         save_template(nom, None, self._tableau_id)
         afficher_info(self, "Template", "Template sauvegardé.")
+
+
+class _DialogColonne(ctk.CTkToplevel):
+    def __init__(self, parent: Any) -> None:
+        super().__init__(parent)
+        self.title("Ajouter une colonne")
+        self.geometry("520x560")
+        self.transient(parent)
+        self.grab_set()
+        self.result: dict | None = None
+        self._var_nom = ctk.StringVar()
+        self._var_type = ctk.StringVar(value="texte")
+        self._var_liste = ctk.StringVar()
+        self._build_ui()
+
+    def _build_ui(self) -> None:
+        ctk.CTkLabel(self, text="Nom de la colonne :").pack(anchor="w", padx=16, pady=(16, 4))
+        ctk.CTkEntry(self, textvariable=self._var_nom).pack(fill="x", padx=16)
+        ctk.CTkLabel(self, text="Type :").pack(anchor="w", padx=16, pady=(12, 4))
+        for label, value in _OPTIONS_TYPES_COLONNE:
+            ctk.CTkRadioButton(self, text=label, variable=self._var_type, value=value).pack(
+                anchor="w", padx=18, pady=2
+            )
+        ctk.CTkLabel(
+            self,
+            text="Valeurs (liste perso, séparées par ;)",
+        ).pack(anchor="w", padx=16, pady=(12, 4))
+        ctk.CTkEntry(self, textvariable=self._var_liste).pack(fill="x", padx=16)
+        footer = ctk.CTkFrame(self, fg_color="transparent")
+        footer.pack(fill="x", padx=16, pady=16)
+        ctk.CTkButton(footer, text="Annuler", command=self.destroy).pack(side="right")
+        ctk.CTkButton(footer, text="✅ Ajouter", command=self._valider).pack(side="right", padx=(0, 8))
+
+    def _valider(self) -> None:
+        nom = self._var_nom.get().strip()
+        if not nom:
+            return
+        type_colonne = self._var_type.get().strip().lower()
+        liste_perso_valeurs = None
+        if type_colonne == "liste_perso":
+            valeurs = [v.strip() for v in self._var_liste.get().split(";") if v.strip()]
+            liste_perso_valeurs = json.dumps(valeurs, ensure_ascii=False) if valeurs else "[]"
+        self.result = {
+            "nom": nom,
+            "type_colonne": type_colonne,
+            "liste_perso_valeurs": liste_perso_valeurs,
+        }
+        self.destroy()
+
+
+class _DialogLigne(ctk.CTkToplevel):
+    def __init__(self, parent: Any, colonnes: list[dict]) -> None:
+        super().__init__(parent)
+        self.title("Ajouter une ligne")
+        self.geometry("560x520")
+        self.transient(parent)
+        self.grab_set()
+        self.result: dict[int, str] | None = None
+        self._vars: dict[int, ctk.StringVar] = {}
+        self._colonnes = colonnes
+        self._build_ui()
+
+    def _build_ui(self) -> None:
+        scroll = ctk.CTkScrollableFrame(self)
+        scroll.pack(fill="both", expand=True, padx=12, pady=12)
+        for col in self._colonnes:
+            cid = int(col["id"])
+            ctk.CTkLabel(scroll, text=f"{col['nom']} :").pack(anchor="w", pady=(6, 2))
+            var = ctk.StringVar()
+            self._vars[cid] = var
+            type_colonne = str(col.get("type_colonne") or "").strip().lower()
+            if type_colonne.startswith("liste_"):
+                valeurs = get_valeurs_liste(type_colonne, str(col.get("liste_perso_valeurs") or ""))
+                widget = ctk.CTkComboBox(scroll, values=valeurs or [""], variable=var)
+                if valeurs:
+                    var.set(valeurs[0])
+            else:
+                widget = ctk.CTkEntry(scroll, textvariable=var)
+            widget.pack(fill="x")
+
+        footer = ctk.CTkFrame(self, fg_color="transparent")
+        footer.pack(fill="x", padx=12, pady=(0, 12))
+        ctk.CTkButton(footer, text="Annuler", command=self.destroy).pack(side="right")
+        ctk.CTkButton(footer, text="✅ Ajouter", command=self._valider).pack(side="right", padx=(0, 8))
+
+    def _valider(self) -> None:
+        self.result = {cid: var.get().strip() for cid, var in self._vars.items()}
+        self.destroy()

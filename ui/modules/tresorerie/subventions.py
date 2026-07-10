@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
+from datetime import datetime
+from tkinter import simpledialog
 from tkinter import ttk
 from typing import Any
 
 import customtkinter as ctk
 
 from core.tresorerie import formater_montant
-from db.models.tresorerie import get_all_subventions, get_stats_subventions
+from db.models.tresorerie import add_subvention, get_all_subventions, get_stats_subventions
 from ui import theme as app_theme
 
 
@@ -31,7 +33,7 @@ def build_tab_subventions(parent: ctk.CTkFrame, _root: Any) -> None:
         width=170,
         fg_color=colors.get("primary", "#1f6aa5"),
         hover_color=colors.get("secondary", "#144870"),
-        command=lambda: None,
+        command=lambda: _ajouter_subvention(parent, _root),
     ).pack(side="right")
 
     table_frame = ctk.CTkFrame(parent)
@@ -83,3 +85,29 @@ def build_tab_subventions(parent: ctk.CTkFrame, _root: Any) -> None:
         ),
         font=fonts.get("bold"),
     ).pack(anchor="w", padx=12, pady=(0, 10))
+
+
+def _ajouter_subvention(parent: ctk.CTkFrame, root: Any) -> None:
+    organisme = simpledialog.askstring("Nouvelle subvention", "Organisme :", parent=root)
+    if not organisme:
+        return
+    montant_str = simpledialog.askstring(
+        "Nouvelle subvention", "Montant demandé (€) :", parent=root, initialvalue="0"
+    )
+    try:
+        montant = float((montant_str or "0").replace(",", "."))
+    except ValueError:
+        montant = 0.0
+    annee = datetime.now().year
+    add_subvention(
+        organisme=organisme.strip(),
+        type_organisme="autre",
+        annee=annee,
+        objet="Demande libre",
+        montant_demande=montant,
+        date_demande=datetime.now().strftime("%Y-%m-%d"),
+        commentaire=None,
+    )
+    for widget in parent.winfo_children():
+        widget.destroy()
+    build_tab_subventions(parent, root)

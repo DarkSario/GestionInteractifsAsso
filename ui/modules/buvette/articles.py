@@ -237,7 +237,7 @@ class _FormulaireArticleBuvette(ctk.CTkToplevel):
             value=self._to_str_decimal(article.get("prix_achat") if article else 0)
         )
         self._stock_var = tk.StringVar(value="— Aucun —")
-        self._commentaire = ctk.CTkTextbox(self, height=90)
+        self._commentaire = None
 
         self._build_ui()
         self._prefill_choices()
@@ -247,6 +247,7 @@ class _FormulaireArticleBuvette(ctk.CTkToplevel):
 
         container = ctk.CTkFrame(self)
         container.pack(fill="both", expand=True, padx=14, pady=14)
+        self._commentaire = ctk.CTkTextbox(container, height=90)
 
         fields = [
             ("Nom *", ctk.CTkEntry(container, textvariable=self._nom_var)),

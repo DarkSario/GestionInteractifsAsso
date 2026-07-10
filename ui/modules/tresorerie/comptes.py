@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+from tkinter import simpledialog
 from tkinter import ttk
 from typing import Any
 
 import customtkinter as ctk
 
 from core.tresorerie import formater_montant
-from db.models.tresorerie import get_all_comptes
+from db.models.tresorerie import add_compte, get_all_comptes
 from ui import theme as app_theme
 from ui.modules.tresorerie.virement_dialog import VirementDialog
 
@@ -32,7 +33,7 @@ def build_tab_comptes(parent: ctk.CTkFrame, root: Any) -> None:
         width=170,
         fg_color=colors.get("primary", "#1f6aa5"),
         hover_color=colors.get("secondary", "#144870"),
-        command=lambda: None,
+        command=lambda: _ajouter_compte(parent, root),
     ).pack(side="right")
 
     table_frame = ctk.CTkFrame(parent)
@@ -91,3 +92,27 @@ def build_tab_comptes(parent: ctk.CTkFrame, root: Any) -> None:
         width=160,
         command=lambda: VirementDialog(root),
     ).pack(side="right")
+
+
+def _ajouter_compte(parent: ctk.CTkFrame, root: Any) -> None:
+    nom = simpledialog.askstring("Nouveau compte", "Nom du compte :", parent=root)
+    if not nom:
+        return
+    type_compte = simpledialog.askstring(
+        "Nouveau compte",
+        "Type (bancaire/livret/sumup/caisse/autre) :",
+        parent=root,
+        initialvalue="bancaire",
+    )
+    type_compte = (type_compte or "bancaire").strip().lower()
+    if type_compte not in {"bancaire", "livret", "sumup", "caisse", "autre"}:
+        type_compte = "bancaire"
+    solde_str = simpledialog.askstring("Nouveau compte", "Solde initial (€) :", parent=root, initialvalue="0")
+    try:
+        solde = float((solde_str or "0").replace(",", "."))
+    except ValueError:
+        solde = 0.0
+    add_compte(nom.strip(), type_compte, solde, 0, 1 if type_compte == "caisse" else 0, "", "", 0)
+    for widget in parent.winfo_children():
+        widget.destroy()
+    build_tab_comptes(parent, root)

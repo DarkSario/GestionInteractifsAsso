@@ -17,7 +17,7 @@ def get_lots_evenement(evenement_id: int) -> list[dict]:
     try:
         rows = conn.execute(
             """
-            SELECT l.id, l.evenement_id, l.numero, l.description, l.valeur_estimee,
+            SELECT l.id, l.evenement_id, l.numero, l.description, l.valeur_estimee, l.valeur_lot,
                    l.type_lot, l.fournisseur_id, f.nom AS fournisseur_nom,
                    l.sponsor_nom, l.numero_gagnant, l.statut, l.date_tirage, l.commentaire
             FROM tombola_lots l
@@ -37,6 +37,7 @@ def add_lot(
     numero,
     description,
     valeur_estimee,
+    valeur_lot,
     type_lot,
     fournisseur_id,
     sponsor_nom,
@@ -49,8 +50,8 @@ def add_lot(
             """
             INSERT INTO tombola_lots
                 (evenement_id, numero, description, valeur_estimee, type_lot,
-                 fournisseur_id, sponsor_nom, commentaire)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                 valeur_lot, fournisseur_id, sponsor_nom, commentaire)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 evenement_id,
@@ -58,6 +59,7 @@ def add_lot(
                 description,
                 valeur_estimee or 0,
                 type_lot,
+                valeur_lot if valeur_lot is not None else valeur_estimee or 0,
                 fournisseur_id,
                 sponsor_nom,
                 commentaire,
@@ -74,6 +76,7 @@ _COLONNES_LOT = frozenset(
         "numero",
         "description",
         "valeur_estimee",
+        "valeur_lot",
         "type_lot",
         "fournisseur_id",
         "sponsor_nom",
@@ -130,14 +133,57 @@ def enregistrer_gagnant(lot_id: int, numero_gagnant: str) -> bool:
     return update_lot(
         lot_id,
         numero_gagnant=numero_gagnant,
-        statut="attribue",
+        statut="gagne",
         date_tirage=datetime.now().strftime("%Y-%m-%d"),
     )
 
 
 def marquer_non_reclame(lot_id: int) -> bool:
     """Marque un lot comme non réclamé."""
-    return update_lot(lot_id, statut="non_reclame")
+    return update_lot(lot_id, statut="reserve")
+
+
+def get_config_tombola_evenement(evenement_id: int) -> dict:
+    """Retourne la configuration tombola de l'événement."""
+    conn = get_connection()
+    try:
+        row = conn.execute(
+            """
+            SELECT tombola_prix_ticket, tombola_prix_carnet
+            FROM evenements
+            WHERE id = ?
+            """,
+            (evenement_id,),
+        ).fetchone()
+    finally:
+        conn.close()
+    evenement = dict(row) if row else {}
+    return {
+        "prix_ticket": float(evenement.get("tombola_prix_ticket") or 0),
+        "prix_carnet": float(evenement.get("tombola_prix_carnet") or 0),
+    }
+
+
+def update_config_tombola_evenement(
+    evenement_id: int,
+    prix_ticket: float,
+    prix_carnet: float,
+) -> bool:
+    """Met à jour les prix ticket/carnet tombola de l'événement."""
+    conn = get_connection()
+    try:
+        cur = conn.execute(
+            """
+            UPDATE evenements
+            SET tombola_prix_ticket = ?, tombola_prix_carnet = ?
+            WHERE id = ?
+            """,
+            (float(prix_ticket or 0), float(prix_carnet or 0), evenement_id),
+        )
+        conn.commit()
+        return cur.rowcount > 0
+    finally:
+        conn.close()
 
 
 def get_carnets_evenement(evenement_id: int) -> list[dict]:
@@ -273,7 +319,7 @@ def get_stats_tombola(evenement_id: int) -> dict:
     montant_total = round(
         sum(float(c.get("montant_encaisse") or 0) for c in carnets), 2
     )
-    lots_attribues = sum(1 for lot in lots if lot.get("statut") == "attribue")
+    lots_attribues = sum(1 for lot in lots if lot.get("statut") in {"attribue", "gagne", "remis"})
 
     return {
         "total_carnets": total_carnets,

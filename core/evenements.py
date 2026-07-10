@@ -80,7 +80,7 @@ def calculer_montant_net(
     Returns:
         Montant net arrondi à 2 décimales.
     """
-    if mode_paiement == "sumup":
+    if mode_paiement in {"sumup", "carte"}:
         frais = calculer_frais_sumup(montant, taux_sumup)
         return round(montant - frais, 2)
     return round(montant, 2)
@@ -153,12 +153,30 @@ def calculer_bilan_evenement(evenement_id: int) -> dict:
         Dict avec recettes_total, depenses_total, benefice et detail.
     """
     from db.models.evenements import get_depenses_evenement, get_stats_billetterie
+    from db.models.stands import get_stands_evenement
 
     stats = get_stats_billetterie(evenement_id)
     recettes_total = stats.get("total_net", 0.0)
 
     depenses = get_depenses_evenement(evenement_id)
     depenses_total = sum(float(d.get("montant", 0)) for d in depenses)
+    stands = get_stands_evenement(evenement_id)
+    recettes_stands = sum(
+        float(s.get("montant_location") or 0)
+        for s in stands
+        if s.get("type_stand") == "location"
+        and (s.get("type_location") or "recette") == "recette"
+        and s.get("statut") != "annule"
+    )
+    depenses_stands = sum(
+        float(s.get("montant_location") or 0)
+        for s in stands
+        if s.get("type_stand") == "location"
+        and (s.get("type_location") or "recette") == "depense"
+        and s.get("statut") != "annule"
+    )
+    recettes_total += recettes_stands
+    depenses_total += depenses_stands
 
     benefice = recettes_total - depenses_total
 
@@ -169,5 +187,6 @@ def calculer_bilan_evenement(evenement_id: int) -> dict:
         "detail": {
             "billetterie": stats,
             "depenses": depenses,
+            "stands": stands,
         },
     }

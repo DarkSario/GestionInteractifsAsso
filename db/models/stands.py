@@ -16,7 +16,7 @@ def get_stands_evenement(evenement_id: int) -> list[dict]:
     try:
         rows = conn.execute(
             """
-            SELECT s.id, s.evenement_id, s.numero_emplacement, s.nom_stand, s.type_stand,
+            SELECT s.id, s.evenement_id, s.numero_emplacement, s.nom_stand, s.type_stand, s.type_location,
                    s.responsable_membre_id, s.responsable_nom_externe,
                    m.nom AS responsable_nom, m.prenom AS responsable_prenom,
                    s.montant_location, s.paiement_avant, s.statut, s.commentaire, s.tresorerie_id
@@ -40,6 +40,7 @@ def add_stand(
     responsable_membre_id,
     responsable_nom_externe,
     montant_location,
+    type_location,
     paiement_avant,
     commentaire,
 ) -> int:
@@ -51,8 +52,8 @@ def add_stand(
             INSERT INTO evenement_stands
                 (evenement_id, numero_emplacement, nom_stand, type_stand,
                  responsable_membre_id, responsable_nom_externe,
-                 montant_location, paiement_avant, commentaire)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 montant_location, type_location, paiement_avant, commentaire)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 evenement_id,
@@ -62,6 +63,7 @@ def add_stand(
                 responsable_membre_id,
                 responsable_nom_externe,
                 montant_location or 0,
+                type_location or "recette",
                 1 if paiement_avant else 0,
                 commentaire,
             ),
@@ -80,6 +82,7 @@ _COLONNES_STAND = frozenset(
         "responsable_membre_id",
         "responsable_nom_externe",
         "montant_location",
+        "type_location",
         "paiement_avant",
         "statut",
         "commentaire",
@@ -130,12 +133,12 @@ def delete_stand(stand_id: int) -> bool:
 
 
 def finaliser_location_stand(stand_id: int) -> bool:
-    """Crée la recette de trésorerie d'un stand en location."""
+    """Comptabilise la location en recette ou dépense selon son type."""
     conn = get_connection()
     try:
         stand = conn.execute(
             """
-            SELECT s.id, s.evenement_id, s.nom_stand, s.type_stand, s.montant_location, s.tresorerie_id,
+            SELECT s.id, s.evenement_id, s.nom_stand, s.type_stand, s.type_location, s.montant_location, s.tresorerie_id,
                    e.nom AS evenement_nom
             FROM evenement_stands s
             LEFT JOIN evenements e ON e.id = s.evenement_id
@@ -160,13 +163,51 @@ def finaliser_location_stand(stand_id: int) -> bool:
         date_du_jour = datetime.now().strftime("%Y-%m-%d")
         evenement_nom = data.get("evenement_nom") or f"Événement #{data.get('evenement_id')}"
         commentaire = f"Location stand — {evenement_nom} — {data.get('nom_stand') or 'Stand'}"
-        cur_treso = conn.execute(
-            """
-            INSERT INTO dons_subventions (date, source, montant, type, commentaire)
-            VALUES (?, ?, ?, ?, ?)
-            """,
-            (date_du_jour, "Stand", montant, "Location stand", commentaire),
-        )
+        if (data.get("type_location") or "recette") == "depense":
+            cur_treso = conn.execute(
+                """
+                INSERT INTO evenement_depenses (
+                    evenement_id, libelle, montant, date, categorie, fournisseur_id, mode_paiement, commentaire
+                )
+                VALUES (?, ?, ?, ?, ?, NULL, 'virement', ?)
+                """,
+                (
+                    data["evenement_id"],
+                    f"Location (dépense) — {data.get('nom_stand') or 'Stand'}",
+                    montant,
+                    date_du_jour,
+                    "Location stand",
+                    commentaire,
+                ),
+            )
+        else:
+            compte = conn.execute(
+                """
+                SELECT id FROM comptes_bancaires
+                WHERE actif = 1
+                ORDER BY est_principal DESC, ordre ASC, id ASC
+                LIMIT 1
+                """
+            ).fetchone()
+            if not compte:
+                return False
+            cur_treso = conn.execute(
+                """
+                INSERT INTO tresorerie_operations (
+                    compte_id, type_operation, libelle, montant, date_operation,
+                    mode_paiement, statut, est_automatique, source_module, commentaire, evenement_id
+                )
+                VALUES (?, 'recette', ?, ?, ?, 'autre', 'valide', 1, 'stands', ?, ?)
+                """,
+                (
+                    compte["id"],
+                    f"Location stand — {data.get('nom_stand') or 'Stand'}",
+                    montant,
+                    date_du_jour,
+                    commentaire,
+                    data["evenement_id"],
+                ),
+            )
         conn.execute(
             "UPDATE evenement_stands SET tresorerie_id = ? WHERE id = ?",
             (cur_treso.lastrowid, stand_id),
@@ -280,13 +321,26 @@ def get_stats_stands(evenement_id: int) -> dict:
     total = len(actifs)
     benevoles = sum(1 for s in actifs if s.get("type_stand") == "benevole")
     locations = sum(1 for s in actifs if s.get("type_stand") == "location")
-    montant_locations = round(
-        sum(float(s.get("montant_location") or 0) for s in actifs if s.get("type_stand") == "location"),
+    montant_locations_recettes = round(
+        sum(
+            float(s.get("montant_location") or 0)
+            for s in actifs
+            if s.get("type_stand") == "location" and (s.get("type_location") or "recette") == "recette"
+        ),
+        2,
+    )
+    montant_locations_depenses = round(
+        sum(
+            float(s.get("montant_location") or 0)
+            for s in actifs
+            if s.get("type_stand") == "location" and (s.get("type_location") or "recette") == "depense"
+        ),
         2,
     )
     return {
         "total": total,
         "benevoles": benevoles,
         "locations": locations,
-        "montant_locations": montant_locations,
+        "montant_locations": montant_locations_recettes,
+        "montant_locations_depenses": montant_locations_depenses,
     }
