@@ -249,7 +249,7 @@ class MainApp(ctk.CTk):
 
     def _ouvrir_stock(self) -> None:
         """Ouvre la fenêtre de gestion du stock."""
-        from ui.modules.stock.liste import ListeStock
+        from ui.modules.stock.articles import ListeStock
 
         fenetre = ListeStock(self)
         fenetre.grab_set()

@@ -1,4 +1,4 @@
-"""Fiche détail d'un événement avec onglets Général, Billetterie, Dépenses, Bénévoles."""
+"""Fiche détail d'un événement avec onglets Général, Billetterie, Dépenses, Bénévoles, Budget."""
 
 from __future__ import annotations
 
@@ -47,6 +47,7 @@ from db.models.fournisseurs import get_all_fournisseurs
 from db.models.membres import get_all_membres
 from ui import theme as app_theme
 from ui.components.dialogs import afficher_erreur, afficher_info, demander_confirmation
+from ui.modules.evenements.budget_evenement import BudgetEvenementView
 from ui.modules.evenements.stands import StandsView
 from ui.modules.evenements.tableaux import TableauxView
 from ui.modules.evenements.tombola import TombolaView
@@ -135,6 +136,7 @@ class FicheEvenement(ctk.CTkToplevel):
         self._tabs.add("📋 Général")
         self._tabs.add("🎫 Billetterie")
         self._tabs.add("💸 Dépenses")
+        self._tabs.add("💰 Budget")
         self._tabs.add("👥 Bénévoles")
         self._tabs.add("🎰 Tombola")
         self._tabs.add("🏪 Stands")
@@ -143,6 +145,7 @@ class FicheEvenement(ctk.CTkToplevel):
         self._build_onglet_general(self._tabs.tab("📋 Général"))
         self._build_onglet_billetterie(self._tabs.tab("🎫 Billetterie"))
         self._build_onglet_depenses(self._tabs.tab("💸 Dépenses"))
+        self._build_onglet_budget(self._tabs.tab("💰 Budget"))
         self._build_onglet_benevoles(self._tabs.tab("👥 Bénévoles"))
         self._build_onglet_tombola(self._tabs.tab("🎰 Tombola"))
         self._build_onglet_stands(self._tabs.tab("🏪 Stands"))
@@ -864,6 +867,14 @@ class FicheEvenement(ctk.CTkToplevel):
             delete_depense(depense_id)
             self._charger_depenses()
             self._actualiser_resume_financier()
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # Onglet Budget
+    # ══════════════════════════════════════════════════════════════════════════
+
+    def _build_onglet_budget(self, parent: Any) -> None:
+        self._budget_view = BudgetEvenementView(parent, self._evenement_id)
+        self._budget_view.pack(fill="both", expand=True, padx=10, pady=10)
 
     # ══════════════════════════════════════════════════════════════════════════
     # Onglet Bénévoles

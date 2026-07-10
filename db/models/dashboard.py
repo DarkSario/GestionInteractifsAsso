@@ -636,6 +636,92 @@ def get_alertes_stock() -> dict:
     return {"critique": critique, "faible": faible}
 
 
+def get_lots_expires_a_archiver() -> int:
+    """Retourne le nombre de lots expirés encore actifs."""
+    return int(
+        _fetch_scalar(
+            """
+            SELECT COUNT(*)
+            FROM stock_lots
+            WHERE statut = 'actif'
+              AND quantite_restante > 0
+              AND date_peremption IS NOT NULL
+              AND date(date_peremption) < date('now')
+            """,
+            default=0,
+        )
+    )
+
+
+def get_articles_peremption_proche_dashboard(jours: int) -> int:
+    """Retourne le nombre de lots qui périment prochainement."""
+    return int(
+        _fetch_scalar(
+            """
+            SELECT COUNT(*)
+            FROM stock_lots
+            WHERE statut = 'actif'
+              AND quantite_restante > 0
+              AND date_peremption IS NOT NULL
+              AND date(date_peremption) >= date('now')
+              AND date(date_peremption) <= date('now', '+' || ? || ' days')
+            """,
+            (int(jours),),
+            0,
+        )
+    )
+
+
+def get_evenements_sans_inventaire_apres() -> int:
+    """Événements terminés sans inventaire 'apres_evenement' validé."""
+    return int(
+        _fetch_scalar(
+            """
+            SELECT COUNT(*)
+            FROM evenements e
+            WHERE COALESCE(e.statut, '') IN ('termine', 'en_cours')
+              AND NOT EXISTS (
+                SELECT 1
+                FROM stock_inventaires i
+                WHERE i.evenement_id = e.id
+                  AND i.type_inventaire = 'apres_evenement'
+                  AND i.statut = 'valide'
+              )
+            """,
+            default=0,
+        )
+    )
+
+
+def get_couts_buvette_non_calcules() -> int:
+    """Événements avec inventaires avant/après validés mais sans coût calculé."""
+    return int(
+        _fetch_scalar(
+            """
+            SELECT COUNT(*)
+            FROM evenements e
+            WHERE EXISTS (
+                SELECT 1 FROM stock_inventaires i1
+                WHERE i1.evenement_id = e.id
+                  AND i1.type_inventaire = 'avant_evenement'
+                  AND i1.statut = 'valide'
+            )
+              AND EXISTS (
+                SELECT 1 FROM stock_inventaires i2
+                WHERE i2.evenement_id = e.id
+                  AND i2.type_inventaire = 'apres_evenement'
+                  AND i2.statut = 'valide'
+            )
+              AND NOT EXISTS (
+                SELECT 1 FROM buvette_couts_evenement c
+                WHERE c.evenement_id = e.id
+              )
+            """,
+            default=0,
+        )
+    )
+
+
 # ── Alertes globales ──────────────────────────────────────────────────────────
 
 
@@ -667,6 +753,37 @@ def get_toutes_alertes() -> list[dict]:
                 "message": (
                     f"Stock faible : {a['nom']} "
                     f"({a['quantite']:.0f} / seuil {a['seuil']:.0f})"
+                ),
+                "module": "stock",
+                "lien_action": "stock",
+            }
+        )
+
+    # Stock v2 : péremption
+    jours_peremption = int(
+        _fetch_scalar(
+            "SELECT COALESCE(valeur, '30') FROM parametres WHERE cle = 'stock_alerte_peremption_jours'",
+            default=30,
+        )
+    )
+    nb_expires = get_lots_expires_a_archiver()
+    if nb_expires > 0:
+        alertes.append(
+            {
+                "niveau": "rouge",
+                "message": f"{nb_expires} lot(s) expiré(s) à archiver",
+                "module": "stock",
+                "lien_action": "stock",
+            }
+        )
+
+    nb_proches = get_articles_peremption_proche_dashboard(jours_peremption)
+    if nb_proches > 0:
+        alertes.append(
+            {
+                "niveau": "orange",
+                "message": (
+                    f"{nb_proches} lot(s) périment dans moins de {jours_peremption} jour(s)"
                 ),
                 "module": "stock",
                 "lien_action": "stock",
@@ -756,6 +873,28 @@ def get_toutes_alertes() -> list[dict]:
                 ),
                 "module": "adherents",
                 "lien_action": "membres",
+            }
+        )
+
+    nb_sans_apres = get_evenements_sans_inventaire_apres()
+    if nb_sans_apres > 0:
+        alertes.append(
+            {
+                "niveau": "orange",
+                "message": f"{nb_sans_apres} événement(s) sans inventaire après",
+                "module": "buvette",
+                "lien_action": "buvette",
+            }
+        )
+
+    nb_couts_non_calcules = get_couts_buvette_non_calcules()
+    if nb_couts_non_calcules > 0:
+        alertes.append(
+            {
+                "niveau": "bleu",
+                "message": f"{nb_couts_non_calcules} coût(s) buvette non calculé(s)",
+                "module": "buvette",
+                "lien_action": "buvette",
             }
         )
 
