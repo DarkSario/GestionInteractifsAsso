@@ -98,11 +98,10 @@ def _ajouter_subvention(parent: ctk.CTkFrame, root: Any) -> None:
         montant = float((montant_str or "0").replace(",", "."))
     except ValueError:
         montant = 0.0
-    annee = datetime.now().year
     add_subvention(
         organisme=organisme.strip(),
         type_organisme="autre",
-        annee=annee,
+        annee=datetime.now().year,
         objet="Demande libre",
         montant_demande=montant,
         date_demande=datetime.now().strftime("%Y-%m-%d"),

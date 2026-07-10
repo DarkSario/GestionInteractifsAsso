@@ -58,5 +58,6 @@ DROP TABLE tombola_lots;
 ALTER TABLE tombola_lots_new RENAME TO tombola_lots;
 
 -- Stands : distinguer recette/dépense
+-- Choix de migration: les lignes existantes sont marquées par défaut en "recette"
+-- pour préserver le comportement historique (toutes les locations étaient traitées en recette).
 ALTER TABLE evenement_stands ADD COLUMN type_location TEXT DEFAULT 'recette';
-

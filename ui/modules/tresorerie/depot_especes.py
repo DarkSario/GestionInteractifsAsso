@@ -50,9 +50,12 @@ def build_tab_depot_especes(parent: ctk.CTkFrame, _root: Any) -> None:
         compte = next((c for c in comptes if c["nom"] == var_compte.get()), comptes[0] if comptes else None)
         if not compte:
             return
-        commentaire = " | ".join(
-            p for p in [f"Origine: {var_origine.get().strip()}", var_reference.get().strip(), var_commentaire.get().strip()] if p
-        )
+        comment_parts = [
+            f"Origine: {var_origine.get().strip()}",
+            var_reference.get().strip(),
+            var_commentaire.get().strip(),
+        ]
+        commentaire = " | ".join(part for part in comment_parts if part)
         add_operation(
             compte_id=int(compte["id"]),
             type_operation="recette",

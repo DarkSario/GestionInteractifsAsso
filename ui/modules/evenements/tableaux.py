@@ -273,7 +273,7 @@ class _DialogColonne(ctk.CTkToplevel):
             )
         ctk.CTkLabel(
             self,
-            text="Valeurs (liste perso, séparées par ;)",
+            text="Valeurs (uniquement pour « Liste personnalisée », séparées par ;)",
         ).pack(anchor="w", padx=16, pady=(12, 4))
         ctk.CTkEntry(self, textvariable=self._var_liste).pack(fill="x", padx=16)
         footer = ctk.CTkFrame(self, fg_color="transparent")
@@ -285,7 +285,7 @@ class _DialogColonne(ctk.CTkToplevel):
         nom = self._var_nom.get().strip()
         if not nom:
             return
-        type_colonne = self._var_type.get().strip().lower()
+        type_colonne = self._var_type.get()
         liste_perso_valeurs = None
         if type_colonne == "liste_perso":
             valeurs = [v.strip() for v in self._var_liste.get().split(";") if v.strip()]
@@ -318,9 +318,9 @@ class _DialogLigne(ctk.CTkToplevel):
             ctk.CTkLabel(scroll, text=f"{col['nom']} :").pack(anchor="w", pady=(6, 2))
             var = ctk.StringVar()
             self._vars[cid] = var
-            type_colonne = str(col.get("type_colonne") or "").strip().lower()
-            if type_colonne.startswith("liste_"):
-                valeurs = get_valeurs_liste(type_colonne, str(col.get("liste_perso_valeurs") or ""))
+            column_type = str(col.get("type_colonne") or "").strip().lower()
+            if column_type.startswith("liste_"):
+                valeurs = get_valeurs_liste(column_type, str(col.get("liste_perso_valeurs") or ""))
                 widget = ctk.CTkComboBox(scroll, values=valeurs or [""], variable=var)
                 if valeurs:
                     var.set(valeurs[0])

@@ -145,7 +145,7 @@ def build_tab_operations(parent: ctk.CTkFrame, _root: Any) -> None:
     ).pack(anchor="w", padx=12, pady=(0, 10))
 
 
-def _ajouter_operation(parent: ctk.CTkFrame, root: Any, type_operation: str) -> None:
+def _ajouter_operation(parent: ctk.CTkFrame, root: Any, operation_type: str) -> None:
     comptes = get_all_comptes(actif_only=True)
     if not comptes:
         return
@@ -154,7 +154,7 @@ def _ajouter_operation(parent: ctk.CTkFrame, root: Any, type_operation: str) -> 
         "Nouvelle opération",
         "Libellé :",
         parent=root,
-        initialvalue="Recette" if type_operation == "recette" else "Dépense",
+        initialvalue="Recette" if operation_type == "recette" else "Dépense",
     )
     if not libelle:
         return
@@ -163,11 +163,11 @@ def _ajouter_operation(parent: ctk.CTkFrame, root: Any, type_operation: str) -> 
         montant = float((montant_str or "0").replace(",", "."))
     except ValueError:
         return
-    categories = get_all_categories(type_operation)
+    categories = get_all_categories(operation_type)
     categorie_id = int(categories[0]["id"]) if categories else None
     add_operation(
         compte_id=compte_id,
-        type_operation=type_operation,
+        type_operation=operation_type,
         libelle=libelle.strip(),
         montant=montant,
         date_operation=datetime.now().strftime("%Y-%m-%d"),

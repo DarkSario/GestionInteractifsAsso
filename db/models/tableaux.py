@@ -12,7 +12,7 @@ from utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-_TYPES_COLONNES_VALIDES = {
+_VALID_COLUMN_TYPES = {
     "texte",
     "nombre",
     "montant",
@@ -29,7 +29,7 @@ _TYPES_COLONNES_VALIDES = {
 
 def _normaliser_type_colonne(type_colonne: str | None) -> str:
     brut = str(type_colonne or "texte").strip().lower()
-    return brut if brut in _TYPES_COLONNES_VALIDES else "texte"
+    return brut if brut in _VALID_COLUMN_TYPES else "texte"
 
 
 # ── Tableaux ─────────────────────────────────────────────────────────────────

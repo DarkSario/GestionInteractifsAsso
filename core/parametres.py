@@ -36,7 +36,7 @@ def valider_nom_liste(nom: str) -> list[str]:
     elif not _NOM_RE.match(nom):
         erreurs.append(
             "Le nom contient des caractères non autorisés "
-            "(lettres, chiffres, espaces, slash, tirets, apostrophes, points et parenthèses uniquement)."
+            "(lettres, chiffres, espaces, barre oblique, tirets, apostrophes, points et parenthèses uniquement)."
         )
     return erreurs
 

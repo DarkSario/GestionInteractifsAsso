@@ -117,7 +117,7 @@ def test_dashboard_colonne_montant():
     evt_id = _event_id("termine")
     tarif_id = add_tarif(evt_id, "Entrée", 10.0, 0, 0)
     _ = tarif_id
-    add_vente(evt_id, datetime.now().strftime("%Y-%m-%d"), "sur_place", "sumup", None, 10.0, 0.18, 9.82, None)
+    add_vente(evt_id, datetime.now().strftime("%Y-%m-%d"), "sur_place", "sumup", None, 100.0, 20.0, 80.0, None)
     bilan = get_bilan_dernier_evenement()
     assert bilan is not None
-    assert bilan["recettes_nettes"] > 0
+    assert bilan["recettes_nettes"] == 80.0

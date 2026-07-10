@@ -9,6 +9,7 @@ from db.models.evenements import get_evenement_by_id
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
+_LOT_AWARDED_STATUSES = {"attribue", "gagne", "remis"}
 
 
 def get_lots_evenement(evenement_id: int) -> list[dict]:
@@ -319,7 +320,7 @@ def get_stats_tombola(evenement_id: int) -> dict:
     montant_total = round(
         sum(float(c.get("montant_encaisse") or 0) for c in carnets), 2
     )
-    lots_attribues = sum(1 for lot in lots if lot.get("statut") in {"attribue", "gagne", "remis"})
+    lots_attribues = sum(1 for lot in lots if lot.get("statut") in _LOT_AWARDED_STATUSES)
 
     return {
         "total_carnets": total_carnets,

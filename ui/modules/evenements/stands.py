@@ -95,9 +95,7 @@ class StandsView(ctk.CTkFrame):
                     s.get("numero_emplacement") or "—",
                     s.get("nom_stand"),
                     responsable or "—",
-                    "Bénévole" if s.get("type_stand") == "benevole" else (
-                        "🟢 Recette" if (s.get("type_location") or "recette") == "recette" else "🔴 Dépense"
-                    ),
+                    self._format_type_stand(s),
                     self._fmt(float(s.get("montant_location") or 0)) if s.get("type_stand") == "location" else "—",
                 ),
             )
@@ -195,6 +193,12 @@ class StandsView(ctk.CTkFrame):
             self._btn_finaliser.configure(text="💸 Finaliser la dépense sélectionnée")
         else:
             self._btn_finaliser.configure(text="💸 Finaliser la recette sélectionnée")
+
+    @staticmethod
+    def _format_type_stand(stand: dict) -> str:
+        if stand.get("type_stand") == "benevole":
+            return "Bénévole"
+        return "🔴 Dépense" if (stand.get("type_location") or "recette") == "depense" else "🟢 Recette"
 
     def _ouvrir_attente(self) -> None:
         if not self._check_evenement():

@@ -185,6 +185,11 @@ class TombolaView(ctk.CTkFrame):
 
         lots = get_lots_evenement(self._evenement_id)
         for lot in lots:
+            valeur_lot = (
+                lot.get("valeur_lot")
+                if lot.get("valeur_lot") is not None
+                else lot.get("valeur_estimee")
+            )
             self._tree_lots.insert(
                 "",
                 "end",
@@ -192,13 +197,13 @@ class TombolaView(ctk.CTkFrame):
                 values=(
                     lot.get("numero"),
                     lot.get("description"),
-                    self._fmt(float(lot.get("valeur_lot") or lot.get("valeur_estimee") or 0)),
+                    self._fmt(float(valeur_lot or 0)),
                     "Sponsorisé" if lot.get("type_lot") == "sponsorise" else "Acheté",
                     str(lot.get("statut") or "").replace("_", " ").title(),
                 ),
             )
-        non_attribues = [lot for lot in lots if lot.get("statut") in {"en_attente", "disponible"}]
-        for lot in non_attribues:
+        available_lots = [lot for lot in lots if lot.get("statut") == "disponible"]
+        for lot in available_lots:
             self._txt_tirage.insert(
                 "end", f"Lot {lot['numero']} — {lot['description']}\n"
             )
@@ -238,7 +243,7 @@ class TombolaView(ctk.CTkFrame):
         lots = [
             lot
             for lot in get_lots_evenement(self._evenement_id)
-            if lot.get("statut") in {"en_attente", "disponible"}
+            if lot.get("statut") == "disponible"
         ]
         if not lots:
             afficher_info(self, "Tirage", "Aucun lot en attente.")

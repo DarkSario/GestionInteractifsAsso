@@ -9,6 +9,9 @@ from utils.logger import get_logger
 
 logger = get_logger(__name__)
 
+LOCATION_TYPE_REVENUE = "recette"
+LOCATION_TYPE_EXPENSE = "depense"
+
 
 def get_stands_evenement(evenement_id: int) -> list[dict]:
     """Retourne les stands d'un événement."""
@@ -63,7 +66,7 @@ def add_stand(
                 responsable_membre_id,
                 responsable_nom_externe,
                 montant_location or 0,
-                type_location or "recette",
+                type_location or LOCATION_TYPE_REVENUE,
                 1 if paiement_avant else 0,
                 commentaire,
             ),
@@ -163,7 +166,7 @@ def finaliser_location_stand(stand_id: int) -> bool:
         date_du_jour = datetime.now().strftime("%Y-%m-%d")
         evenement_nom = data.get("evenement_nom") or f"Événement #{data.get('evenement_id')}"
         commentaire = f"Location stand — {evenement_nom} — {data.get('nom_stand') or 'Stand'}"
-        if (data.get("type_location") or "recette") == "depense":
+        if data.get("type_location", LOCATION_TYPE_REVENUE) == LOCATION_TYPE_EXPENSE:
             cur_treso = conn.execute(
                 """
                 INSERT INTO evenement_depenses (
@@ -190,6 +193,7 @@ def finaliser_location_stand(stand_id: int) -> bool:
                 """
             ).fetchone()
             if not compte:
+                logger.warning("finaliser_location_stand: no active account found for stand %s", stand_id)
                 return False
             cur_treso = conn.execute(
                 """
@@ -325,7 +329,7 @@ def get_stats_stands(evenement_id: int) -> dict:
         sum(
             float(s.get("montant_location") or 0)
             for s in actifs
-            if s.get("type_stand") == "location" and (s.get("type_location") or "recette") == "recette"
+            if s.get("type_stand") == "location" and (s.get("type_location") or LOCATION_TYPE_REVENUE) == LOCATION_TYPE_REVENUE
         ),
         2,
     )
@@ -333,7 +337,7 @@ def get_stats_stands(evenement_id: int) -> dict:
         sum(
             float(s.get("montant_location") or 0)
             for s in actifs
-            if s.get("type_stand") == "location" and (s.get("type_location") or "recette") == "depense"
+            if s.get("type_stand") == "location" and (s.get("type_location") or LOCATION_TYPE_REVENUE) == LOCATION_TYPE_EXPENSE
         ),
         2,
     )
