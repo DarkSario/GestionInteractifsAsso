@@ -118,6 +118,7 @@ STATUTS_BEN_INV = {v: k for k, v in STATUTS_BENEVOLE.items()}
 def serialiser_modules_depuis_cases(
     vars_modules: dict[str, tk.BooleanVar | bool],
 ) -> str:
+    """Sérialise les modules actifs depuis des cases à cocher ou booléens."""
     modules = [
         module
         for module, var in vars_modules.items()

@@ -89,6 +89,11 @@ def _normaliser_date(value: str | None) -> str | None:
     return brut
 
 
+def _date_formulaire_ou_aujourdhui(value: str | None) -> str:
+    date_normalisee = _normaliser_date(value)
+    return date_normalisee or datetime.now().strftime(_DATE_FORMAT)
+
+
 def _annee_depuis_date(value: str) -> int:
     try:
         return datetime.strptime(value, _DATE_FORMAT).year
@@ -105,7 +110,7 @@ def enregistrer_subvention_depuis_formulaire(
         raise ValueError("L'organisme est obligatoire.")
 
     objet = str(formulaire.get("objet") or "").strip() or "Demande libre"
-    date_demande = _normaliser_date(str(formulaire.get("date_demande") or "")) or datetime.now().strftime(_DATE_FORMAT)
+    date_demande = _date_formulaire_ou_aujourdhui(str(formulaire.get("date_demande") or ""))
     montant_demande = _parse_float(formulaire.get("montant_demande"))
     montant_obtenu = _parse_float(formulaire.get("montant_obtenu"))
     date_obtention = _normaliser_date(str(formulaire.get("date_obtention") or ""))

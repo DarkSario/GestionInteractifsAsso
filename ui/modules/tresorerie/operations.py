@@ -81,6 +81,7 @@ _STATUTS = {
 
 
 def _periode_contient_cloture() -> bool:
+    """Retourne True si des opérations rapprochées signalent une période clôturée."""
     try:
         from db.connection import get_connection
 

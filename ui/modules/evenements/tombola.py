@@ -120,6 +120,7 @@ def enregistrer_lot_depuis_formulaire(
 ) -> int:
     valeur_estimee = _parse_float(formulaire.get("valeur_estimee"))
     valeur_lot = _parse_float(formulaire.get("valeur_lot"))
+    # Les lots offerts peuvent être saisis sans valorisation initiale.
     if valeur_lot <= 0:
         valeur_lot = valeur_estimee
     donnees = {
