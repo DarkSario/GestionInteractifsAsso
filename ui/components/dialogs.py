@@ -2,7 +2,38 @@
 
 from typing import Any
 
-import customtkinter as ctk
+try:
+    import customtkinter as ctk
+except ModuleNotFoundError:  # pragma: no cover - environnement sans Tk
+    class _DummyWidget:
+        def __init__(self, *_args, **_kwargs):
+            pass
+
+        def pack(self, *_args, **_kwargs):
+            pass
+
+        def destroy(self):
+            pass
+
+        def grab_set(self):
+            pass
+
+        def wait_window(self):
+            pass
+
+        def title(self, *_args, **_kwargs):
+            pass
+
+        def resizable(self, *_args, **_kwargs):
+            pass
+
+        def transient(self, *_args, **_kwargs):
+            pass
+
+    class _DummyCTk:
+        CTkToplevel = CTkLabel = CTkButton = CTkFrame = _DummyWidget
+
+    ctk = _DummyCTk()
 
 from ui import theme as app_theme
 

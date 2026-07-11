@@ -94,12 +94,34 @@ ONGLETS_MODULES = {
     "📊 Tableaux": {"tableaux"},
 }
 
+LIBELLES_MODULES = {
+    "billetterie": "Billetterie",
+    "depenses": "Dépenses",
+    "benevoles": "Bénévoles",
+    "tombola_classique": "Tombola",
+    "tombola_solidaire": "Tombola solidaire",
+    "stands": "Stands",
+    "tableaux": "Tableaux",
+    "budget_previsionnel": "Budget",
+}
+
 STATUTS_BENEVOLE = {
     "confirme": "Confirmé",
     "desiste": "Désisté",
     "remplace": "Remplacé",
 }
 STATUTS_BEN_INV = {v: k for k, v in STATUTS_BENEVOLE.items()}
+
+
+def serialiser_modules_depuis_cases(
+    vars_modules: dict[str, tk.BooleanVar | bool],
+) -> str:
+    modules = [
+        module
+        for module, var in vars_modules.items()
+        if bool(var.get() if hasattr(var, "get") else var)
+    ]
+    return serialiser_modules_actifs(modules)
 
 
 class FicheEvenement(ctk.CTkToplevel):
@@ -135,6 +157,13 @@ class FicheEvenement(ctk.CTkToplevel):
             text="🎪 Fiche événement",
             font=fonts.get("title"),
         ).pack(side="left")
+
+        ctk.CTkButton(
+            frame_top,
+            text="⚙️ Modules",
+            width=120,
+            command=self._ouvrir_modules,
+        ).pack(side="right", padx=(0, 8))
 
         ctk.CTkButton(
             frame_top,
@@ -258,6 +287,36 @@ class FicheEvenement(ctk.CTkToplevel):
             ),
         )
 
+        modules_frame = ctk.CTkFrame(frame)
+        modules_frame.pack(fill="x", pady=(10, 6))
+        ctk.CTkLabel(
+            modules_frame,
+            text="Modules activés",
+            font=fonts.get("bold"),
+        ).pack(anchor="w", padx=12, pady=(10, 6))
+        ctk.CTkLabel(
+            modules_frame,
+            text=(
+                "Choisissez les modules à activer pour cet événement.\n"
+                "Ces choix pourront être modifiés ultérieurement."
+            ),
+        ).pack(anchor="w", padx=12, pady=(0, 6))
+
+        self._vars_modules: dict[str, tk.BooleanVar] = {}
+        grille_modules = ctk.CTkFrame(modules_frame, fg_color="transparent")
+        grille_modules.pack(fill="x", padx=12, pady=(0, 10))
+        for index, module in enumerate(MODULES_EVENEMENT_DISPONIBLES):
+            var = tk.BooleanVar(value=module in {"billetterie", "depenses"})
+            self._vars_modules[module] = var
+            checkbox = ctk.CTkCheckBox(
+                grille_modules,
+                text=LIBELLES_MODULES.get(module, module.replace("_", " ").title()),
+                variable=var,
+                onvalue=True,
+                offvalue=False,
+            )
+            checkbox.grid(row=index // 2, column=index % 2, sticky="w", padx=(0, 18), pady=4)
+
         # Bilan de fin
         f_bilan = ctk.CTkFrame(frame, fg_color="transparent")
         f_bilan.pack(fill="x", pady=3)
@@ -313,6 +372,9 @@ class FicheEvenement(ctk.CTkToplevel):
         self._var_budget.set(
             f"{float(budget):.2f}".replace(".", ",") if budget is not None else ""
         )
+        self._definir_modules_selection(
+            modules_actifs_depuis_json(evt.get("modules_actifs_json"))
+        )
         self._txt_bilan.delete("1.0", "end")
         self._txt_bilan.insert("1.0", evt.get("bilan_fin") or "")
 
@@ -353,6 +415,7 @@ class FicheEvenement(ctk.CTkToplevel):
             return
 
         try:
+            modules_actifs_json = serialiser_modules_depuis_cases(self._vars_modules)
             if self._evenement_id is None:
                 self._evenement_id = add_evenement(
                     nom,
@@ -362,7 +425,7 @@ class FicheEvenement(ctk.CTkToplevel):
                     date_fin,
                     statut,
                     budget,
-                    serialiser_modules_actifs(None),
+                    modules_actifs_json,
                 )
                 update_evenement(self._evenement_id, bilan_fin=bilan)
                 afficher_info(self, "Succès", "Événement créé avec succès.")
@@ -377,6 +440,7 @@ class FicheEvenement(ctk.CTkToplevel):
                     statut=statut,
                     budget_previsionnel=budget,
                     bilan_fin=bilan,
+                    modules_actifs_json=modules_actifs_json,
                 )
                 afficher_info(self, "Succès", "Événement mis à jour.")
         except Exception as exc:
@@ -406,6 +470,14 @@ class FicheEvenement(ctk.CTkToplevel):
                 self._tabs.delete(nom_onglet)
             except Exception:
                 continue
+
+    def _ouvrir_modules(self) -> None:
+        self._tabs.set("📋 Général")
+
+    def _definir_modules_selection(self, modules: list[str]) -> None:
+        selection = set(modules)
+        for module, var in self._vars_modules.items():
+            var.set(module in selection)
 
     def _actualiser_resume_financier(self) -> None:
         if not self._evenement_id:
