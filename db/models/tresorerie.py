@@ -21,6 +21,7 @@ _SUBVENTION_STATUTS = {
     "annulée": "annulee",
     "partielle": "partielle",
 }
+_SUBVENTION_STATUTS_OBTENUS = {"accordee", "partielle"}
 
 
 def _fetch_all(query: str, params: tuple = ()) -> list[dict]:
@@ -831,9 +832,7 @@ def get_stats_subventions(annee=None) -> dict:
     subventions = get_all_subventions(annee=annee)
     total_demande = round(sum(float(s.get("montant_demande") or 0) for s in subventions), 2)
     total_obtenu = round(sum(float(s.get("montant_obtenu") or 0) for s in subventions), 2)
-    nb_accordees = sum(
-        1 for s in subventions if s.get("statut") in {"accordee", "partielle"}
-    )
+    nb_accordees = sum(1 for s in subventions if s.get("statut") in _SUBVENTION_STATUTS_OBTENUS)
     nb_en_attente = sum(1 for s in subventions if s.get("statut") == "en_attente")
 
     return {

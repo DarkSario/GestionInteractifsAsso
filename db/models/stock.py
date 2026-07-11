@@ -61,23 +61,21 @@ def get_all_articles(include_archives: bool = False) -> list[dict]:
                 SELECT s.id, s.nom, s.categorie_id, c.nom AS categorie_nom,
                        s.unite_id, u.nom AS unite_nom,
                        s.fournisseur_habituel_id, f.nom AS fournisseur_nom,
-                       COALESCE(
-                           CASE
-                               WHEN EXISTS (
-                                   SELECT 1 FROM mouvements_stock ms WHERE ms.stock_id = s.id
-                               )
-                               THEN (SELECT COALESCE(SUM(ms2.quantite), 0) FROM mouvements_stock ms2 WHERE ms2.stock_id = s.id)
-                               ELSE s.quantite
-                           END,
-                           s.quantite,
-                           0
-                       ) AS quantite,
+                       CASE
+                           WHEN COUNT(ms.id) > 0 THEN COALESCE(SUM(ms.quantite), 0)
+                           ELSE COALESCE(s.quantite, 0)
+                       END AS quantite,
                        s.seuil_alerte, s.prix_achat,
                        s.lot, s.commentaire, s.statut_archive
                 FROM stock s
                 LEFT JOIN categories c ON s.categorie_id = c.id
                 LEFT JOIN unites u ON s.unite_id = u.id
                 LEFT JOIN fournisseurs f ON s.fournisseur_habituel_id = f.id
+                LEFT JOIN mouvements_stock ms ON ms.stock_id = s.id
+                GROUP BY
+                    s.id, s.nom, s.categorie_id, c.nom, s.unite_id, u.nom,
+                    s.fournisseur_habituel_id, f.nom, s.quantite, s.seuil_alerte,
+                    s.prix_achat, s.lot, s.commentaire, s.statut_archive
                 ORDER BY s.statut_archive ASC, s.nom ASC
                 """
             ).fetchall()
@@ -87,24 +85,22 @@ def get_all_articles(include_archives: bool = False) -> list[dict]:
                 SELECT s.id, s.nom, s.categorie_id, c.nom AS categorie_nom,
                        s.unite_id, u.nom AS unite_nom,
                        s.fournisseur_habituel_id, f.nom AS fournisseur_nom,
-                       COALESCE(
-                           CASE
-                               WHEN EXISTS (
-                                   SELECT 1 FROM mouvements_stock ms WHERE ms.stock_id = s.id
-                               )
-                               THEN (SELECT COALESCE(SUM(ms2.quantite), 0) FROM mouvements_stock ms2 WHERE ms2.stock_id = s.id)
-                               ELSE s.quantite
-                           END,
-                           s.quantite,
-                           0
-                       ) AS quantite,
+                       CASE
+                           WHEN COUNT(ms.id) > 0 THEN COALESCE(SUM(ms.quantite), 0)
+                           ELSE COALESCE(s.quantite, 0)
+                       END AS quantite,
                        s.seuil_alerte, s.prix_achat,
                        s.lot, s.commentaire, s.statut_archive
                 FROM stock s
                 LEFT JOIN categories c ON s.categorie_id = c.id
                 LEFT JOIN unites u ON s.unite_id = u.id
                 LEFT JOIN fournisseurs f ON s.fournisseur_habituel_id = f.id
+                LEFT JOIN mouvements_stock ms ON ms.stock_id = s.id
                 WHERE s.statut_archive = 0
+                GROUP BY
+                    s.id, s.nom, s.categorie_id, c.nom, s.unite_id, u.nom,
+                    s.fournisseur_habituel_id, f.nom, s.quantite, s.seuil_alerte,
+                    s.prix_achat, s.lot, s.commentaire, s.statut_archive
                 ORDER BY s.nom ASC
                 """
             ).fetchall()
@@ -129,24 +125,22 @@ def get_article_by_id(article_id: int) -> dict | None:
             SELECT s.id, s.nom, s.categorie_id, c.nom AS categorie_nom,
                    s.unite_id, u.nom AS unite_nom,
                    s.fournisseur_habituel_id, f.nom AS fournisseur_nom,
-                   COALESCE(
-                       CASE
-                           WHEN EXISTS (
-                               SELECT 1 FROM mouvements_stock ms WHERE ms.stock_id = s.id
-                           )
-                           THEN (SELECT COALESCE(SUM(ms2.quantite), 0) FROM mouvements_stock ms2 WHERE ms2.stock_id = s.id)
-                           ELSE s.quantite
-                       END,
-                       s.quantite,
-                       0
-                   ) AS quantite,
+                   CASE
+                       WHEN COUNT(ms.id) > 0 THEN COALESCE(SUM(ms.quantite), 0)
+                       ELSE COALESCE(s.quantite, 0)
+                   END AS quantite,
                    s.seuil_alerte, s.prix_achat,
                    s.lot, s.commentaire, s.statut_archive
             FROM stock s
             LEFT JOIN categories c ON s.categorie_id = c.id
             LEFT JOIN unites u ON s.unite_id = u.id
             LEFT JOIN fournisseurs f ON s.fournisseur_habituel_id = f.id
+            LEFT JOIN mouvements_stock ms ON ms.stock_id = s.id
             WHERE s.id = ?
+            GROUP BY
+                s.id, s.nom, s.categorie_id, c.nom, s.unite_id, u.nom,
+                s.fournisseur_habituel_id, f.nom, s.quantite, s.seuil_alerte,
+                s.prix_achat, s.lot, s.commentaire, s.statut_archive
             """,
             (article_id,),
         ).fetchone()

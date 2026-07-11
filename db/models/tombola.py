@@ -435,7 +435,11 @@ def get_total_dons_tombola_solidaire(evenement_id: int) -> float:
 def effectuer_tirage_tombola_solidaire(
     evenement_id: int, seed: int | None = None
 ) -> dict | None:
-    """Désigne aléatoirement un gagnant pour la tombola solidaire."""
+    """Désigne aléatoirement un gagnant pour la tombola solidaire.
+
+    Le paramètre ``seed`` est optionnel et sert uniquement à rendre le tirage
+    déterministe dans les tests automatisés.
+    """
     participations = get_participations_solidaires(evenement_id)
     if not participations:
         return None
