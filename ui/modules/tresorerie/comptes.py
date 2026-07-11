@@ -86,7 +86,8 @@ def enregistrer_compte_depuis_formulaire(formulaire: dict[str, Any]) -> int:
 class _ComptesTab(ctk.CTkFrame):
     def __init__(self, parent: ctk.CTkFrame, root: Any) -> None:
         super().__init__(parent)
-        self._root = root
+        # IMPORTANT : ne pas nommer self._root car cela écrase la méthode interne tkinter _root()
+        self._tresorerie_root = root
         self._build_ui()
         self.refresh()
 
@@ -142,7 +143,7 @@ class _ComptesTab(ctk.CTkFrame):
             footer,
             text="↔️ Virement interne",
             width=160,
-            command=lambda: VirementDialog(self._root),
+            command=lambda: VirementDialog(self._tresorerie_root),
         ).pack(side="right")
 
         self._build_formulaire()
