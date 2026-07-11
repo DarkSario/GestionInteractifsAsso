@@ -3,6 +3,14 @@
 import sys
 import traceback
 
+try:
+    import tkinter  # noqa: F401
+except ImportError:
+    print("ERREUR : tkinter n'est pas installé.")
+    print("Sur Linux/Mac : sudo apt install python3-tk")
+    print("Sur Windows   : réinstaller Python en cochant « tcl/tk and IDLE »")
+    sys.exit(1)
+
 from ui.app import MainApp
 from ui.screens.welcome import WelcomeScreen
 from utils.logger import get_logger

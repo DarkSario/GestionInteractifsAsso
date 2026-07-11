@@ -138,8 +138,8 @@ class _CodeMasterDialog(ctk.CTkToplevel):
         ctk.CTkLabel(
             self,
             text=(
-                "→ Si le code est correct : déclôture ET réinitialise\n"
-                "  le mot de passe à « asso2024 »"
+                "→ Si le code est correct : déclôture ET génère\n"
+                "  un nouveau mot de passe aléatoire sécurisé"
             ),
             font=fonts.get("normal"),
             justify="left",
@@ -169,9 +169,9 @@ class _CodeMasterDialog(ctk.CTkToplevel):
 
     def _valider(self) -> None:
         code = self._code_entry.get()
-        ok, msg = reset_mot_de_passe_via_master(code)
+        ok, val = reset_mot_de_passe_via_master(code)
         if not ok:
-            afficher_erreur(self, "Code incorrect", msg or "Code master invalide.")
+            afficher_erreur(self, "Code incorrect", val or "Code master invalide.")
             self._code_entry.delete(0, "end")
             return
 
@@ -181,6 +181,8 @@ class _CodeMasterDialog(ctk.CTkToplevel):
         afficher_info(
             self,
             "Opération réussie",
-            "L'exercice a été déclôturé.\nLe mot de passe a été réinitialisé à « asso2024 ».",
+            f"L'exercice a été déclôturé.\n"
+            f"Nouveau mot de passe de déclôture : {val}\n"
+            "Conservez-le précieusement.",
         )
         self.destroy()

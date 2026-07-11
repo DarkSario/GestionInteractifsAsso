@@ -106,7 +106,6 @@ class MainApp(ctk.CTk):
         menu_exports.add_command(label="📋 Bilan AG", command=self._ouvrir_bilan_ag)
         menubar.add_cascade(label="Exports", menu=menu_exports)
         menubar.add_command(label="🏠 Tableau de bord", command=self._ouvrir_dashboard)
-        menubar.add_command(label="Journal général", command=self._todo)
 
         menu_admin = tk.Menu(menubar, tearoff=0)
         menu_admin.add_command(label="⚙️ Paramètres", command=self._ouvrir_parametres)

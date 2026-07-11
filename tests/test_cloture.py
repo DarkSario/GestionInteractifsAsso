@@ -19,8 +19,11 @@ from db.models.cloture import (
     is_periode_cloturee,
 )
 from db.models.securite import (
+    _hasher_secret,
+    _verifier_secret,
     changer_mot_de_passe_decloture,
     hash_password,
+    initialiser_secrets,
     reset_mot_de_passe_via_master,
     verifier_code_master,
     verifier_mot_de_passe_decloture,
@@ -38,6 +41,10 @@ from core.cloture import (
     valider_cloture,
 )
 
+# Valeurs de test (non réelles — générées dynamiquement pour chaque suite)
+_MDP_TEST = "mdp_de_test_phase14"
+_MASTER_TEST = "master_de_test_phase14"
+
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -45,6 +52,8 @@ from core.cloture import (
 def _setup(tmp_db):
     set_db_file(str(tmp_db))
     run_migrations()
+    # Initialiser avec des valeurs connues pour les tests
+    initialiser_secrets(mdp_initial=_MDP_TEST, code_master_initial=_MASTER_TEST)
 
 
 def _compte_principal_id() -> int:
@@ -156,15 +165,14 @@ def test_decloture_mot_de_passe_correct(tmp_db):
 
 def test_decloture_mot_de_passe_incorrect(tmp_db):
     _setup(tmp_db)
-    # Le mot de passe par défaut est asso2024
     assert verifier_mot_de_passe_decloture("mauvais_mdp") is False
-    assert verifier_mot_de_passe_decloture("asso2024") is True
+    assert verifier_mot_de_passe_decloture(_MDP_TEST) is True
     set_db_file("")
 
 
 def test_decloture_code_master(tmp_db):
     _setup(tmp_db)
-    assert verifier_code_master("INTERACTIFS-2024-MASTER") is True
+    assert verifier_code_master(_MASTER_TEST) is True
     assert verifier_code_master("mauvais_code") is False
     set_db_file("")
 
@@ -172,22 +180,23 @@ def test_decloture_code_master(tmp_db):
 def test_reset_mdp_via_code_master(tmp_db):
     _setup(tmp_db)
     # D'abord changer le mot de passe
-    ok, _ = changer_mot_de_passe_decloture("asso2024", "nouveau_mdp")
+    ok, _ = changer_mot_de_passe_decloture(_MDP_TEST, "nouveau_mdp")
     assert ok is True
     # Vérifier que le nouveau mot de passe fonctionne
     assert verifier_mot_de_passe_decloture("nouveau_mdp") is True
     # Reset via code master
-    ok, msg = reset_mot_de_passe_via_master("INTERACTIFS-2024-MASTER")
+    ok, nouveau_mdp = reset_mot_de_passe_via_master(_MASTER_TEST)
     assert ok is True
-    # Après reset, le mot de passe par défaut doit refonctionner
-    assert verifier_mot_de_passe_decloture("asso2024") is True
+    assert nouveau_mdp  # Un nouveau mot de passe aléatoire a été généré
+    # Après reset, le nouveau mot de passe généré doit fonctionner
+    assert verifier_mot_de_passe_decloture(nouveau_mdp) is True
     set_db_file("")
 
 
 def test_changer_mot_de_passe(tmp_db):
     _setup(tmp_db)
     # Changement avec ancien mot de passe correct
-    ok, msg = changer_mot_de_passe_decloture("asso2024", "nouveauMDP123")
+    ok, msg = changer_mot_de_passe_decloture(_MDP_TEST, "nouveauMDP123")
     assert ok is True
     assert verifier_mot_de_passe_decloture("nouveauMDP123") is True
 
@@ -197,7 +206,7 @@ def test_changer_mot_de_passe(tmp_db):
     assert msg
 
     # Changement avec code master à la place de l'ancien mot de passe
-    ok, msg = changer_mot_de_passe_decloture("INTERACTIFS-2024-MASTER", "mdp_via_master")
+    ok, msg = changer_mot_de_passe_decloture(_MASTER_TEST, "mdp_via_master")
     assert ok is True
     assert verifier_mot_de_passe_decloture("mdp_via_master") is True
     set_db_file("")
@@ -260,13 +269,62 @@ def test_stats_exercice(tmp_db):
     set_db_file("")
 
 
-def test_hash_password():
-    """Le hash SHA-256 est correct."""
-    expected = hashlib.sha256("asso2024".encode()).hexdigest()
-    assert hash_password("asso2024") == expected
-
-
 def test_generer_nom_exercice():
     assert generer_nom_exercice("scolaire", "2025-09-01") == "2025-2026"
     assert generer_nom_exercice("civile", "2025-01-01") == "2025"
     assert generer_nom_exercice("scolaire", "2024-09-01") == "2024-2025"
+
+
+# ── Tests des nouvelles fonctions de hachage (Phase 14) ──────────────────────
+
+
+def test_hasher_secret_avec_sel():
+    """Le hash scrypt inclut bien un sel (format sel_hex$hash_hex)."""
+    h1 = _hasher_secret("mon_secret")
+    h2 = _hasher_secret("mon_secret")
+    assert "$" in h1
+    assert "$" in h2
+    # Deux hashes du même secret sont différents (sel aléatoire)
+    assert h1 != h2
+
+
+def test_verifier_secret_correct():
+    """La vérification scrypt retourne True pour un secret correct."""
+    secret = "test_verif_correct"
+    stocke = _hasher_secret(secret)
+    assert _verifier_secret(secret, stocke) is True
+
+
+def test_verifier_secret_incorrect():
+    """La vérification scrypt retourne False pour un secret incorrect."""
+    stocke = _hasher_secret("bon_secret")
+    assert _verifier_secret("mauvais_secret", stocke) is False
+
+
+def test_retrocompat_sha256():
+    """La vérification accepte les anciens hashes SHA-256 (sans sel)."""
+    import hashlib
+    secret = "ancien_secret_sha256"
+    hash_sha256 = hashlib.sha256(secret.encode()).hexdigest()
+    # Doit fonctionner (format héritage : pas de $ dans le hash)
+    assert "$" not in hash_sha256
+    assert _verifier_secret(secret, hash_sha256) is True
+    assert _verifier_secret("mauvais", hash_sha256) is False
+
+
+def test_hash_password_format_scrypt():
+    """hash_password retourne désormais un hash scrypt (contient '$')."""
+    h = hash_password("test_mdp")
+    assert "$" in h
+
+
+def test_initialiser_secrets_idempotent(tmp_db):
+    """initialiser_secrets n'écrase pas les valeurs déjà stockées."""
+    set_db_file(str(tmp_db))
+    run_migrations()
+    initialiser_secrets(mdp_initial="premier_mdp", code_master_initial="premier_master")
+    # Second appel avec d'autres valeurs : ne doit pas écraser
+    initialiser_secrets(mdp_initial="autre_mdp", code_master_initial="autre_master")
+    assert verifier_mot_de_passe_decloture("premier_mdp") is True
+    assert verifier_mot_de_passe_decloture("autre_mdp") is False
+    set_db_file("")

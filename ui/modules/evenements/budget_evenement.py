@@ -59,9 +59,18 @@ class BudgetEvenementView(ctk.CTkFrame):
     def set_evenement_id(self, evenement_id: int | None) -> None:
         """Met à jour l'événement chargé puis rafraîchit la vue."""
         self._evenement_id = evenement_id
-        self._refresh()
+        try:
+            if self.winfo_exists():
+                self._refresh()
+        except Exception:
+            pass
 
     def _refresh(self) -> None:
+        try:
+            if not self._content.winfo_exists():
+                return
+        except Exception:
+            return
         self._content.delete("1.0", "end")
         if not self._evenement_id:
             self._content.insert("1.0", "Sauvegardez d'abord l'événement pour activer le budget.")

@@ -192,10 +192,8 @@ class ParametresApp(ctk.CTkToplevel):
                 self._exercice_debut.insert(0, self._fmt_date(row["date_debut"]))
                 self._exercice_fin.delete(0, "end")
                 self._exercice_fin.insert(0, self._fmt_date(row["date_fin"]))
-        except Exception:
-            pass
-
-    def _choisir_logo(self) -> None:
+        except Exception as exc:
+            logger.warning("Impossible de charger l'exercice courant : %s", exc)
         chemin = filedialog.askopenfilename(
             parent=self,
             title="Choisir le logo de l'association",
@@ -256,10 +254,8 @@ class ParametresApp(ctk.CTkToplevel):
             for c in comptes:
                 self._comptes_options.append(c["nom"])
                 self._comptes_ids.append(str(c["id"]))
-        except Exception:
-            pass
-
-        f_cp = ctk.CTkFrame(frame, fg_color="transparent")
+        except Exception as exc:
+            logger.warning("Impossible de charger la liste des comptes : %s", exc)
         f_cp.pack(fill="x", pady=3)
         ctk.CTkLabel(f_cp, text="Compte principal", width=150, anchor="ne").pack(
             side="left", padx=(0, 8)

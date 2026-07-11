@@ -33,6 +33,5 @@ CREATE TABLE IF NOT EXISTS exercices_log (
 
 -- Paramètres sécurité déclôture
 INSERT OR IGNORE INTO parametres (cle, valeur, description) VALUES
-    ('mdp_decloture_hash', '', 'Hash SHA-256 du mot de passe de déclôture (vide = asso2024)'),
-    ('mdp_decloture_defaut', 'asso2024', 'Mot de passe par défaut déclôture'),
-    ('code_master_hash', 'fa4efea1667cb85b353b9e38313e42be04811f08828e4fa3149ab7e6552f76c3', 'Hash SHA-256 du code master de récupération');
+    ('mdp_decloture_hash', '', 'Hash scrypt du mot de passe de déclôture (initialisé automatiquement)'),
+    ('code_master_hash', '', 'Hash scrypt du code master de récupération (initialisé automatiquement)');
