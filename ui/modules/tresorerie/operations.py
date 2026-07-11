@@ -171,7 +171,7 @@ def enregistrer_operation_depuis_formulaire(formulaire: dict[str, Any]) -> int:
 class _OperationsTab(ctk.CTkFrame):
     def __init__(self, parent: ctk.CTkFrame, root: Any) -> None:
         super().__init__(parent)
-        self._root = root
+        self._tresorerie_root = root
         self._comptes = get_all_comptes(actif_only=True)
         self._categories: list[dict[str, Any]] = []
         self._build_ui()

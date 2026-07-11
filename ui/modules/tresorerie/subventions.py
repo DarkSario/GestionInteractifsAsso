@@ -148,7 +148,7 @@ def enregistrer_subvention_depuis_formulaire(
 class _SubventionsTab(ctk.CTkFrame):
     def __init__(self, parent: ctk.CTkFrame, root: Any) -> None:
         super().__init__(parent)
-        self._root = root
+        self._tresorerie_root = root
         self._subvention_selectionnee: int | None = None
         self._build_ui()
         self.refresh()
