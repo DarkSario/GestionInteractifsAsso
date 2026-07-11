@@ -552,8 +552,8 @@ def add_remise_cheque(
             date_remise,
             reference,
             commentaire,
-            int(nombre_cheques or 0),
-            float(montant_total or 0),
+            int(nombre_cheques) if nombre_cheques is not None else 0,
+            float(montant_total) if montant_total is not None else 0,
             numero_bordereau or None,
         ),
     )

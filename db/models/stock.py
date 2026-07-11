@@ -29,7 +29,7 @@ def _quantite_stock_calculee(conn, stock_id: int) -> int:
     ).fetchone()
     if not row:
         raise ValueError(f"Article introuvable : id={stock_id}")
-    if int(row["nb_mouvements"] or 0) == 0:
+    if row["nb_mouvements"] == 0:
         return int(row["quantite_article"] or 0)
     return int(row["quantite_mouvements"] or 0)
 

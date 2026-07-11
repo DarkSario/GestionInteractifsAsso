@@ -27,6 +27,10 @@ MODULES_EVENEMENT_PAR_DEFAUT = (
 )
 
 
+def _normaliser_module_evenement(module: str | None) -> str:
+    return str(module or "").strip().lower()
+
+
 # ── Événements ───────────────────────────────────────────────────────────────
 
 
@@ -187,7 +191,7 @@ def serialiser_modules_actifs(modules: list[str] | tuple[str, ...] | None) -> st
     """Sérialise une liste de modules activés."""
     modules_valides = []
     for module in modules or MODULES_EVENEMENT_PAR_DEFAUT:
-        module_normalise = str(module or "").strip().lower()
+        module_normalise = _normaliser_module_evenement(module)
         if (
             module_normalise in MODULES_EVENEMENT_DISPONIBLES
             and module_normalise not in modules_valides
@@ -215,7 +219,7 @@ def modules_actifs_depuis_json(modules_actifs_json: str | None) -> list[str]:
 
     modules_valides: list[str] = []
     for module in raw:
-        module_normalise = str(module or "").strip().lower()
+        module_normalise = _normaliser_module_evenement(module)
         if (
             module_normalise in MODULES_EVENEMENT_DISPONIBLES
             and module_normalise not in modules_valides
