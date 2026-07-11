@@ -367,7 +367,7 @@ class StandsView(ctk.CTkFrame):
     @staticmethod
     def _format_type_stand(stand: dict) -> str:
         if stand.get("type_stand") == "benevole":
-            return "Stand"
+            return "Stand bénévole"
         return "🔴 Dépense" if (stand.get("type_location") or "recette") == "depense" else "🟢 Recette"
 
     def _ouvrir_attente(self) -> None:

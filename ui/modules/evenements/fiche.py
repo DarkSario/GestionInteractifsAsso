@@ -104,6 +104,7 @@ LIBELLES_MODULES = {
     "tableaux": "Tableaux",
     "budget_previsionnel": "Budget",
 }
+MODULES_CREATION_INITIAUX = ("billetterie", "depenses")
 
 STATUTS_BENEVOLE = {
     "confirme": "Confirmé",
@@ -306,7 +307,7 @@ class FicheEvenement(ctk.CTkToplevel):
         grille_modules = ctk.CTkFrame(modules_frame, fg_color="transparent")
         grille_modules.pack(fill="x", padx=12, pady=(0, 10))
         for index, module in enumerate(MODULES_EVENEMENT_DISPONIBLES):
-            var = tk.BooleanVar(value=module in {"billetterie", "depenses"})
+            var = tk.BooleanVar(value=module in MODULES_CREATION_INITIAUX)
             self._vars_modules[module] = var
             checkbox = ctk.CTkCheckBox(
                 grille_modules,
