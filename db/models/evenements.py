@@ -106,33 +106,23 @@ def add_evenement(
     """Crée un événement et retourne son identifiant."""
     conn = get_connection()
     try:
-        if modules_actifs_json is None:
-            cur = conn.execute(
-                """
-                INSERT INTO evenements
-                    (nom, type, description, date_debut, date_fin, statut, budget_previsionnel)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-                """,
-                (nom, type_, description, date_debut, date_fin, statut, budget_previsionnel),
-            )
-        else:
-            cur = conn.execute(
-                """
-                INSERT INTO evenements
-                    (nom, type, description, date_debut, date_fin, statut, budget_previsionnel, modules_actifs_json)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    nom,
-                    type_,
-                    description,
-                    date_debut,
-                    date_fin,
-                    statut,
-                    budget_previsionnel,
-                    modules_actifs_json,
-                ),
-            )
+        cur = conn.execute(
+            """
+            INSERT INTO evenements
+                (nom, type, description, date_debut, date_fin, statut, budget_previsionnel, modules_actifs_json)
+            VALUES (?, ?, ?, ?, ?, ?, ?, COALESCE(?, '["billetterie","depenses","benevoles"]'))
+            """,
+            (
+                nom,
+                type_,
+                description,
+                date_debut,
+                date_fin,
+                statut,
+                budget_previsionnel,
+                modules_actifs_json,
+            ),
+        )
         conn.commit()
         return cur.lastrowid
     finally:

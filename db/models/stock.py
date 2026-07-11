@@ -347,12 +347,12 @@ def add_mouvement(
 
         # Calculer le nouveau stock
         if type_mouvement == "Inventaire":
-            delta = quantite - stock_actuel
+            quantite_enregistree = quantite - stock_actuel
         elif type_mouvement.startswith("Entrée"):
-            delta = quantite
+            quantite_enregistree = quantite
         else:
             # Sortie
-            delta = -quantite
+            quantite_enregistree = -quantite
 
         # Insérer le mouvement
         cursor = conn.execute(
@@ -366,7 +366,7 @@ def add_mouvement(
                 stock_id,
                 date,
                 type_mouvement,
-                delta,
+                quantite_enregistree,
                 prix_unitaire,
                 fournisseur_id,
                 evenement_id,
@@ -380,7 +380,7 @@ def add_mouvement(
         conn.commit()
         logger.info(
             "Mouvement ajouté : stock_id=%s type=%s qté=%s",
-            stock_id, type_mouvement, delta,
+            stock_id, type_mouvement, quantite_enregistree,
         )
         return cursor.lastrowid
     finally:

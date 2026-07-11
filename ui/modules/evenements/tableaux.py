@@ -353,7 +353,7 @@ class _DialogLigne(ctk.CTkToplevel):
             if column_type.startswith("liste_"):
                 valeurs = get_valeurs_liste(column_type, str(col.get("liste_perso_valeurs") or ""))
                 widget = ctk.CTkComboBox(scroll, values=valeurs or [""], variable=var)
-                if valeurs and not var.get():
+                if valeurs and var.get() not in valeurs:
                     var.set(valeurs[0])
             else:
                 widget = ctk.CTkEntry(scroll, textvariable=var)
