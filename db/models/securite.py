@@ -192,7 +192,7 @@ def reset_mot_de_passe_via_master(code_master: str) -> tuple[bool, str]:
         return False, "Code master incorrect."
 
     try:
-        nouveau_mdp = secrets.token_urlsafe(12)
+        nouveau_mdp = secrets.token_urlsafe(16)
         set_parametre(_MDP_HASH_CLE, _hasher_secret(nouveau_mdp))
         logger.info("Mot de passe de déclôture réinitialisé via le code master.")
         return True, nouveau_mdp

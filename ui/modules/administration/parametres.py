@@ -194,6 +194,8 @@ class ParametresApp(ctk.CTkToplevel):
                 self._exercice_fin.insert(0, self._fmt_date(row["date_fin"]))
         except Exception as exc:
             logger.warning("Impossible de charger l'exercice courant : %s", exc)
+
+    def _choisir_logo(self) -> None:
         chemin = filedialog.askopenfilename(
             parent=self,
             title="Choisir le logo de l'association",
