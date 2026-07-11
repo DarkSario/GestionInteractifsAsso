@@ -481,11 +481,23 @@ class TombolaView(ctk.CTkFrame):
     def _ouvrir_formulaire_lot(self, lot: dict[str, Any] | None = None) -> None:
         if not self._check_evenement():
             return
+        valeur_reference = 0.0
+        if lot:
+            valeur_reference = float(
+                (
+                    lot.get("valeur_lot")
+                    if lot.get("valeur_lot") is not None
+                    else lot.get("valeur_estimee")
+                )
+                or 0
+            )
         self._lot_selectionne = int(lot["id"]) if lot else None
         self._titre_form_lot.configure(text="🎁 Modifier le lot" if lot else "🎁 Lot tombola")
         self._var_numero_lot.set(str(lot.get("numero") or "") if lot else "")
         self._var_description_lot.set(lot.get("description") or "" if lot else "")
-        self._var_valeur_lot.set(f"{float((lot.get('valeur_lot') if lot.get('valeur_lot') is not None else lot.get('valeur_estimee')) or 0):.2f}".replace(".", ",") if lot else "0,00")
+        self._var_valeur_lot.set(
+            f"{valeur_reference:.2f}".replace(".", ",") if lot else "0,00"
+        )
         self._var_donateur_lot.set(lot.get("donateur") or "" if lot else "")
         self._var_statut_lot.set(next((label for label, code in _STATUTS_LOT.items() if code == lot.get("statut")), "Disponible") if lot else "Disponible")
         self._var_numero_gagnant_lot.set(lot.get("numero_gagnant") or "" if lot else "")

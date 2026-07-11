@@ -245,16 +245,18 @@ class _SubventionsTab(ctk.CTkFrame):
         ctk.CTkButton(actions, text="💾 Enregistrer", command=self._enregistrer).pack(side="right")
 
     def _ouvrir_formulaire(self, subvention: dict[str, Any] | None = None) -> None:
+        data = subvention or {}
+        date_du_jour = datetime.now().strftime(_DATE_FORMAT)
         self._subvention_selectionnee = int(subvention["id"]) if subvention else None
         self._titre_formulaire.configure(text="🏛️ Modifier la subvention" if subvention else "🏛️ Subvention")
-        self._var_organisme.set(subvention.get("organisme") or "" if subvention else "")
-        self._var_objet.set(subvention.get("objet") or "" if subvention else "")
-        self._var_demande.set(f"{float(subvention.get('montant_demande') or 0):.2f}".replace(".", ",") if subvention else "0,00")
-        self._var_obtenu.set(f"{float(subvention.get('montant_obtenu') or 0):.2f}".replace(".", ",") if subvention else "0,00")
-        self._var_date_demande.set(subvention.get("date_demande") or datetime.now().strftime(_DATE_FORMAT) if subvention else datetime.now().strftime(_DATE_FORMAT))
-        self._var_date_obtention.set(subvention.get("date_decision") or subvention.get("date_versement") or "" if subvention else "")
-        self._var_statut.set(_STATUTS_LABELS.get(subvention.get("statut") or "en_attente", "En attente") if subvention else "En attente")
-        self._var_commentaire.set(subvention.get("commentaire") or "" if subvention else "")
+        self._var_organisme.set(data.get("organisme") or "")
+        self._var_objet.set(data.get("objet") or "")
+        self._var_demande.set(f"{float(data.get('montant_demande') or 0):.2f}".replace(".", ","))
+        self._var_obtenu.set(f"{float(data.get('montant_obtenu') or 0):.2f}".replace(".", ","))
+        self._var_date_demande.set(data.get("date_demande") or date_du_jour)
+        self._var_date_obtention.set(data.get("date_decision") or data.get("date_versement") or "")
+        self._var_statut.set(_STATUTS_LABELS.get(data.get("statut") or "en_attente", "En attente"))
+        self._var_commentaire.set(data.get("commentaire") or "")
         if not self._frame_formulaire.winfo_manager():
             self._frame_formulaire.pack(side="right", fill="y", padx=(12, 0))
 
