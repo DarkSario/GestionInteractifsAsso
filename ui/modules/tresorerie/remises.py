@@ -107,7 +107,7 @@ def enregistrer_remise_depuis_formulaire(formulaire: dict[str, Any]) -> int:
 class _RemisesTab(ctk.CTkFrame):
     def __init__(self, parent: ctk.CTkFrame, root: Any) -> None:
         super().__init__(parent)
-        self._root = root
+        self._tresorerie_root = root
         self._comptes = get_all_comptes(actif_only=True)
         self._build_ui()
         self.refresh()
