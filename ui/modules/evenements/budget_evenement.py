@@ -56,6 +56,11 @@ class BudgetEvenementView(ctk.CTkFrame):
             row=len(champs), column=1, sticky="e", padx=6, pady=8
         )
 
+    def set_evenement_id(self, evenement_id: int | None) -> None:
+        """Met à jour l'événement chargé puis rafraîchit la vue."""
+        self._evenement_id = evenement_id
+        self._refresh()
+
     def _refresh(self) -> None:
         self._content.delete("1.0", "end")
         if not self._evenement_id:

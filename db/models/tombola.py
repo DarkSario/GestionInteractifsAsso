@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import random
 from datetime import datetime
 
 from db.connection import get_connection
@@ -19,7 +20,7 @@ def get_lots_evenement(evenement_id: int) -> list[dict]:
         rows = conn.execute(
             """
             SELECT l.id, l.evenement_id, l.numero, l.description, l.valeur_estimee, l.valeur_lot,
-                   l.type_lot, l.fournisseur_id, f.nom AS fournisseur_nom,
+                   l.type_lot, l.fournisseur_id, f.nom AS fournisseur_nom, l.donateur,
                    l.sponsor_nom, l.numero_gagnant, l.statut, l.date_tirage, l.commentaire
             FROM tombola_lots l
             LEFT JOIN fournisseurs f ON f.id = l.fournisseur_id
@@ -43,6 +44,7 @@ def add_lot(
     fournisseur_id,
     sponsor_nom,
     commentaire,
+    donateur=None,
 ) -> int:
     """Ajoute un lot de tombola et retourne son identifiant."""
     conn = get_connection()
@@ -51,8 +53,8 @@ def add_lot(
             """
             INSERT INTO tombola_lots
                 (evenement_id, numero, description, valeur_estimee, type_lot,
-                 valeur_lot, fournisseur_id, sponsor_nom, commentaire)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 valeur_lot, fournisseur_id, sponsor_nom, commentaire, donateur)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 evenement_id,
@@ -64,6 +66,7 @@ def add_lot(
                 fournisseur_id,
                 sponsor_nom,
                 commentaire,
+                donateur,
             ),
         )
         conn.commit()
@@ -81,6 +84,7 @@ _COLONNES_LOT = frozenset(
         "type_lot",
         "fournisseur_id",
         "sponsor_nom",
+        "donateur",
         "numero_gagnant",
         "statut",
         "date_tirage",
@@ -150,7 +154,7 @@ def get_config_tombola_evenement(evenement_id: int) -> dict:
     try:
         row = conn.execute(
             """
-            SELECT tombola_prix_ticket, tombola_prix_carnet
+            SELECT tombola_prix_ticket, tombola_prix_carnet, tombola_tickets_par_carnet
             FROM evenements
             WHERE id = ?
             """,
@@ -160,8 +164,9 @@ def get_config_tombola_evenement(evenement_id: int) -> dict:
         conn.close()
     evenement = dict(row) if row else {}
     return {
-        "prix_ticket": float(evenement.get("tombola_prix_ticket") or 0),
-        "prix_carnet": float(evenement.get("tombola_prix_carnet") or 0),
+        "prix_ticket": float(evenement.get("tombola_prix_ticket") or 1.0),
+        "prix_carnet": float(evenement.get("tombola_prix_carnet") or 5.0),
+        "tickets_par_carnet": int(evenement.get("tombola_tickets_par_carnet") or 5),
     }
 
 
@@ -169,6 +174,7 @@ def update_config_tombola_evenement(
     evenement_id: int,
     prix_ticket: float,
     prix_carnet: float,
+    tickets_par_carnet: int | None = None,
 ) -> bool:
     """Met à jour les prix ticket/carnet tombola de l'événement."""
     conn = get_connection()
@@ -176,10 +182,17 @@ def update_config_tombola_evenement(
         cur = conn.execute(
             """
             UPDATE evenements
-            SET tombola_prix_ticket = ?, tombola_prix_carnet = ?
+            SET tombola_prix_ticket = ?,
+                tombola_prix_carnet = ?,
+                tombola_tickets_par_carnet = ?
             WHERE id = ?
             """,
-            (float(prix_ticket or 0), float(prix_carnet or 0), evenement_id),
+            (
+                float(prix_ticket or 0),
+                float(prix_carnet or 0),
+                int(tickets_par_carnet or 5),
+                evenement_id,
+            ),
         )
         conn.commit()
         return cur.rowcount > 0
@@ -348,3 +361,103 @@ def generer_pv_tirage(evenement_id: int) -> dict:
         "date_generation": datetime.now().strftime("%Y-%m-%d %H:%M"),
         "lots": lots_tries,
     }
+
+
+def add_participation_solidaire(
+    evenement_id: int,
+    nom: str,
+    prenom: str,
+    telephone: str | None,
+    montant_don: float,
+    commentaire: str | None,
+) -> int:
+    """Ajoute une participation de tombola solidaire."""
+    conn = get_connection()
+    try:
+        cur = conn.execute(
+            """
+            INSERT INTO tombola_solidaire_participations (
+                evenement_id, nom, prenom, telephone, montant_don, commentaire
+            )
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                evenement_id,
+                nom,
+                prenom,
+                telephone or None,
+                float(montant_don or 0),
+                commentaire or None,
+            ),
+        )
+        conn.commit()
+        return cur.lastrowid
+    finally:
+        conn.close()
+
+
+def get_participations_solidaires(evenement_id: int) -> list[dict]:
+    """Retourne les participations de tombola solidaire d'un événement."""
+    conn = get_connection()
+    try:
+        rows = conn.execute(
+            """
+            SELECT id, evenement_id, nom, prenom, telephone, montant_don,
+                   date_participation, est_gagnant, commentaire, created_at
+            FROM tombola_solidaire_participations
+            WHERE evenement_id = ?
+            ORDER BY est_gagnant DESC, date_participation ASC, id ASC
+            """,
+            (evenement_id,),
+        ).fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        conn.close()
+
+
+def get_total_dons_tombola_solidaire(evenement_id: int) -> float:
+    """Calcule le total des dons collectés pour la tombola solidaire."""
+    conn = get_connection()
+    try:
+        row = conn.execute(
+            """
+            SELECT COALESCE(SUM(montant_don), 0) AS total
+            FROM tombola_solidaire_participations
+            WHERE evenement_id = ?
+            """,
+            (evenement_id,),
+        ).fetchone()
+        return round(float(row["total"] or 0), 2) if row else 0.0
+    finally:
+        conn.close()
+
+
+def effectuer_tirage_tombola_solidaire(
+    evenement_id: int, seed: int | None = None
+) -> dict | None:
+    """Désigne aléatoirement un gagnant pour la tombola solidaire.
+
+    Le paramètre ``seed`` est optionnel et sert uniquement à rendre le tirage
+    déterministe dans les tests automatisés.
+    """
+    participations = get_participations_solidaires(evenement_id)
+    if not participations:
+        return None
+    rng = random.Random(seed)
+    gagnant = rng.choice(participations)
+    conn = get_connection()
+    try:
+        conn.execute(
+            """
+            UPDATE tombola_solidaire_participations
+            SET est_gagnant = CASE WHEN id = ? THEN 1 ELSE 0 END
+            WHERE evenement_id = ?
+            """,
+            (gagnant["id"], evenement_id),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+    for participation in participations:
+        participation["est_gagnant"] = 1 if participation["id"] == gagnant["id"] else 0
+    return next((p for p in participations if p["id"] == gagnant["id"]), None)

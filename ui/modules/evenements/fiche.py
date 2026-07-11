@@ -18,6 +18,7 @@ from core.evenements import (
     valider_vente,
 )
 from db.models.evenements import (
+    MODULES_EVENEMENT_DISPONIBLES,
     add_benevole,
     add_billet,
     add_depense,
@@ -38,6 +39,8 @@ from db.models.evenements import (
     get_stats_billetterie,
     get_tarifs_evenement,
     get_ventes_evenement,
+    modules_actifs_depuis_json,
+    serialiser_modules_actifs,
     update_benevole,
     update_depense,
     update_evenement,
@@ -79,6 +82,16 @@ MODES_DEPENSE = {
     "sumup": "SumUp",
     "virement": "Virement",
     "": "—",
+}
+
+ONGLETS_MODULES = {
+    "🎫 Billetterie": {"billetterie"},
+    "💸 Dépenses": {"depenses"},
+    "💰 Budget": {"budget_previsionnel"},
+    "👥 Bénévoles": {"benevoles"},
+    "🎰 Tombola": {"tombola_classique", "tombola_solidaire"},
+    "🏪 Stands": {"stands"},
+    "📊 Tableaux": {"tableaux"},
 }
 
 STATUTS_BENEVOLE = {
@@ -307,9 +320,11 @@ class FicheEvenement(ctk.CTkToplevel):
         self._charger_billetterie()
         self._charger_depenses()
         self._charger_benevoles()
+        self._budget_view.set_evenement_id(self._evenement_id)
         self._tombola_view.set_evenement_id(self._evenement_id)
         self._stands_view.set_evenement_id(self._evenement_id)
         self._tableaux_view.set_evenement_id(self._evenement_id)
+        self._appliquer_modules_actifs()
 
     def _sauvegarder_general(self) -> None:
         nom = self._var_nom.get().strip()
@@ -340,7 +355,14 @@ class FicheEvenement(ctk.CTkToplevel):
         try:
             if self._evenement_id is None:
                 self._evenement_id = add_evenement(
-                    nom, type_, description, date_debut, date_fin, statut, budget
+                    nom,
+                    type_,
+                    description,
+                    date_debut,
+                    date_fin,
+                    statut,
+                    budget,
+                    serialiser_modules_actifs(None),
                 )
                 update_evenement(self._evenement_id, bilan_fin=bilan)
                 afficher_info(self, "Succès", "Événement créé avec succès.")
@@ -361,10 +383,29 @@ class FicheEvenement(ctk.CTkToplevel):
             afficher_erreur(self, "Erreur", str(exc))
             return
 
+        self._evenement = get_evenement_by_id(self._evenement_id) if self._evenement_id else None
         self._actualiser_resume_financier()
+        self._budget_view.set_evenement_id(self._evenement_id)
         self._tombola_view.set_evenement_id(self._evenement_id)
         self._stands_view.set_evenement_id(self._evenement_id)
         self._tableaux_view.set_evenement_id(self._evenement_id)
+        self._appliquer_modules_actifs()
+
+    def _appliquer_modules_actifs(self) -> None:
+        if not self._evenement:
+            return
+        modules_actifs = set(
+            modules_actifs_depuis_json(self._evenement.get("modules_actifs_json"))
+        )
+        if modules_actifs == set(MODULES_EVENEMENT_DISPONIBLES):
+            return
+        for nom_onglet, modules_onglet in ONGLETS_MODULES.items():
+            if modules_actifs.intersection(modules_onglet):
+                continue
+            try:
+                self._tabs.delete(nom_onglet)
+            except Exception:
+                continue
 
     def _actualiser_resume_financier(self) -> None:
         if not self._evenement_id:

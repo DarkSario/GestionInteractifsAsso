@@ -2,12 +2,33 @@
 
 from __future__ import annotations
 
+import json
 from datetime import datetime
 
 from db.connection import get_connection
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
+
+MODULES_EVENEMENT_DISPONIBLES = (
+    "billetterie",
+    "depenses",
+    "benevoles",
+    "tombola_classique",
+    "tombola_solidaire",
+    "stands",
+    "tableaux",
+    "budget_previsionnel",
+)
+MODULES_EVENEMENT_PAR_DEFAUT = (
+    "billetterie",
+    "depenses",
+    "benevoles",
+)
+
+
+def _normaliser_module_evenement(module: str | None) -> str:
+    return str(module or "").strip().lower()
 
 
 # ── Événements ───────────────────────────────────────────────────────────────
@@ -23,6 +44,7 @@ def get_all_evenements(statut: str | None = None) -> list[dict]:
             f"""
             SELECT e.id, e.nom, e.type, e.description, e.date_debut, e.date_fin,
                    e.statut, e.budget_previsionnel, e.bilan_fin, e.created_at,
+                   e.modules_actifs_json,
                    (
                        COALESCE((SELECT SUM(v.montant_net) FROM evenement_ventes v
                                  WHERE v.evenement_id = e.id AND v.statut = 'valide'), 0)
@@ -59,7 +81,8 @@ def get_evenement_by_id(evenement_id: int) -> dict | None:
         row = conn.execute(
             """
             SELECT id, nom, type, description, date_debut, date_fin,
-                   statut, budget_previsionnel, bilan_fin, created_at
+                   statut, budget_previsionnel, bilan_fin, created_at,
+                   modules_actifs_json
             FROM evenements
             WHERE id = ?
             """,
@@ -78,6 +101,7 @@ def add_evenement(
     date_fin: str | None,
     statut: str,
     budget_previsionnel: float | None,
+    modules_actifs_json: str | None = None,
 ) -> int:
     """Crée un événement et retourne son identifiant."""
     conn = get_connection()
@@ -85,10 +109,19 @@ def add_evenement(
         cur = conn.execute(
             """
             INSERT INTO evenements
-                (nom, type, description, date_debut, date_fin, statut, budget_previsionnel)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+                (nom, type, description, date_debut, date_fin, statut, budget_previsionnel, modules_actifs_json)
+            VALUES (?, ?, ?, ?, ?, ?, ?, COALESCE(?, '["billetterie","depenses","benevoles"]'))
             """,
-            (nom, type_, description, date_debut, date_fin, statut, budget_previsionnel),
+            (
+                nom,
+                type_,
+                description,
+                date_debut,
+                date_fin,
+                statut,
+                budget_previsionnel,
+                modules_actifs_json,
+            ),
         )
         conn.commit()
         return cur.lastrowid
@@ -98,7 +131,7 @@ def add_evenement(
 
 _COLONNES_EVENEMENT = frozenset({
     "nom", "type", "description", "date_debut", "date_fin",
-    "statut", "budget_previsionnel", "bilan_fin",
+    "statut", "budget_previsionnel", "bilan_fin", "modules_actifs_json",
 })
 
 
@@ -142,6 +175,55 @@ def get_evenements_for_select() -> list[dict]:
         return [dict(r) for r in rows]
     finally:
         conn.close()
+
+
+def serialiser_modules_actifs(modules: list[str] | tuple[str, ...] | None) -> str:
+    """Sérialise une liste de modules activés."""
+    modules_valides = []
+    for module in modules or MODULES_EVENEMENT_PAR_DEFAUT:
+        module_normalise = _normaliser_module_evenement(module)
+        if (
+            module_normalise in MODULES_EVENEMENT_DISPONIBLES
+            and module_normalise not in modules_valides
+        ):
+            modules_valides.append(module_normalise)
+    if not modules_valides:
+        modules_valides = list(MODULES_EVENEMENT_PAR_DEFAUT)
+    return json.dumps(modules_valides, ensure_ascii=False)
+
+
+def modules_actifs_depuis_json(modules_actifs_json: str | None) -> list[str]:
+    """Retourne les modules actifs normalisés.
+
+    Les événements historiques sans configuration explicite gardent tous les
+    onglets visibles par défaut.
+    """
+    if not modules_actifs_json:
+        return list(MODULES_EVENEMENT_DISPONIBLES)
+    try:
+        raw = json.loads(modules_actifs_json)
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return list(MODULES_EVENEMENT_DISPONIBLES)
+    if not isinstance(raw, list):
+        return list(MODULES_EVENEMENT_DISPONIBLES)
+
+    modules_valides: list[str] = []
+    for module in raw:
+        module_normalise = _normaliser_module_evenement(module)
+        if (
+            module_normalise in MODULES_EVENEMENT_DISPONIBLES
+            and module_normalise not in modules_valides
+        ):
+            modules_valides.append(module_normalise)
+    return modules_valides or list(MODULES_EVENEMENT_PAR_DEFAUT)
+
+
+def get_modules_actifs_evenement(evenement_id: int) -> list[str]:
+    """Retourne les modules actifs d'un événement."""
+    evenement = get_evenement_by_id(evenement_id)
+    if not evenement:
+        return list(MODULES_EVENEMENT_PAR_DEFAUT)
+    return modules_actifs_depuis_json(evenement.get("modules_actifs_json"))
 
 
 # ── Tarifs ───────────────────────────────────────────────────────────────────

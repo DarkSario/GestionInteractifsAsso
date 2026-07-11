@@ -376,6 +376,52 @@ def update_ligne_statut(ligne_id: int, statut: str) -> bool:
         conn.close()
 
 
+def update_ligne(
+    ligne_id: int,
+    valeurs: dict[int, str] | None = None,
+    statut_ligne: str | None = None,
+) -> bool:
+    """Met à jour une ligne complète et ses cellules."""
+    conn = get_connection()
+    try:
+        exists = conn.execute(
+            "SELECT id FROM tableaux_lignes WHERE id = ?",
+            (ligne_id,),
+        ).fetchone()
+        if not exists:
+            return False
+        if statut_ligne is not None:
+            conn.execute(
+                "UPDATE tableaux_lignes SET statut_ligne = ? WHERE id = ?",
+                (statut_ligne, ligne_id),
+            )
+        for colonne_id, valeur in (valeurs or {}).items():
+            existing = conn.execute(
+                "SELECT id FROM tableaux_cellules WHERE ligne_id = ? AND colonne_id = ?",
+                (ligne_id, colonne_id),
+            ).fetchone()
+            if existing:
+                conn.execute(
+                    "UPDATE tableaux_cellules SET valeur = ? WHERE id = ?",
+                    (valeur, existing["id"]),
+                )
+            else:
+                conn.execute(
+                    """
+                    INSERT INTO tableaux_cellules (ligne_id, colonne_id, valeur)
+                    VALUES (?, ?, ?)
+                    """,
+                    (ligne_id, colonne_id, valeur),
+                )
+        conn.commit()
+        return True
+    except Exception as exc:
+        logger.error("update_ligne: %s", exc)
+        return False
+    finally:
+        conn.close()
+
+
 def delete_ligne(ligne_id: int) -> bool:
     """Supprime une ligne et ses cellules."""
     conn = get_connection()

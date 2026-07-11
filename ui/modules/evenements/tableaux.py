@@ -16,12 +16,14 @@ from db.models.tableaux import (
     apply_template,
     calculer_totaux,
     dupliquer_tableau,
+    get_cellules_ligne,
     get_all_templates,
     get_colonnes_tableau,
     get_lignes_tableau,
     get_tableaux_evenement,
     save_template,
     set_cellule,
+    update_ligne,
 )
 from ui.components.dialogs import afficher_info
 
@@ -84,6 +86,9 @@ class TableauxView(ctk.CTkFrame):
         ctk.CTkButton(actions, text="+ Ligne", command=self._ajouter_ligne).pack(
             side="left"
         )
+        ctk.CTkButton(
+            actions, text="✏️ Modifier ligne", command=self._modifier_ligne
+        ).pack(side="left", padx=(8, 0))
         ctk.CTkButton(actions, text="⚙️ Colonnes", command=self._ajouter_colonne).pack(
             side="left", padx=8
         )
@@ -99,6 +104,7 @@ class TableauxView(ctk.CTkFrame):
 
         self._tree_lignes = ttk.Treeview(self, show="headings", height=10)
         self._tree_lignes.pack(fill="both", expand=True, padx=8, pady=(0, 8))
+        self._tree_lignes.bind("<Double-1>", self._modifier_ligne)
 
     def _check_evenement(self) -> bool:
         if self._evenement_id:
@@ -237,6 +243,24 @@ class TableauxView(ctk.CTkFrame):
                 set_cellule(ligne_id, int(col["id"]), valeur)
         self._charger_tableau(self._tableau_id)
 
+    def _modifier_ligne(self, _event: Any | None = None) -> None:
+        if not self._tableau_id:
+            afficher_info(self, "Lignes", "Sélectionnez d'abord un tableau.")
+            return
+        selected = self._tree_lignes.selection()
+        if not selected:
+            afficher_info(self, "Lignes", "Sélectionnez d'abord une ligne.")
+            return
+        ligne_id = int(selected[0])
+        colonnes = get_colonnes_tableau(self._tableau_id)
+        cellules = get_cellules_ligne(ligne_id)
+        dialog = _DialogLigne(self, colonnes, valeurs_initiales=cellules, titre="Modifier une ligne")
+        self.wait_window(dialog)
+        if dialog.result is None:
+            return
+        update_ligne(ligne_id, valeurs=dialog.result)
+        self._charger_tableau(self._tableau_id)
+
     def _sauver_template(self) -> None:
         if not self._tableau_id:
             afficher_info(self, "Template", "Sélectionnez d'abord un tableau.")
@@ -299,15 +323,22 @@ class _DialogColonne(ctk.CTkToplevel):
 
 
 class _DialogLigne(ctk.CTkToplevel):
-    def __init__(self, parent: Any, colonnes: list[dict]) -> None:
+    def __init__(
+        self,
+        parent: Any,
+        colonnes: list[dict],
+        valeurs_initiales: dict[int, str] | None = None,
+        titre: str = "Ajouter une ligne",
+    ) -> None:
         super().__init__(parent)
-        self.title("Ajouter une ligne")
+        self.title(titre)
         self.geometry("560x520")
         self.transient(parent)
         self.grab_set()
         self.result: dict[int, str] | None = None
         self._vars: dict[int, ctk.StringVar] = {}
         self._colonnes = colonnes
+        self._valeurs_initiales = valeurs_initiales or {}
         self._build_ui()
 
     def _build_ui(self) -> None:
@@ -316,13 +347,14 @@ class _DialogLigne(ctk.CTkToplevel):
         for col in self._colonnes:
             cid = int(col["id"])
             ctk.CTkLabel(scroll, text=f"{col['nom']} :").pack(anchor="w", pady=(6, 2))
-            var = ctk.StringVar()
+            valeur_initiale = str(self._valeurs_initiales.get(cid, ""))
+            var = ctk.StringVar(value=valeur_initiale)
             self._vars[cid] = var
             column_type = str(col.get("type_colonne") or "").strip().lower()
             if column_type.startswith("liste_"):
                 valeurs = get_valeurs_liste(column_type, str(col.get("liste_perso_valeurs") or ""))
                 widget = ctk.CTkComboBox(scroll, values=valeurs or [""], variable=var)
-                if valeurs:
+                if valeurs and not valeur_initiale:
                     var.set(valeurs[0])
             else:
                 widget = ctk.CTkEntry(scroll, textvariable=var)
@@ -331,7 +363,7 @@ class _DialogLigne(ctk.CTkToplevel):
         footer = ctk.CTkFrame(self, fg_color="transparent")
         footer.pack(fill="x", padx=12, pady=(0, 12))
         ctk.CTkButton(footer, text="Annuler", command=self.destroy).pack(side="right")
-        ctk.CTkButton(footer, text="✅ Ajouter", command=self._valider).pack(side="right", padx=(0, 8))
+        ctk.CTkButton(footer, text="💾 Enregistrer", command=self._valider).pack(side="right", padx=(0, 8))
 
     def _valider(self) -> None:
         self.result = {cid: var.get().strip() for cid, var in self._vars.items()}
