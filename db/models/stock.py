@@ -6,6 +6,12 @@ from db.connection import get_connection
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
+_SQL_QUANTITE_ACTUELLE = """
+CASE
+    WHEN COUNT(ms.id) > 0 THEN COALESCE(SUM(ms.quantite), 0)
+    ELSE COALESCE(s.quantite, 0)
+END
+"""
 
 
 def _quantite_stock_calculee(conn, stock_id: int) -> int:
@@ -57,14 +63,11 @@ def get_all_articles(include_archives: bool = False) -> list[dict]:
     try:
         if include_archives:
             rows = conn.execute(
-                """
+                f"""
                 SELECT s.id, s.nom, s.categorie_id, c.nom AS categorie_nom,
                        s.unite_id, u.nom AS unite_nom,
                        s.fournisseur_habituel_id, f.nom AS fournisseur_nom,
-                       CASE
-                           WHEN COUNT(ms.id) > 0 THEN COALESCE(SUM(ms.quantite), 0)
-                           ELSE COALESCE(s.quantite, 0)
-                       END AS quantite,
+                       {_SQL_QUANTITE_ACTUELLE} AS quantite,
                        s.seuil_alerte, s.prix_achat,
                        s.lot, s.commentaire, s.statut_archive
                 FROM stock s
@@ -81,14 +84,11 @@ def get_all_articles(include_archives: bool = False) -> list[dict]:
             ).fetchall()
         else:
             rows = conn.execute(
-                """
+                f"""
                 SELECT s.id, s.nom, s.categorie_id, c.nom AS categorie_nom,
                        s.unite_id, u.nom AS unite_nom,
                        s.fournisseur_habituel_id, f.nom AS fournisseur_nom,
-                       CASE
-                           WHEN COUNT(ms.id) > 0 THEN COALESCE(SUM(ms.quantite), 0)
-                           ELSE COALESCE(s.quantite, 0)
-                       END AS quantite,
+                       {_SQL_QUANTITE_ACTUELLE} AS quantite,
                        s.seuil_alerte, s.prix_achat,
                        s.lot, s.commentaire, s.statut_archive
                 FROM stock s
@@ -121,14 +121,11 @@ def get_article_by_id(article_id: int) -> dict | None:
     conn = get_connection()
     try:
         row = conn.execute(
-            """
+            f"""
             SELECT s.id, s.nom, s.categorie_id, c.nom AS categorie_nom,
                    s.unite_id, u.nom AS unite_nom,
                    s.fournisseur_habituel_id, f.nom AS fournisseur_nom,
-                   CASE
-                       WHEN COUNT(ms.id) > 0 THEN COALESCE(SUM(ms.quantite), 0)
-                       ELSE COALESCE(s.quantite, 0)
-                   END AS quantite,
+                   {_SQL_QUANTITE_ACTUELLE} AS quantite,
                    s.seuil_alerte, s.prix_achat,
                    s.lot, s.commentaire, s.statut_archive
             FROM stock s

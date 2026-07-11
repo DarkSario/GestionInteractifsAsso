@@ -347,13 +347,14 @@ class _DialogLigne(ctk.CTkToplevel):
         for col in self._colonnes:
             cid = int(col["id"])
             ctk.CTkLabel(scroll, text=f"{col['nom']} :").pack(anchor="w", pady=(6, 2))
-            var = ctk.StringVar(value=str(self._valeurs_initiales.get(cid, "")))
+            valeur_initiale = str(self._valeurs_initiales.get(cid, ""))
+            var = ctk.StringVar(value=valeur_initiale)
             self._vars[cid] = var
             column_type = str(col.get("type_colonne") or "").strip().lower()
             if column_type.startswith("liste_"):
                 valeurs = get_valeurs_liste(column_type, str(col.get("liste_perso_valeurs") or ""))
                 widget = ctk.CTkComboBox(scroll, values=valeurs or [""], variable=var)
-                if valeurs and var.get() not in valeurs:
+                if valeurs and not valeur_initiale:
                     var.set(valeurs[0])
             else:
                 widget = ctk.CTkEntry(scroll, textvariable=var)

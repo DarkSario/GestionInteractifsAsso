@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS tombola_solidaire_participations (
     created_at TEXT DEFAULT (datetime('now'))
 );
 
+-- Valeur alignée avec MODULES_EVENEMENT_PAR_DEFAUT côté application.
 ALTER TABLE evenements ADD COLUMN modules_actifs_json TEXT DEFAULT '["billetterie","depenses","benevoles"]';
 ALTER TABLE evenements ADD COLUMN tombola_tickets_par_carnet INTEGER DEFAULT 5;
 

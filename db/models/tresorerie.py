@@ -741,7 +741,11 @@ def update_subvention(subvention_id, **kwargs) -> bool:
         if key not in allowed:
             continue
         if key == "statut":
-            value = _SUBVENTION_STATUTS.get(str(value or "").strip().lower(), value)
+            valeur_normalisee = _SUBVENTION_STATUTS.get(str(value or "").strip().lower())
+            if valeur_normalisee is None:
+                logger.warning("update_subvention: statut invalide ignoré pour id=%s", subvention_id)
+                return False
+            value = valeur_normalisee
         updates.append((allowed[key], value))
 
     if not updates:
