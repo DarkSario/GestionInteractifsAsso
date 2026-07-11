@@ -79,6 +79,7 @@ _TYPES_STAND = {
 }
 _TYPES_LOCATION = {"Recette": "recette", "Dépense": "depense"}
 _STATUTS = ["Prévu", "Confirmé", "Annulé"]
+_STATUTS_STAND = {"Prévu": "prevu", "Confirmé": "confirme", "Annulé": "annule"}
 
 
 def _parse_float(value: str | float | int | None) -> float:
@@ -100,7 +101,7 @@ def enregistrer_stand_depuis_formulaire(
     telephone = str(formulaire.get("telephone") or "").strip() or None
     emplacement = str(formulaire.get("emplacement") or "").strip() or None
     commentaire = str(formulaire.get("commentaire") or "").strip() or None
-    statut = str(formulaire.get("statut") or "confirme").strip().lower().replace("é", "e")
+    statut = _STATUTS_STAND.get(str(formulaire.get("statut") or "Confirmé"), "confirme")
     montant = _parse_float(formulaire.get("montant_location"))
 
     if stand_id is None:

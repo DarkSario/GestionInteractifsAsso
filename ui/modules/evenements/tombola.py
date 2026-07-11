@@ -111,11 +111,15 @@ def enregistrer_lot_depuis_formulaire(
     formulaire: dict[str, Any],
     lot_id: int | None = None,
 ) -> int:
+    valeur_estimee = _parse_float(formulaire.get("valeur_estimee"))
+    valeur_lot = _parse_float(formulaire.get("valeur_lot"))
+    if valeur_lot <= 0:
+        valeur_lot = valeur_estimee
     donnees = {
         "numero": _parse_int(formulaire.get("numero")),
         "description": str(formulaire.get("description") or "").strip(),
-        "valeur_estimee": _parse_float(formulaire.get("valeur_estimee")),
-        "valeur_lot": _parse_float(formulaire.get("valeur_estimee")),
+        "valeur_estimee": valeur_estimee,
+        "valeur_lot": valeur_lot,
         "donateur": str(formulaire.get("donateur") or "").strip() or None,
         "numero_gagnant": str(formulaire.get("numero_gagnant") or "").strip() or None,
         "statut": _STATUTS_LOT.get(str(formulaire.get("statut") or "Disponible"), "disponible"),
