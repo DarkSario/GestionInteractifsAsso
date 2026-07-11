@@ -19,8 +19,12 @@ def get_stands_evenement(evenement_id: int) -> list[dict]:
     try:
         rows = conn.execute(
             """
-            SELECT s.id, s.evenement_id, s.numero_emplacement, s.nom_stand, s.type_stand, s.type_location,
+            SELECT s.id, s.evenement_id, s.numero_emplacement,
+                   COALESCE(s.emplacement, s.numero_emplacement) AS emplacement,
+                   s.nom_stand, s.type_stand, s.type_location,
                    s.responsable_membre_id, s.responsable_nom_externe,
+                   COALESCE(s.responsable, s.responsable_nom_externe) AS responsable,
+                   s.telephone,
                    m.nom AS responsable_nom, m.prenom AS responsable_prenom,
                    s.montant_location, s.paiement_avant, s.statut, s.commentaire, s.tresorerie_id
             FROM evenement_stands s
@@ -46,6 +50,9 @@ def add_stand(
     type_location,
     paiement_avant,
     commentaire,
+    responsable=None,
+    telephone=None,
+    emplacement=None,
 ) -> int:
     """Ajoute un stand et retourne son identifiant."""
     conn = get_connection()
@@ -55,8 +62,9 @@ def add_stand(
             INSERT INTO evenement_stands
                 (evenement_id, numero_emplacement, nom_stand, type_stand,
                  responsable_membre_id, responsable_nom_externe,
-                 montant_location, type_location, paiement_avant, commentaire)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 montant_location, type_location, paiement_avant, commentaire,
+                 responsable, telephone, emplacement)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 evenement_id,
@@ -69,6 +77,9 @@ def add_stand(
                 type_location or LOCATION_TYPE_REVENUE,
                 1 if paiement_avant else 0,
                 commentaire,
+                responsable or responsable_nom_externe,
+                telephone or None,
+                emplacement or numero_emplacement,
             ),
         )
         conn.commit()
@@ -90,6 +101,9 @@ _COLONNES_STAND = frozenset(
         "statut",
         "commentaire",
         "tresorerie_id",
+        "responsable",
+        "telephone",
+        "emplacement",
     }
 )
 _UPDATE_STAND_SQL = {
@@ -298,14 +312,17 @@ def promouvoir_attente(attente_id: int) -> bool:
             """
             INSERT INTO evenement_stands
                 (evenement_id, numero_emplacement, nom_stand, type_stand,
-                 responsable_nom_externe, montant_location, paiement_avant, statut, commentaire)
-            VALUES (?, NULL, ?, 'benevole', ?, 0, 0, 'confirme', ?)
+                 responsable_nom_externe, montant_location, paiement_avant, statut,
+                 commentaire, responsable, telephone, emplacement)
+            VALUES (?, NULL, ?, 'benevole', ?, 0, 0, 'confirme', ?, ?, ?, NULL)
             """,
             (
                 data["evenement_id"],
                 f"Stand {identite}",
                 identite,
                 data.get("commentaire"),
+                identite,
+                data.get("contact"),
             ),
         )
         conn.execute("DELETE FROM evenement_stands_attente WHERE id = ?", (attente_id,))

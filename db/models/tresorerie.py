@@ -10,6 +10,18 @@ from utils.logger import get_logger
 
 logger = get_logger(__name__)
 
+_SUBVENTION_STATUTS = {
+    "en_attente": "en_attente",
+    "en attente": "en_attente",
+    "accordee": "accordee",
+    "obtenue": "accordee",
+    "refusee": "refusee",
+    "refusée": "refusee",
+    "annulee": "annulee",
+    "annulée": "annulee",
+    "partielle": "partielle",
+}
+
 
 def _fetch_all(query: str, params: tuple = ()) -> list[dict]:
     conn = get_connection()
@@ -517,13 +529,32 @@ def add_virement_interne(
 # ── Remises de chèques ────────────────────────────────────────────────────────
 
 
-def add_remise_cheque(compte_id, date_remise, reference, commentaire) -> int:
+def add_remise_cheque(
+    compte_id,
+    date_remise,
+    reference,
+    commentaire,
+    nombre_cheques: int | None = None,
+    montant_total: float | None = None,
+    numero_bordereau: str | None = None,
+) -> int:
     return _execute(
         """
-        INSERT INTO remises_cheques (compte_id, date_remise, reference, commentaire)
-        VALUES (?, ?, ?, ?)
+        INSERT INTO remises_cheques (
+            compte_id, date_remise, reference, commentaire,
+            nombre_cheques, montant_total, numero_bordereau
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?)
         """,
-        (compte_id, date_remise, reference, commentaire),
+        (
+            compte_id,
+            date_remise,
+            reference,
+            commentaire,
+            int(nombre_cheques or 0),
+            float(montant_total or 0),
+            numero_bordereau or None,
+        ),
     )
 
 
@@ -628,6 +659,33 @@ def update_remise_statut(remise_id: int, statut: str) -> bool:
     return True
 
 
+def update_remise_cheque(remise_id: int, **kwargs) -> bool:
+    """Met à jour une remise de chèques."""
+    allowed = {
+        "date_remise": "UPDATE remises_cheques SET date_remise = ? WHERE id = ?",
+        "reference": "UPDATE remises_cheques SET reference = ? WHERE id = ?",
+        "commentaire": "UPDATE remises_cheques SET commentaire = ? WHERE id = ?",
+        "nombre_cheques": "UPDATE remises_cheques SET nombre_cheques = ? WHERE id = ?",
+        "montant_total": "UPDATE remises_cheques SET montant_total = ? WHERE id = ?",
+        "numero_bordereau": "UPDATE remises_cheques SET numero_bordereau = ? WHERE id = ?",
+        "compte_id": "UPDATE remises_cheques SET compte_id = ? WHERE id = ?",
+    }
+    updates: list[tuple[str, Any]] = []
+    for key, value in kwargs.items():
+        if key in allowed:
+            updates.append((allowed[key], value))
+    if not updates:
+        return False
+    conn = get_connection()
+    try:
+        for statement, value in updates:
+            conn.execute(statement, (value, remise_id))
+        conn.commit()
+        return True
+    finally:
+        conn.close()
+
+
 # ── Subventions ───────────────────────────────────────────────────────────────
 
 
@@ -681,6 +739,8 @@ def update_subvention(subvention_id, **kwargs) -> bool:
     for key, value in kwargs.items():
         if key not in allowed:
             continue
+        if key == "statut":
+            value = _SUBVENTION_STATUTS.get(str(value or "").strip().lower(), value)
         updates.append((allowed[key], value))
 
     if not updates:
@@ -771,7 +831,9 @@ def get_stats_subventions(annee=None) -> dict:
     subventions = get_all_subventions(annee=annee)
     total_demande = round(sum(float(s.get("montant_demande") or 0) for s in subventions), 2)
     total_obtenu = round(sum(float(s.get("montant_obtenu") or 0) for s in subventions), 2)
-    nb_accordees = sum(1 for s in subventions if s.get("statut") == "accordee")
+    nb_accordees = sum(
+        1 for s in subventions if s.get("statut") in {"accordee", "partielle"}
+    )
     nb_en_attente = sum(1 for s in subventions if s.get("statut") == "en_attente")
 
     return {

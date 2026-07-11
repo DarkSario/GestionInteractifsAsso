@@ -1,9 +1,44 @@
 """CRUD pour les tables stock et mouvements_stock."""
 
+from __future__ import annotations
+
 from db.connection import get_connection
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
+
+
+def _quantite_stock_calculee(conn, stock_id: int) -> int:
+    """Retourne la quantité actuelle calculée depuis les mouvements.
+
+    Si l'article ne possède encore aucun mouvement, on conserve la quantité
+    enregistrée sur la fiche article pour rester rétrocompatible.
+    """
+    row = conn.execute(
+        """
+        SELECT
+            s.quantite AS quantite_article,
+            COUNT(m.id) AS nb_mouvements,
+            COALESCE(SUM(m.quantite), 0) AS quantite_mouvements
+        FROM stock s
+        LEFT JOIN mouvements_stock m ON m.stock_id = s.id
+        WHERE s.id = ?
+        GROUP BY s.id, s.quantite
+        """,
+        (stock_id,),
+    ).fetchone()
+    if not row:
+        raise ValueError(f"Article introuvable : id={stock_id}")
+    if int(row["nb_mouvements"] or 0) == 0:
+        return int(row["quantite_article"] or 0)
+    return int(row["quantite_mouvements"] or 0)
+
+
+def _recalculer_quantite_stock(conn, stock_id: int) -> int:
+    """Recalcule puis persiste la quantité actuelle d'un article."""
+    quantite = _quantite_stock_calculee(conn, stock_id)
+    conn.execute("UPDATE stock SET quantite = ? WHERE id = ?", (quantite, stock_id))
+    return quantite
 
 
 # ── Articles ─────────────────────────────────────────────────────────────────
@@ -26,7 +61,18 @@ def get_all_articles(include_archives: bool = False) -> list[dict]:
                 SELECT s.id, s.nom, s.categorie_id, c.nom AS categorie_nom,
                        s.unite_id, u.nom AS unite_nom,
                        s.fournisseur_habituel_id, f.nom AS fournisseur_nom,
-                       s.quantite, s.seuil_alerte, s.prix_achat,
+                       COALESCE(
+                           CASE
+                               WHEN EXISTS (
+                                   SELECT 1 FROM mouvements_stock ms WHERE ms.stock_id = s.id
+                               )
+                               THEN (SELECT COALESCE(SUM(ms2.quantite), 0) FROM mouvements_stock ms2 WHERE ms2.stock_id = s.id)
+                               ELSE s.quantite
+                           END,
+                           s.quantite,
+                           0
+                       ) AS quantite,
+                       s.seuil_alerte, s.prix_achat,
                        s.lot, s.commentaire, s.statut_archive
                 FROM stock s
                 LEFT JOIN categories c ON s.categorie_id = c.id
@@ -41,7 +87,18 @@ def get_all_articles(include_archives: bool = False) -> list[dict]:
                 SELECT s.id, s.nom, s.categorie_id, c.nom AS categorie_nom,
                        s.unite_id, u.nom AS unite_nom,
                        s.fournisseur_habituel_id, f.nom AS fournisseur_nom,
-                       s.quantite, s.seuil_alerte, s.prix_achat,
+                       COALESCE(
+                           CASE
+                               WHEN EXISTS (
+                                   SELECT 1 FROM mouvements_stock ms WHERE ms.stock_id = s.id
+                               )
+                               THEN (SELECT COALESCE(SUM(ms2.quantite), 0) FROM mouvements_stock ms2 WHERE ms2.stock_id = s.id)
+                               ELSE s.quantite
+                           END,
+                           s.quantite,
+                           0
+                       ) AS quantite,
+                       s.seuil_alerte, s.prix_achat,
                        s.lot, s.commentaire, s.statut_archive
                 FROM stock s
                 LEFT JOIN categories c ON s.categorie_id = c.id
@@ -72,7 +129,18 @@ def get_article_by_id(article_id: int) -> dict | None:
             SELECT s.id, s.nom, s.categorie_id, c.nom AS categorie_nom,
                    s.unite_id, u.nom AS unite_nom,
                    s.fournisseur_habituel_id, f.nom AS fournisseur_nom,
-                   s.quantite, s.seuil_alerte, s.prix_achat,
+                   COALESCE(
+                       CASE
+                           WHEN EXISTS (
+                               SELECT 1 FROM mouvements_stock ms WHERE ms.stock_id = s.id
+                           )
+                           THEN (SELECT COALESCE(SUM(ms2.quantite), 0) FROM mouvements_stock ms2 WHERE ms2.stock_id = s.id)
+                           ELSE s.quantite
+                       END,
+                       s.quantite,
+                       0
+                   ) AS quantite,
+                   s.seuil_alerte, s.prix_achat,
                    s.lot, s.commentaire, s.statut_archive
             FROM stock s
             LEFT JOIN categories c ON s.categorie_id = c.id
@@ -281,25 +349,15 @@ def add_mouvement(
     conn = get_connection()
     try:
         # Récupérer le stock actuel
-        row = conn.execute(
-            "SELECT quantite FROM stock WHERE id = ?",
-            (stock_id,),
-        ).fetchone()
-        if not row:
-            raise ValueError(f"Article introuvable : id={stock_id}")
-
-        stock_actuel = row["quantite"]
+        stock_actuel = _quantite_stock_calculee(conn, stock_id)
 
         # Calculer le nouveau stock
         if type_mouvement == "Inventaire":
-            nouveau_stock = quantite
             delta = quantite - stock_actuel
         elif type_mouvement.startswith("Entrée"):
-            nouveau_stock = stock_actuel + quantite
             delta = quantite
         else:
             # Sortie
-            nouveau_stock = stock_actuel - quantite
             delta = -quantite
 
         # Insérer le mouvement
@@ -324,10 +382,7 @@ def add_mouvement(
         )
 
         # Mettre à jour la quantité en stock
-        conn.execute(
-            "UPDATE stock SET quantite = ? WHERE id = ?",
-            (nouveau_stock, stock_id),
-        )
+        _recalculer_quantite_stock(conn, stock_id)
         conn.commit()
         logger.info(
             "Mouvement ajouté : stock_id=%s type=%s qté=%s",
@@ -441,14 +496,9 @@ def delete_mouvement(mouvement_id: int) -> bool:
             return False
 
         stock_id = row["stock_id"]
-        delta = row["quantite"]
 
         conn.execute("DELETE FROM mouvements_stock WHERE id = ?", (mouvement_id,))
-        # Inverser le delta pour restaurer le stock
-        conn.execute(
-            "UPDATE stock SET quantite = quantite - ? WHERE id = ?",
-            (delta, stock_id),
-        )
+        _recalculer_quantite_stock(conn, stock_id)
         conn.commit()
         logger.info("Mouvement supprimé : id=%s", mouvement_id)
         return True

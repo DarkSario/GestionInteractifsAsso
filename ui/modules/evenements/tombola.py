@@ -56,6 +56,9 @@ class TombolaView(ctk.CTkFrame):
         ctk.CTkLabel(cfg, text="Prix carnet (€)").pack(side="left")
         self._var_prix_carnet = ctk.StringVar(value="0")
         ctk.CTkEntry(cfg, textvariable=self._var_prix_carnet, width=90).pack(side="left", padx=6)
+        ctk.CTkLabel(cfg, text="Tickets / carnet").pack(side="left", padx=(14, 0))
+        self._var_tickets_par_carnet = ctk.StringVar(value="5")
+        ctk.CTkEntry(cfg, textvariable=self._var_tickets_par_carnet, width=70).pack(side="left", padx=6)
         ctk.CTkButton(cfg, text="💾 Enregistrer", width=120, command=self._sauver_config).pack(side="left", padx=(8, 0))
 
         ctk.CTkButton(
@@ -141,6 +144,7 @@ class TombolaView(ctk.CTkFrame):
         config = get_config_tombola_evenement(self._evenement_id)
         self._var_prix_ticket.set(str(config["prix_ticket"]).replace(".", ","))
         self._var_prix_carnet.set(str(config["prix_carnet"]).replace(".", ","))
+        self._var_tickets_par_carnet.set(str(config.get("tickets_par_carnet") or 5))
 
         carnets = get_carnets_evenement(self._evenement_id)
         for c in carnets:
@@ -292,10 +296,16 @@ class TombolaView(ctk.CTkFrame):
         try:
             prix_ticket = float(self._var_prix_ticket.get().replace(",", "."))
             prix_carnet = float(self._var_prix_carnet.get().replace(",", "."))
+            tickets_par_carnet = int(self._var_tickets_par_carnet.get() or 5)
         except ValueError:
             afficher_erreur(self, "Configuration tombola", "Montants invalides.")
             return
-        update_config_tombola_evenement(self._evenement_id, prix_ticket, prix_carnet)
+        update_config_tombola_evenement(
+            self._evenement_id,
+            prix_ticket,
+            prix_carnet,
+            tickets_par_carnet=tickets_par_carnet,
+        )
         afficher_info(self, "Configuration tombola", "Tarifs tombola enregistrés.")
 
     def _modifier_statut_lot(self) -> None:

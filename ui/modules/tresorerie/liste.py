@@ -41,8 +41,8 @@ class ListeTresorerie(ctk.CTkToplevel):
         tab_comptes = tabs.add("💰 Comptes")
         tab_operations = tabs.add("📋 Opérations")
         tab_remises = tabs.add("🏦 Remises chèques")
-        tab_subventions = tabs.add("🎁 Subventions")
         tab_depot = tabs.add("💵 Dépôt Espèces")
+        tab_subventions = tabs.add("🎁 Subventions")
 
         build_tab_comptes(tab_comptes, self)
         build_tab_operations(tab_operations, self)

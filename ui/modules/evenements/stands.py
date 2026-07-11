@@ -84,7 +84,7 @@ class StandsView(ctk.CTkFrame):
 
         stands = get_stands_evenement(self._evenement_id)
         for s in stands:
-            responsable = s.get("responsable_nom_externe") or " ".join(
+            responsable = s.get("responsable") or s.get("responsable_nom_externe") or " ".join(
                 p for p in [s.get("responsable_prenom"), s.get("responsable_nom")] if p
             ).strip()
             self._tree.insert(
@@ -92,7 +92,7 @@ class StandsView(ctk.CTkFrame):
                 "end",
                 iid=str(s["id"]),
                 values=(
-                    s.get("numero_emplacement") or "—",
+                    s.get("emplacement") or s.get("numero_emplacement") or "—",
                     s.get("nom_stand"),
                     responsable or "—",
                     self._format_type_stand(s),
