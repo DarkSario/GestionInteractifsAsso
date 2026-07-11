@@ -3,7 +3,25 @@
 import json
 from typing import Any
 
-import customtkinter as ctk
+try:
+    import customtkinter as ctk
+except ModuleNotFoundError:  # pragma: no cover - environnement sans Tk
+    class _DummyFont:
+        def __init__(self, *_args, **_kwargs):
+            pass
+
+    class _DummyCTk:
+        CTkFont = _DummyFont
+
+        @staticmethod
+        def set_appearance_mode(*_args, **_kwargs):
+            return None
+
+        @staticmethod
+        def set_default_color_theme(*_args, **_kwargs):
+            return None
+
+    ctk = _DummyCTk()
 
 from config.settings import THEME_FILE
 from utils.logger import get_logger
