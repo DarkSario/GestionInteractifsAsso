@@ -92,6 +92,13 @@ _STATUTS_LOT = {
 }
 
 
+def _label_statut_lot(statut: str | None) -> str:
+    for label, code in _STATUTS_LOT.items():
+        if code == statut:
+            return label
+    return "Disponible"
+
+
 def _parse_float(value: str | float | int | None) -> float:
     try:
         return float(str(value or "0").replace(",", ".").strip() or 0)
@@ -499,7 +506,7 @@ class TombolaView(ctk.CTkFrame):
             f"{valeur_reference:.2f}".replace(".", ",") if lot else "0,00"
         )
         self._var_donateur_lot.set(lot.get("donateur") or "" if lot else "")
-        self._var_statut_lot.set(next((label for label, code in _STATUTS_LOT.items() if code == lot.get("statut")), "Disponible") if lot else "Disponible")
+        self._var_statut_lot.set(_label_statut_lot(lot.get("statut")) if lot else "Disponible")
         self._var_numero_gagnant_lot.set(lot.get("numero_gagnant") or "" if lot else "")
         self._var_commentaire_lot.set(lot.get("commentaire") or "" if lot else "")
         if not self._frame_lot_formulaire.winfo_manager():

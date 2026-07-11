@@ -122,6 +122,18 @@ def _label_statut(statut: str | None) -> str:
     return statut or ""
 
 
+def _libelle_montant_operation(operation: dict[str, Any]) -> str:
+    montant = float(operation.get("montant") or 0)
+    type_op = operation.get("type_operation")
+    signe = (
+        "+"
+        if type_op == "recette"
+        or (type_op == "virement_interne" and operation.get("source_module") == "virement_entrant")
+        else "-"
+    )
+    return f"{signe}{formater_montant(montant)}"
+
+
 def enregistrer_operation_depuis_formulaire(formulaire: dict[str, Any]) -> int:
     comptes = get_all_comptes(actif_only=True)
     if not comptes:
@@ -357,9 +369,7 @@ class _OperationsTab(ctk.CTkFrame):
         self._tree.delete(*self._tree.get_children())
         operations = get_operations()
         for operation in operations:
-            montant = float(operation.get("montant") or 0)
             type_op = operation.get("type_operation")
-            signe = "+" if type_op == "recette" or (type_op == "virement_interne" and operation.get("source_module") == "virement_entrant") else "-"
             self._tree.insert(
                 "",
                 "end",
@@ -368,7 +378,7 @@ class _OperationsTab(ctk.CTkFrame):
                     operation.get("date_operation") or "",
                     operation.get("libelle") or "",
                     operation.get("categorie_nom") or "—",
-                    f"{signe}{formater_montant(montant)}",
+                    _libelle_montant_operation(operation),
                     _label_statut(operation.get("statut")),
                 ),
                 tags=(type_op,),

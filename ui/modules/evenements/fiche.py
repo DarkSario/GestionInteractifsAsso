@@ -104,6 +104,7 @@ LIBELLES_MODULES = {
     "tableaux": "Tableaux",
     "budget_previsionnel": "Budget",
 }
+# Valeurs initiales choisies pour coller au flux de création le plus fréquent.
 MODULES_CREATION_INITIAUX = ("billetterie", "depenses")
 
 STATUTS_BENEVOLE = {

@@ -89,6 +89,13 @@ def _normaliser_date(value: str | None) -> str | None:
     return brut
 
 
+def _annee_depuis_date(value: str) -> int:
+    try:
+        return datetime.strptime(value, _DATE_FORMAT).year
+    except ValueError:
+        return datetime.now().year
+
+
 def enregistrer_subvention_depuis_formulaire(
     formulaire: dict[str, Any],
     subvention_id: int | None = None,
@@ -105,7 +112,7 @@ def enregistrer_subvention_depuis_formulaire(
     statut = str(formulaire.get("statut") or "en_attente").strip().lower()
     commentaire = str(formulaire.get("commentaire") or "").strip() or None
 
-    annee = int(date_demande[:4]) if len(date_demande) >= 4 and date_demande[:4].isdigit() else datetime.now().year
+    annee = _annee_depuis_date(date_demande)
     if subvention_id is None:
         subvention_id = add_subvention(
             organisme=organisme,
