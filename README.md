@@ -20,6 +20,7 @@ Application desktop en Python permettant de gérer :
 ## Prérequis
 
 - **Python 3.10+**
+- **tkinter** (inclus sur Windows ; sur Linux : `sudo apt install python3-tk`)
 - Les dépendances listées dans `requirements.txt`
 
 ---
