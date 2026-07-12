@@ -51,13 +51,16 @@ except ModuleNotFoundError:  # pragma: no cover - environnement sans Tk
 from core.tresorerie import formater_montant
 from db.models.tresorerie import (
     add_operation,
+    delete_operation,
     get_all_categories,
     get_all_comptes,
+    get_operation_by_id,
     get_operations,
     get_stats_tresorerie,
+    update_operation,
 )
 from ui import theme as app_theme
-from ui.components.dialogs import afficher_erreur, afficher_info
+from ui.components.dialogs import afficher_erreur, afficher_info, demander_confirmation
 
 
 COULEURS = {
@@ -174,6 +177,7 @@ class _OperationsTab(ctk.CTkFrame):
         self._tresorerie_root = root
         self._comptes = get_all_comptes(actif_only=True)
         self._categories: list[dict[str, Any]] = []
+        self._operation_en_edition: int | None = None
         self._build_ui()
         self.refresh()
 
@@ -198,6 +202,22 @@ class _OperationsTab(ctk.CTkFrame):
             text="+ Dépense",
             width=110,
             command=lambda: self._ouvrir_formulaire("depense"),
+        ).pack(side="right", padx=(0, 8))
+        ctk.CTkButton(
+            header,
+            text="✏️ Modifier",
+            width=110,
+            fg_color="gray",
+            hover_color="#555",
+            command=self._modifier_operation,
+        ).pack(side="right", padx=(0, 8))
+        ctk.CTkButton(
+            header,
+            text="🗑️ Supprimer",
+            width=110,
+            fg_color="#b71c1c",
+            hover_color="#7f0000",
+            command=self._supprimer_operation,
         ).pack(side="right", padx=(0, 8))
 
         if _periode_contient_cloture():
@@ -257,11 +277,12 @@ class _OperationsTab(ctk.CTkFrame):
         self._var_compte = ctk.StringVar(value=self._comptes[0]["nom"] if self._comptes else "")
         self._var_commentaire = ctk.StringVar()
 
-        ctk.CTkLabel(
+        self._lbl_titre_formulaire = ctk.CTkLabel(
             self._frame_formulaire,
             text="💸 Nouvelle opération",
             font=app_theme.FONTS.get("subtitle"),
-        ).pack(anchor="w", padx=16, pady=(16, 12))
+        )
+        self._lbl_titre_formulaire.pack(anchor="w", padx=16, pady=(16, 12))
 
         bloc_type = ctk.CTkFrame(self._frame_formulaire, fg_color="transparent")
         bloc_type.pack(fill="x", padx=16, pady=4)
@@ -327,6 +348,8 @@ class _OperationsTab(ctk.CTkFrame):
         if not self._comptes:
             afficher_info(self, "Opérations", "Créez d'abord un compte actif.")
             return
+        self._operation_en_edition = None
+        self._lbl_titre_formulaire.configure(text="💸 Nouvelle opération")
         self._var_type.set(type_operation)
         self._var_libelle.set("Recette" if type_operation == "recette" else "Dépense")
         self._var_montant.set("0,00")
@@ -339,30 +362,122 @@ class _OperationsTab(ctk.CTkFrame):
         if not self._frame_formulaire.winfo_manager():
             self._frame_formulaire.pack(side="right", fill="y", padx=(12, 0))
 
+    def _modifier_operation(self) -> None:
+        selected = self._tree.selection()
+        if not selected:
+            afficher_info(self, "Opérations", "Sélectionnez une opération à modifier.")
+            return
+        try:
+            operation_id = int(selected[0])
+        except (TypeError, ValueError):
+            return
+        operation = get_operation_by_id(operation_id)
+        if not operation:
+            afficher_erreur(self, "Opérations", "Opération introuvable.")
+            return
+        if int(operation.get("est_automatique") or 0) == 1:
+            afficher_info(self, "Opérations", "Les opérations automatiques ne peuvent pas être modifiées.")
+            return
+        self._operation_en_edition = operation_id
+        self._lbl_titre_formulaire.configure(text="✏️ Modifier l'opération")
+        type_op = operation.get("type_operation", "depense")
+        self._var_type.set(type_op)
+        self._refresh_categories()
+        self._var_libelle.set(operation.get("libelle") or "")
+        montant = float(operation.get("montant") or 0)
+        self._var_montant.set(f"{montant:,.2f}".replace(",", " ").replace(".", ","))
+        self._var_date.set(operation.get("date_operation") or datetime.now().strftime("%Y-%m-%d"))
+        moyen_code = operation.get("mode_paiement") or "autre"
+        moyen_label = next((k for k, v in _MOYENS_PAIEMENT.items() if v == moyen_code), "Virement")
+        self._var_moyen.set(moyen_label)
+        statut_code = operation.get("statut") or "valide"
+        statut_label = next((k for k, v in _STATUTS.items() if v == statut_code), "Payé")
+        self._var_statut.set(statut_label)
+        compte_nom = operation.get("compte_nom") or (self._comptes[0]["nom"] if self._comptes else "")
+        self._var_compte.set(compte_nom)
+        self._var_commentaire.set(operation.get("commentaire") or "")
+        cat_nom = operation.get("categorie_nom") or ""
+        if cat_nom and cat_nom in [c.get("nom") or "" for c in self._categories]:
+            self._var_categorie.set(cat_nom)
+        if not self._frame_formulaire.winfo_manager():
+            self._frame_formulaire.pack(side="right", fill="y", padx=(12, 0))
+
+    def _supprimer_operation(self) -> None:
+        selected = self._tree.selection()
+        if not selected:
+            afficher_info(self, "Opérations", "Sélectionnez une opération à supprimer.")
+            return
+        try:
+            operation_id = int(selected[0])
+        except (TypeError, ValueError):
+            return
+        operation = get_operation_by_id(operation_id)
+        if not operation:
+            afficher_erreur(self, "Opérations", "Opération introuvable.")
+            return
+        if int(operation.get("est_automatique") or 0) == 1:
+            afficher_info(self, "Opérations", "Les opérations automatiques ne peuvent pas être supprimées.")
+            return
+        if not demander_confirmation(
+            self,
+            "Supprimer l'opération",
+            f"Supprimer définitivement l'opération « {operation.get('libelle') or ''} » ?\n"
+            "Cette action est irréversible.",
+        ):
+            return
+        ok = delete_operation(operation_id)
+        if ok:
+            self.refresh()
+        else:
+            afficher_erreur(self, "Opérations", "Impossible de supprimer cette opération.")
+
     def _fermer_formulaire(self) -> None:
+        self._operation_en_edition = None
         self._frame_formulaire.pack_forget()
 
     def _enregistrer(self) -> None:
-        try:
-            enregistrer_operation_depuis_formulaire(
-                {
-                    "type_operation": self._var_type.get(),
-                    "libelle": self._var_libelle.get(),
-                    "montant": self._var_montant.get(),
-                    "date_operation": self._var_date.get(),
-                    "categorie": self._var_categorie.get(),
-                    "mode_paiement": _MOYENS_PAIEMENT.get(self._var_moyen.get(), "autre"),
-                    "statut": _STATUTS.get(self._var_statut.get(), "valide"),
-                    "compte_id": next(
-                        (int(c["id"]) for c in self._comptes if c["nom"] == self._var_compte.get()),
-                        None,
-                    ),
-                    "commentaire": self._var_commentaire.get(),
-                }
-            )
-        except ValueError as exc:
-            afficher_erreur(self, "Opérations", str(exc))
-            return
+        formulaire = {
+            "type_operation": self._var_type.get(),
+            "libelle": self._var_libelle.get(),
+            "montant": self._var_montant.get(),
+            "date_operation": self._var_date.get(),
+            "categorie": self._var_categorie.get(),
+            "mode_paiement": _MOYENS_PAIEMENT.get(self._var_moyen.get(), "autre"),
+            "statut": _STATUTS.get(self._var_statut.get(), "valide"),
+            "compte_id": next(
+                (int(c["id"]) for c in self._comptes if c["nom"] == self._var_compte.get()),
+                None,
+            ),
+            "commentaire": self._var_commentaire.get(),
+        }
+        if self._operation_en_edition is not None:
+            # Mode édition
+            try:
+                categories = get_all_categories(formulaire["type_operation"])
+                cat_nom = formulaire["categorie"]
+                cat = next((c for c in categories if (c.get("nom") or "") == cat_nom), None)
+                cat_id = int(cat["id"]) if cat else None
+                update_operation(
+                    self._operation_en_edition,
+                    type_operation=formulaire["type_operation"],
+                    libelle=formulaire["libelle"],
+                    montant=_parse_float(formulaire["montant"]),
+                    date_operation=_normaliser_date(formulaire["date_operation"]),
+                    categorie_id=cat_id,
+                    mode_paiement=formulaire["mode_paiement"],
+                    statut=formulaire["statut"],
+                    compte_id=formulaire["compte_id"],
+                    commentaire=formulaire["commentaire"] or None,
+                )
+            except Exception as exc:
+                afficher_erreur(self, "Opérations", str(exc))
+                return
+        else:
+            try:
+                enregistrer_operation_depuis_formulaire(formulaire)
+            except ValueError as exc:
+                afficher_erreur(self, "Opérations", str(exc))
+                return
         self.refresh()
         self._fermer_formulaire()
 

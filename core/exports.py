@@ -190,7 +190,7 @@ def export_bilan_ag_pdf(exercice: str, chemin_sortie: str,
         gen = PdfBilanAG(exercice, sections=sections, avec_graphiques=avec_graphiques)
         return gen.generer(chemin_sortie)
     except Exception as exc:
-        logger.error("export_bilan_ag_pdf: %s", exc)
+        logger.exception("export_bilan_ag_pdf: %s", exc)
         return False
 
 

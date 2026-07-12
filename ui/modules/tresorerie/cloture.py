@@ -17,6 +17,7 @@ from db.models.cloture import (
     get_exercice_by_id,
     get_log_exercice,
     get_stats_exercice,
+    update_exercice,
 )
 from ui import theme as app_theme
 from ui.components.dialogs import afficher_erreur, afficher_info, demander_confirmation
@@ -56,6 +57,19 @@ class GestionExercices(ctk.CTkToplevel):
             hover_color=colors.get("secondary", "#144870"),
             command=self._nouvel_exercice,
         ).pack(side="right")
+
+        # Label explicatif
+        ctk.CTkLabel(
+            self,
+            text=(
+                "ℹ️  Un exercice correspond à une année scolaire/associative. "
+                "Il sert à filtrer les données par période (comptabilité, événements, membres)."
+            ),
+            font=fonts.get("small"),
+            text_color="gray",
+            wraplength=860,
+            justify="left",
+        ).pack(anchor="w", padx=16, pady=(0, 4))
 
         # Tableau des exercices
         table_frame = ctk.CTkFrame(self)
@@ -114,6 +128,17 @@ class GestionExercices(ctk.CTkToplevel):
             command=self._decloturer,
         )
         self._btn_decloturer.pack(side="left", padx=(0, 8))
+
+        self._btn_modifier = ctk.CTkButton(
+            btn_frame,
+            text="✏️ Modifier",
+            width=130,
+            state="disabled",
+            fg_color="gray",
+            hover_color="#555",
+            command=self._modifier_exercice,
+        )
+        self._btn_modifier.pack(side="left", padx=(0, 8))
 
         self._btn_consulter = ctk.CTkButton(
             btn_frame,
@@ -174,6 +199,7 @@ class GestionExercices(ctk.CTkToplevel):
             self._exercice_selectionne = None
             self._btn_cloturer.configure(state="disabled")
             self._btn_decloturer.configure(state="disabled")
+            self._btn_modifier.configure(state="disabled")
             self._btn_consulter.configure(state="disabled")
             self._btn_log.configure(state="disabled")
             return
@@ -186,6 +212,7 @@ class GestionExercices(ctk.CTkToplevel):
         statut = self._exercice_selectionne["statut"]
         self._btn_cloturer.configure(state="normal" if statut == "ouvert" else "disabled")
         self._btn_decloturer.configure(state="normal" if statut == "cloture" else "disabled")
+        self._btn_modifier.configure(state="normal" if statut == "ouvert" else "disabled")
         self._btn_consulter.configure(state="normal")
         self._btn_log.configure(state="normal")
 
@@ -196,6 +223,17 @@ class GestionExercices(ctk.CTkToplevel):
         self.wait_window(dialog)
         if dialog.resultat:
             self._charger_exercices()
+
+    def _modifier_exercice(self) -> None:
+        """Ouvre le dialogue de modification d'un exercice ouvert."""
+        if not self._exercice_selectionne:
+            return
+        dialog = _DialogModifierExercice(self, self._exercice_selectionne)
+        dialog.grab_set()
+        self.wait_window(dialog)
+        if dialog.resultat:
+            self._charger_exercices()
+            self._on_selection()
 
     def _cloturer(self) -> None:
         """Ouvre le dialogue de clôture."""
@@ -373,7 +411,112 @@ class _DialogNouvelExercice(ctk.CTkToplevel):
         self.destroy()
 
 
-# ── Vue consultation exercice ────────────────────────────────────────────────
+# ── Dialogue Modifier exercice ───────────────────────────────────────────────
+
+
+class _DialogModifierExercice(ctk.CTkToplevel):
+    """Dialogue de modification d'un exercice ouvert."""
+
+    def __init__(self, parent: Any, exercice: dict) -> None:
+        super().__init__(parent)
+        self.title(f"✏️ Modifier — {exercice.get('nom', '')}")
+        self.geometry("480x360")
+        self.resizable(False, False)
+        self.transient(parent)
+        self._exercice = exercice
+        self.resultat = False
+        self._build_ui()
+
+    def _build_ui(self) -> None:
+        fonts = app_theme.FONTS
+        colors = app_theme.COLORS
+
+        ctk.CTkLabel(self, text="Modifier l'exercice", font=fonts.get("subtitle")).pack(
+            padx=20, pady=(16, 12)
+        )
+
+        form = ctk.CTkFrame(self, fg_color="transparent")
+        form.pack(fill="x", padx=20)
+
+        ctk.CTkLabel(form, text="Nom :", font=fonts.get("normal"), anchor="w").grid(
+            row=0, column=0, sticky="w", pady=6
+        )
+        self._nom_entry = ctk.CTkEntry(form)
+        self._nom_entry.insert(0, self._exercice.get("nom") or "")
+        self._nom_entry.grid(row=0, column=1, sticky="ew", padx=(10, 0), pady=6)
+
+        ctk.CTkLabel(form, text="Date début :", font=fonts.get("normal"), anchor="w").grid(
+            row=1, column=0, sticky="w", pady=6
+        )
+        self._debut_entry = ctk.CTkEntry(form)
+        self._debut_entry.insert(0, self._exercice.get("date_debut") or "")
+        self._debut_entry.grid(row=1, column=1, sticky="ew", padx=(10, 0), pady=6)
+
+        ctk.CTkLabel(form, text="Date fin :", font=fonts.get("normal"), anchor="w").grid(
+            row=2, column=0, sticky="w", pady=6
+        )
+        self._fin_entry = ctk.CTkEntry(form)
+        self._fin_entry.insert(0, self._exercice.get("date_fin") or "")
+        self._fin_entry.grid(row=2, column=1, sticky="ew", padx=(10, 0), pady=6)
+
+        ctk.CTkLabel(form, text="Solde ouverture :", font=fonts.get("normal"), anchor="w").grid(
+            row=3, column=0, sticky="w", pady=6
+        )
+        self._solde_entry = ctk.CTkEntry(form)
+        self._solde_entry.insert(0, str(self._exercice.get("solde_ouverture") or "0"))
+        self._solde_entry.grid(row=3, column=1, sticky="ew", padx=(10, 0), pady=6)
+
+        form.grid_columnconfigure(1, weight=1)
+
+        btn_frame = ctk.CTkFrame(self, fg_color="transparent")
+        btn_frame.pack(pady=16)
+        ctk.CTkButton(
+            btn_frame, text="Annuler", width=110, fg_color="gray", hover_color="#555",
+            command=self.destroy,
+        ).pack(side="left", padx=8)
+        ctk.CTkButton(
+            btn_frame, text="💾 Enregistrer", width=130,
+            fg_color=colors.get("primary", "#1f6aa5"),
+            hover_color=colors.get("secondary", "#144870"),
+            command=self._enregistrer,
+        ).pack(side="left", padx=8)
+
+    def _enregistrer(self) -> None:
+        nom = self._nom_entry.get().strip()
+        debut = self._debut_entry.get().strip()
+        fin = self._fin_entry.get().strip()
+        solde_txt = self._solde_entry.get().strip() or "0"
+
+        erreurs = []
+        if not nom:
+            erreurs.append("Le nom est obligatoire.")
+        if not debut:
+            erreurs.append("La date de début est obligatoire.")
+        if not fin:
+            erreurs.append("La date de fin est obligatoire.")
+        try:
+            solde = float(solde_txt.replace(",", "."))
+        except ValueError:
+            erreurs.append("Le solde d'ouverture est invalide.")
+            solde = 0.0
+
+        if erreurs:
+            afficher_erreur(self, "Erreur de saisie", "\n".join(erreurs))
+            return
+
+        ok = update_exercice(
+            int(self._exercice["id"]),
+            nom=nom,
+            date_debut=debut,
+            date_fin=fin,
+            solde_ouverture=solde,
+        )
+        if ok:
+            self.resultat = True
+            self.destroy()
+        else:
+            afficher_erreur(self, "Erreur", "Impossible de modifier cet exercice (déjà clôturé ?).")
+
 
 
 class _ConsultationExercice(ctk.CTkToplevel):

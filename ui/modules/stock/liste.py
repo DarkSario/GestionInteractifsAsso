@@ -67,6 +67,16 @@ class ListeStock(ctk.CTkToplevel):
 
         ctk.CTkButton(
             frame_header,
+            text="📋 Inventaires",
+            width=130,
+            font=fonts.get("normal"),
+            fg_color="gray",
+            hover_color="#555",
+            command=self._ouvrir_inventaires,
+        ).pack(side="right", padx=5)
+
+        ctk.CTkButton(
+            frame_header,
             text="+ Ajouter",
             width=110,
             font=fonts.get("bold"),
@@ -461,3 +471,14 @@ class ListeStock(ctk.CTkToplevel):
         self.wait_window(fenetre)
         self._charger_categories()
         self._charger_articles()
+
+    def _ouvrir_inventaires(self) -> None:
+        from ui.modules.buvette.inventaires import OngletInventaires
+
+        fenetre = ctk.CTkToplevel(self)
+        fenetre.title("📋 Inventaires de stock")
+        fenetre.geometry("900x560")
+        fenetre.transient(self)
+        fenetre.grab_set()
+        onglet = OngletInventaires(fenetre)
+        onglet.pack(fill="both", expand=True)

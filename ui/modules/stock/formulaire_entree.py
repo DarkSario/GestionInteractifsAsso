@@ -10,11 +10,14 @@ import customtkinter as ctk
 
 from core.stock_v2 import add_lot, get_tags
 from db.models.fournisseurs import get_fournisseurs_for_select
-from db.models.stock import get_articles_for_select
+from db.models.stock import add_mouvement, get_articles_for_select
 from ui.components.dialogs import afficher_erreur, afficher_info
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
+
+# Type de mouvement pour une entrée de marchandise (index 0 de TYPES_MOUVEMENTS)
+_TYPE_ENTREE_ACHAT = "Entrée — Achat"
 
 
 class FormulaireEntreeMarchandise(ctk.CTkToplevel):
@@ -121,11 +124,13 @@ class FormulaireEntreeMarchandise(ctk.CTkToplevel):
                 return
 
             fournisseur = self._fournisseur_labels.get(self._fournisseur_var.get())
+            quantite = int(self._quantite_var.get() or 0)
+            prix_ttc = self._parse_float(self._prix_ttc_var.get())
             lot_id = add_lot(
                 article_id=article["id"],
-                quantite=int(self._quantite_var.get() or 0),
+                quantite=quantite,
                 prix_ht=self._parse_float(self._prix_ht_var.get()),
-                prix_ttc=self._parse_float(self._prix_ttc_var.get()),
+                prix_ttc=prix_ttc,
                 tva_taux=self._parse_float(self._tva_var.get()),
                 fournisseur_id=fournisseur["id"] if fournisseur else None,
                 numero_facture=self._facture_var.get(),
@@ -135,6 +140,19 @@ class FormulaireEntreeMarchandise(ctk.CTkToplevel):
                 commentaire="",
                 tag_ids=[tag_id for tag_id, var in self._tag_vars.items() if var.get()],
             )
+            # Créer un mouvement dans mouvements_stock pour synchroniser l'affichage
+            if quantite > 0:
+                add_mouvement(
+                    stock_id=article["id"],
+                    date=self._date_achat_var.get() or date.today().isoformat(),
+                    type_mouvement=_TYPE_ENTREE_ACHAT,
+                    quantite=quantite,
+                    prix_unitaire=prix_ttc if prix_ttc > 0 else None,
+                    fournisseur_id=fournisseur["id"] if fournisseur else None,
+                    evenement_id=None,
+                    numero_facture=self._facture_var.get() or None,
+                    commentaire=f"Lot #{lot_id}" if lot_id else None,
+                )
         except ValueError:
             afficher_erreur(
                 self,

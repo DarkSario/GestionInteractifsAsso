@@ -499,7 +499,7 @@ def _creer_archive_zip(
     inclure_config: bool,
 ) -> None:
     destination.parent.mkdir(parents=True, exist_ok=True)
-    with tempfile.TemporaryDirectory() as tmp_dir_str:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp_dir_str:
         tmp_dir = Path(tmp_dir_str)
         snapshot_db = tmp_dir / nom_db_interne
         _copier_base_sqlite(db_path, snapshot_db)

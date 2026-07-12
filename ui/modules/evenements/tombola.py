@@ -176,7 +176,11 @@ class TombolaView(ctk.CTkFrame):
 
     def set_evenement_id(self, evenement_id: int | None) -> None:
         self._evenement_id = evenement_id
-        self.refresh()
+        try:
+            if self.winfo_exists():
+                self.refresh()
+        except Exception:
+            pass
 
     def _build_ui(self) -> None:
         self._tabs = ctk.CTkTabview(self)
@@ -379,11 +383,21 @@ class TombolaView(ctk.CTkFrame):
         return f"{value:,.2f}€".replace(",", " ").replace(".", ",")
 
     def refresh(self) -> None:
+        try:
+            if not self.winfo_exists():
+                return
+        except Exception:
+            return
         self._refresh_carnets()
         self._refresh_lots()
         self._refresh_solidaire()
 
     def _refresh_carnets(self) -> None:
+        try:
+            if not self._tree_carnets.winfo_exists():
+                return
+        except Exception:
+            return
         self._tree_carnets.delete(*self._tree_carnets.get_children())
         if not self._evenement_id:
             self._lbl_stats.configure(text="Stats : sauvegardez d'abord l'événement")
@@ -424,6 +438,11 @@ class TombolaView(ctk.CTkFrame):
         )
 
     def _refresh_lots(self) -> None:
+        try:
+            if not self._tree_lots.winfo_exists():
+                return
+        except Exception:
+            return
         self._tree_lots.delete(*self._tree_lots.get_children())
         self._txt_tirage.delete("1.0", "end")
         if not self._evenement_id:
@@ -449,6 +468,11 @@ class TombolaView(ctk.CTkFrame):
             self._txt_tirage.insert("end", f"Lot {lot['numero']} — {lot['description']}\n")
 
     def _refresh_solidaire(self) -> None:
+        try:
+            if not self._tree_solidaire.winfo_exists():
+                return
+        except Exception:
+            return
         self._tree_solidaire.delete(*self._tree_solidaire.get_children())
         if not self._evenement_id:
             self._lbl_stats_solidaire.configure(text="Sauvegardez d'abord l'événement.")
