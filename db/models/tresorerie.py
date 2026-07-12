@@ -407,6 +407,20 @@ def annuler_operation(operation_id: int) -> bool:
     return True
 
 
+def delete_operation(operation_id: int) -> bool:
+    """Supprime définitivement une opération manuelle."""
+    operation = _fetch_one(
+        "SELECT est_automatique FROM tresorerie_operations WHERE id = ?",
+        (operation_id,),
+    )
+    if not operation:
+        return False
+    if int(operation.get("est_automatique") or 0) == 1:
+        return False
+    _execute("DELETE FROM tresorerie_operations WHERE id = ?", (operation_id,))
+    return True
+
+
 def get_operations(
     compte_id=None,
     type_operation=None,

@@ -258,6 +258,7 @@ class ParametresApp(ctk.CTkToplevel):
                 self._comptes_ids.append(str(c["id"]))
         except Exception as exc:
             logger.warning("Impossible de charger la liste des comptes : %s", exc)
+        f_cp = ctk.CTkFrame(frame, fg_color="transparent")
         f_cp.pack(fill="x", pady=3)
         ctk.CTkLabel(f_cp, text="Compte principal", width=150, anchor="ne").pack(
             side="left", padx=(0, 8)

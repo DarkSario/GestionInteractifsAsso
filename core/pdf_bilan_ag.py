@@ -77,7 +77,7 @@ class PdfBilanAG(BasePDF):
                 elements.extend(self._section_signatures())
             return elements
         except Exception as exc:
-            logger.error("PdfBilanAG._construire_contenu: %s", exc)
+            logger.exception("PdfBilanAG._construire_contenu: %s", exc)
             return elements + [self._message_aucune_donnee()]
 
     def _section_resume_financier(self) -> list:

@@ -88,6 +88,35 @@ def add_exercice(
     )
 
 
+def update_exercice(
+    exercice_id: int,
+    nom: str,
+    date_debut: str,
+    date_fin: str,
+    solde_ouverture: float,
+    commentaire: str | None = None,
+) -> bool:
+    """Met à jour un exercice ouvert (dates, nom, solde d'ouverture)."""
+    exercice = get_exercice_by_id(exercice_id)
+    if not exercice or exercice.get("statut") != "ouvert":
+        return False
+    conn = get_connection()
+    try:
+        conn.execute(
+            """
+            UPDATE exercices
+            SET nom = ?, date_debut = ?, date_fin = ?,
+                solde_ouverture = ?, commentaire = ?
+            WHERE id = ?
+            """,
+            (nom, date_debut, date_fin, float(solde_ouverture or 0), commentaire, exercice_id),
+        )
+        conn.commit()
+        return True
+    finally:
+        conn.close()
+
+
 def cloturer_exercice(exercice_id: int, solde_cloture: float) -> bool:
     """Clôture un exercice.
 

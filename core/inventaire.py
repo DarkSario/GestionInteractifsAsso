@@ -330,3 +330,25 @@ def get_inventaires(evenement_id: int = None) -> list[dict]:
         return [dict(r) for r in rows]
     finally:
         conn.close()
+
+
+def supprimer_inventaire(inventaire_id: int) -> bool:
+    """Supprime un inventaire non validé et ses lignes."""
+    conn = get_connection()
+    try:
+        inv = conn.execute(
+            "SELECT id, statut FROM stock_inventaires WHERE id = ?",
+            (inventaire_id,),
+        ).fetchone()
+        if not inv:
+            return False
+        # On autorise la suppression quel que soit le statut (l'utilisateur confirme)
+        conn.execute(
+            "DELETE FROM stock_inventaire_lignes WHERE inventaire_id = ?",
+            (inventaire_id,),
+        )
+        conn.execute("DELETE FROM stock_inventaires WHERE id = ?", (inventaire_id,))
+        conn.commit()
+        return True
+    finally:
+        conn.close()

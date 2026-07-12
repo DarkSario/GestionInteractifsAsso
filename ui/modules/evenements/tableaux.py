@@ -15,6 +15,7 @@ from db.models.tableaux import (
     add_tableau,
     apply_template,
     calculer_totaux,
+    delete_colonne,
     dupliquer_tableau,
     get_cellules_ligne,
     get_all_templates,
@@ -25,7 +26,7 @@ from db.models.tableaux import (
     set_cellule,
     update_ligne,
 )
-from ui.components.dialogs import afficher_info
+from ui.components.dialogs import afficher_info, demander_confirmation
 
 _OPTIONS_TYPES_COLONNE = [
     ("Texte libre", "texte"),
@@ -92,6 +93,10 @@ class TableauxView(ctk.CTkFrame):
         ctk.CTkButton(actions, text="⚙️ Colonnes", command=self._ajouter_colonne).pack(
             side="left", padx=8
         )
+        ctk.CTkButton(
+            actions, text="🗑️ Supprimer colonne", command=self._supprimer_colonne,
+            fg_color="#b71c1c", hover_color="#7f0000",
+        ).pack(side="left", padx=(0, 8))
         ctk.CTkButton(actions, text="💾 Template", command=self._sauver_template).pack(
             side="left", padx=8
         )
@@ -227,6 +232,29 @@ class TableauxView(ctk.CTkFrame):
         )
         self._charger_tableau(self._tableau_id)
 
+    def _supprimer_colonne(self) -> None:
+        if not self._tableau_id:
+            afficher_info(self, "Colonnes", "Sélectionnez d'abord un tableau.")
+            return
+        colonnes = get_colonnes_tableau(self._tableau_id)
+        if not colonnes:
+            afficher_info(self, "Colonnes", "Ce tableau ne possède aucune colonne.")
+            return
+        dialog = _DialogChoisirColonne(self, colonnes)
+        self.wait_window(dialog)
+        if dialog.colonne_id is None:
+            return
+        nom_col = next((c["nom"] for c in colonnes if int(c["id"]) == dialog.colonne_id), "")
+        if not demander_confirmation(
+            self,
+            "Supprimer la colonne",
+            f"Supprimer la colonne « {nom_col} » et toutes ses données ?\n"
+            "Cette action est irréversible.",
+        ):
+            return
+        delete_colonne(dialog.colonne_id)
+        self._charger_tableau(self._tableau_id)
+
     def _ajouter_ligne(self) -> None:
         if not self._tableau_id:
             afficher_info(self, "Lignes", "Sélectionnez d'abord un tableau.")
@@ -272,6 +300,42 @@ class TableauxView(ctk.CTkFrame):
             return
         save_template(nom, None, self._tableau_id)
         afficher_info(self, "Template", "Template sauvegardé.")
+
+
+class _DialogChoisirColonne(ctk.CTkToplevel):
+    """Dialogue de sélection d'une colonne à supprimer."""
+
+    def __init__(self, parent: Any, colonnes: list[dict]) -> None:
+        super().__init__(parent)
+        self.title("Supprimer une colonne")
+        self.geometry("400x300")
+        self.transient(parent)
+        self.grab_set()
+        self.colonne_id: int | None = None
+        self._colonnes = colonnes
+        self._var = ctk.StringVar(value=colonnes[0]["nom"] if colonnes else "")
+        self._build_ui()
+
+    def _build_ui(self) -> None:
+        ctk.CTkLabel(self, text="Sélectionnez la colonne à supprimer :").pack(anchor="w", padx=16, pady=(16, 4))
+        for col in self._colonnes:
+            ctk.CTkRadioButton(self, text=col["nom"], variable=self._var, value=col["nom"]).pack(
+                anchor="w", padx=20, pady=3
+            )
+        footer = ctk.CTkFrame(self, fg_color="transparent")
+        footer.pack(fill="x", padx=16, pady=16)
+        ctk.CTkButton(footer, text="Annuler", command=self.destroy).pack(side="right")
+        ctk.CTkButton(
+            footer, text="🗑️ Supprimer", fg_color="#b71c1c", hover_color="#7f0000",
+            command=self._valider,
+        ).pack(side="right", padx=(0, 8))
+
+    def _valider(self) -> None:
+        nom = self._var.get()
+        col = next((c for c in self._colonnes if c["nom"] == nom), None)
+        if col:
+            self.colonne_id = int(col["id"])
+        self.destroy()
 
 
 class _DialogColonne(ctk.CTkToplevel):

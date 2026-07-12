@@ -13,10 +13,11 @@ from core.inventaire import (
     get_inventaires,
     get_lignes_inventaire,
     saisir_ligne_inventaire,
+    supprimer_inventaire,
     valider_inventaire,
 )
 from db.models.evenements import get_evenements_for_select
-from ui.components.dialogs import afficher_erreur, afficher_info
+from ui.components.dialogs import afficher_erreur, afficher_info, demander_confirmation
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -43,6 +44,10 @@ class OngletInventaires(ctk.CTkFrame):
         ctk.CTkButton(head, text="+ Nouvel inventaire", command=self._nouveau).pack(side="left")
         ctk.CTkButton(head, text="✏️ Saisir", command=self._saisir).pack(side="left", padx=8)
         ctk.CTkButton(head, text="✅ Valider définitivement", command=self._valider).pack(side="left", padx=8)
+        ctk.CTkButton(
+            head, text="🗑️ Supprimer", command=self._supprimer,
+            fg_color="#b71c1c", hover_color="#7f0000",
+        ).pack(side="left", padx=8)
 
         frame = ctk.CTkFrame(self)
         frame.pack(fill="both", expand=True, padx=10, pady=(0, 10))
@@ -118,6 +123,24 @@ class OngletInventaires(ctk.CTkFrame):
             ),
         )
         self._charger()
+
+    def _supprimer(self) -> None:
+        inventaire_id = self._selected_id()
+        if inventaire_id is None:
+            afficher_info(self, "Inventaires", "Sélectionnez un inventaire à supprimer.")
+            return
+        if not demander_confirmation(
+            self,
+            "Supprimer l'inventaire",
+            "Supprimer définitivement cet inventaire et toutes ses lignes ?\n"
+            "Cette action est irréversible.",
+        ):
+            return
+        ok = supprimer_inventaire(inventaire_id)
+        if ok:
+            self._charger()
+        else:
+            afficher_erreur(self, "Inventaires", "Impossible de supprimer cet inventaire.")
 
 
 class _DialogNouvelInventaire(ctk.CTkToplevel):
