@@ -627,7 +627,7 @@ def finaliser_remise(remise_id: int) -> bool:
     _execute(
         """
         UPDATE remises_cheques
-        SET montant_total = ?, nombre_cheques = ?, statut = 'remis'
+        SET montant_total = ?, nombre_cheques = ?, statut = 'remis', operation_id = NULL
         WHERE id = ?
         """,
         (total, nb, remise_id),
