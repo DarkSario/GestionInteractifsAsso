@@ -277,10 +277,8 @@ class ListeDons(ctk.CTkToplevel):
 
 
 class _DialogDon(FormDialog):
-    _TYPE_PARTICULIER = 'particulier'
-    _TYPE_ENTREPRISE = 'entreprise'
-    _NATURE_ARGENT = 'argent'
-    _NATURE = 'nature'
+    _TYPE_LABELS = {'Particulier': 'particulier', 'Entreprise': 'entreprise'}
+    _NATURE_LABELS = {'Argent': 'argent', 'Don en nature': 'nature'}
 
     def __init__(self, parent: Any, membres: list[dict[str, Any]], exercices: dict[str, int | None], don: dict[str, Any] | None = None) -> None:
         super().__init__(
@@ -294,7 +292,7 @@ class _DialogDon(FormDialog):
         self._don = don
 
         self._var_exercice = ctk.StringVar(value=self._label_exercice(don.get('exercice_id')) if don else 'Tous')
-        self._var_type = ctk.StringVar(value=(don.get('type_donateur') if don else self._TYPE_PARTICULIER))
+        self._var_type = ctk.StringVar(value=self._label_depuis_code(self._TYPE_LABELS, don.get('type_donateur') if don else 'particulier'))
         self._var_membre = ctk.StringVar(value=self._label_membre(don.get('membre_id')) if don else '— Aucun —')
         self._var_nom = ctk.StringVar(value=don.get('donateur_nom') if don else '')
         self._var_prenom = ctk.StringVar(value=don.get('donateur_prenom') if don else '')
@@ -303,7 +301,7 @@ class _DialogDon(FormDialog):
         self._var_ville = ctk.StringVar(value=don.get('donateur_ville') if don else '')
         self._var_siret = ctk.StringVar(value=don.get('donateur_siret') if don else '')
         self._var_date = ctk.StringVar(value=don.get('date_don') if don else date.today().isoformat())
-        self._var_nature = ctk.StringVar(value=don.get('nature_don') if don else self._NATURE_ARGENT)
+        self._var_nature = ctk.StringVar(value=self._label_depuis_code(self._NATURE_LABELS, don.get('nature_don') if don else 'argent'))
         self._var_montant = ctk.StringVar(value=f"{float(don.get('montant') or 0):.2f}" if don and don.get('montant') is not None else '')
         self._var_description = ctk.StringVar(value=don.get('description_don') if don else '')
         self._var_valeur = ctk.StringVar(value=f"{float(don.get('valeur_estimee') or 0):.2f}" if don and don.get('valeur_estimee') is not None else '')
@@ -323,6 +321,10 @@ class _DialogDon(FormDialog):
     def _label_membre(self, membre_id: Any) -> str:
         membre = next((m for m in self._membres if int(m['id']) == int(membre_id or 0)), None)
         return f"{membre['nom']} {membre['prenom']}".strip() if membre else '— Aucun —'
+
+    @staticmethod
+    def _label_depuis_code(mapping: dict[str, str], code: str | None) -> str:
+        return next((label for label, value in mapping.items() if value == code), next(iter(mapping)))
 
     def _build(self) -> None:
         def section(titre: str) -> ctk.CTkFrame:
@@ -345,7 +347,7 @@ class _DialogDon(FormDialog):
         champ(section_donateur, 'Exercice', ctk.CTkOptionMenu(section_donateur, values=list(self._map_exercices), variable=self._var_exercice, width=260))
         type_menu = ctk.CTkSegmentedButton(
             section_donateur,
-            values=[self._TYPE_PARTICULIER, self._TYPE_ENTREPRISE],
+            values=list(self._TYPE_LABELS),
             variable=self._var_type,
             command=self._toggle_type_fields,
         )
@@ -364,7 +366,7 @@ class _DialogDon(FormDialog):
         champ(section_don, 'Date du don *', ctk.CTkEntry(section_don, textvariable=self._var_date, width=260))
         nature = ctk.CTkSegmentedButton(
             section_don,
-            values=[self._NATURE_ARGENT, self._NATURE],
+            values=list(self._NATURE_LABELS),
             variable=self._var_nature,
             command=self._toggle_nature_fields,
         )
@@ -372,7 +374,7 @@ class _DialogDon(FormDialog):
         champ(section_don, 'Montant (€)', ctk.CTkEntry(section_don, textvariable=self._var_montant, width=260))
         self._frame_description = champ(section_don, 'Description', ctk.CTkEntry(section_don, textvariable=self._var_description, width=260))
         self._frame_valeur = champ(section_don, 'Valeur estimée (€)', ctk.CTkEntry(section_don, textvariable=self._var_valeur, width=260))
-        champ(section_don, 'Mode versement', ctk.CTkOptionMenu(section_don, values=['cheque', 'virement', 'especes', 'cb', 'autre'], variable=self._var_mode, width=260))
+        self._frame_mode = champ(section_don, 'Mode versement', ctk.CTkOptionMenu(section_don, values=['cheque', 'virement', 'especes', 'cb', 'autre'], variable=self._var_mode, width=260))
 
         section_options = section('Options')
         if not self._don:
@@ -400,13 +402,15 @@ class _DialogDon(FormDialog):
         self._mettre_a_jour_visibilite_champs()
 
     def _mettre_a_jour_visibilite_champs(self) -> None:
-        if self._var_type.get() == self._TYPE_ENTREPRISE:
+        type_code = self._TYPE_LABELS.get(self._var_type.get(), 'particulier')
+        nature_code = self._NATURE_LABELS.get(self._var_nature.get(), 'argent')
+        if type_code == 'entreprise':
             self._frame_siret.pack(fill='x', pady=4)
         else:
             self._frame_siret.pack_forget()
-        if self._var_nature.get() == self._NATURE:
-            self._frame_description.pack(fill='x', pady=4)
-            self._frame_valeur.pack(fill='x', pady=4)
+        if nature_code == 'nature':
+            self._frame_description.pack(fill='x', pady=4, before=self._frame_mode)
+            self._frame_valeur.pack(fill='x', pady=4, before=self._frame_mode)
         else:
             self._frame_description.pack_forget()
             self._frame_valeur.pack_forget()
@@ -415,10 +419,11 @@ class _DialogDon(FormDialog):
         if not self._var_nom.get().strip():
             afficher_erreur(self, 'Dons', 'Le nom du donateur est obligatoire.')
             return
-        if self._var_nature.get() == self._NATURE_ARGENT and not self._var_montant.get().strip():
+        nature_code = self._NATURE_LABELS.get(self._var_nature.get(), 'argent')
+        if nature_code == 'argent' and not self._var_montant.get().strip():
             afficher_erreur(self, 'Dons', 'Le montant est obligatoire pour un don en argent.')
             return
-        if self._var_nature.get() == self._NATURE:
+        if nature_code == 'nature':
             if not self._var_description.get().strip():
                 afficher_erreur(self, 'Dons', 'La description est obligatoire pour un don en nature.')
                 return
@@ -436,21 +441,22 @@ class _DialogDon(FormDialog):
         except ValueError:
             afficher_erreur(self, 'Dons', 'Montant invalide.')
             return
+        type_code = self._TYPE_LABELS.get(self._var_type.get(), 'particulier')
         self.result = {
             'exercice_id': exercice_id,
             'date_don': self._var_date.get().strip(),
-            'type_donateur': self._var_type.get().strip(),
+            'type_donateur': type_code,
             'membre_id': membre_id,
             'donateur_nom': self._var_nom.get().strip(),
             'donateur_prenom': self._var_prenom.get().strip() or None,
             'donateur_adresse': self._var_adresse.get().strip() or None,
             'donateur_cp': self._var_cp.get().strip() or None,
             'donateur_ville': self._var_ville.get().strip() or None,
-            'donateur_siret': self._var_siret.get().strip() or None if self._var_type.get() == self._TYPE_ENTREPRISE else None,
-            'nature_don': self._var_nature.get().strip(),
+            'donateur_siret': self._var_siret.get().strip() or None if type_code == 'entreprise' else None,
+            'nature_don': nature_code,
             'montant': montant,
-            'description_don': self._var_description.get().strip() or None if self._var_nature.get() == self._NATURE else None,
-            'valeur_estimee': valeur_estimee if self._var_nature.get() == self._NATURE else None,
+            'description_don': self._var_description.get().strip() or None if nature_code == 'nature' else None,
+            'valeur_estimee': valeur_estimee if nature_code == 'nature' else None,
             'mode_versement': self._var_mode.get().strip(),
             'commentaire': self._var_commentaire.get().strip() or None,
             'creer_tresorerie': bool(self._var_creer_treso.get()),
