@@ -1,4 +1,4 @@
-"""Fenêtre Bilan AG — Phase 9."""
+"""Fenêtre Bilan AG — Phase 9 / Phase 21."""
 
 from __future__ import annotations
 
@@ -21,8 +21,9 @@ class BilanAGDialog(ctk.CTkToplevel):
     def __init__(self, parent) -> None:
         super().__init__(parent)
         self.title("📋 Bilan AG")
-        self.geometry("620x560")
-        self.resizable(False, False)
+        self.geometry("700x720")
+        self.minsize(700, 680)
+        self.resizable(True, True)
         self.transient(parent)
         self.grab_set()
 
@@ -47,52 +48,94 @@ class BilanAGDialog(ctk.CTkToplevel):
             "signatures": ctk.BooleanVar(value=True),
         }
 
+        # Période de référence
+        self._type_periode_var = ctk.StringVar(value="scolaire")
+        annee_en_cours = datetime.now().year
+        self._annee_scolaire_var = ctk.StringVar(value=f"{annee_en_cours - 1}-{annee_en_cours}")
+        self._annee_civile_var = ctk.StringVar(value=str(annee_en_cours))
+
         self._build_ui()
 
     def _build_ui(self) -> None:
         fonts = app_theme.FONTS
-        ctk.CTkLabel(self, text="📋 Bilan AG", font=fonts.get("title")).pack(
+
+        scroll = ctk.CTkScrollableFrame(self, fg_color="transparent")
+        scroll.pack(fill="both", expand=True, padx=0, pady=0)
+
+        ctk.CTkLabel(scroll, text="📋 Bilan AG", font=fonts.get("title")).pack(
             anchor="w", padx=20, pady=(16, 10)
         )
 
-        frame_exercice = ctk.CTkFrame(self)
-        frame_exercice.pack(fill="x", padx=20, pady=(0, 10))
-        ctk.CTkLabel(frame_exercice, text="Exercice", font=fonts.get("subtitle")).pack(
+        # ── Période de référence ──────────────────────────────────────────────
+        frame_periode = ctk.CTkFrame(scroll)
+        frame_periode.pack(fill="x", padx=20, pady=(0, 10))
+        ctk.CTkLabel(frame_periode, text="Période de référence", font=fonts.get("subtitle")).pack(
             anchor="w", padx=12, pady=(10, 6)
         )
-        ctk.CTkOptionMenu(
-            frame_exercice,
-            values=[self._exercice],
-            variable=self._exercice_var,
-            width=240,
-        ).pack(anchor="w", padx=12, pady=(0, 10))
 
-        frame_sections = ctk.CTkFrame(self)
+        annees_scolaires = self._generer_annees_scolaires()
+        annees_civiles = [str(y) for y in range(datetime.now().year - 3, datetime.now().year + 2)]
+
+        row_scolaire = ctk.CTkFrame(frame_periode, fg_color="transparent")
+        row_scolaire.pack(fill="x", padx=12, pady=2)
+        ctk.CTkRadioButton(
+            row_scolaire,
+            text="Année scolaire",
+            variable=self._type_periode_var,
+            value="scolaire",
+            width=160,
+        ).pack(side="left")
+        ctk.CTkOptionMenu(
+            row_scolaire,
+            values=annees_scolaires,
+            variable=self._annee_scolaire_var,
+            width=140,
+        ).pack(side="left", padx=(8, 0))
+
+        row_civile = ctk.CTkFrame(frame_periode, fg_color="transparent")
+        row_civile.pack(fill="x", padx=12, pady=(2, 10))
+        ctk.CTkRadioButton(
+            row_civile,
+            text="Année civile",
+            variable=self._type_periode_var,
+            value="civile",
+            width=160,
+        ).pack(side="left")
+        ctk.CTkOptionMenu(
+            row_civile,
+            values=annees_civiles,
+            variable=self._annee_civile_var,
+            width=140,
+        ).pack(side="left", padx=(8, 0))
+
+        # ── Sections du bilan ─────────────────────────────────────────────────
+        frame_sections = ctk.CTkFrame(scroll)
         frame_sections.pack(fill="x", padx=20, pady=(0, 10))
         ctk.CTkLabel(frame_sections, text="Sections du bilan", font=fonts.get("subtitle")).pack(
             anchor="w", padx=12, pady=(10, 6)
         )
         labels = [
-            ("☑ Résumé financier", "resume_financier"),
-            ("☑ Trésorerie détaillée", "tresorerie_detail"),
-            ("☑ Subventions", "subventions"),
-            ("☑ Événements (récapitulatif)", "evenements"),
-            ("☑ Buvette", "buvette"),
-            ("☑ Adhérents", "adherents"),
-            ("☑ Dons reçus", "dons"),
-            ("☐ Remboursements en attente", "remboursements"),
-            ("☑ Zone signatures", "signatures"),
+            ("Résumé financier", "resume_financier"),
+            ("Trésorerie détaillée", "tresorerie_detail"),
+            ("Subventions", "subventions"),
+            ("Événements (récapitulatif)", "evenements"),
+            ("Buvette", "buvette"),
+            ("Adhérents", "adherents"),
+            ("Dons reçus", "dons"),
+            ("Remboursements en attente", "remboursements"),
+            ("Zone signatures", "signatures"),
         ]
         for text, key in labels:
             ctk.CTkCheckBox(frame_sections, text=text, variable=self._sections_vars[key]).pack(
                 anchor="w", padx=16, pady=3
             )
 
-        ctk.CTkCheckBox(self, text="Inclure les graphiques", variable=self._graphiques_var).pack(
+        ctk.CTkCheckBox(scroll, text="Inclure les graphiques", variable=self._graphiques_var).pack(
             anchor="w", padx=34, pady=(0, 12)
         )
 
-        frame_dest = ctk.CTkFrame(self)
+        # ── Destination ───────────────────────────────────────────────────────
+        frame_dest = ctk.CTkFrame(scroll)
         frame_dest.pack(fill="x", padx=20, pady=(0, 12))
         ctk.CTkLabel(frame_dest, text="Destination", font=fonts.get("subtitle")).pack(
             anchor="w", padx=12, pady=(10, 6)
@@ -111,8 +154,9 @@ class BilanAGDialog(ctk.CTkToplevel):
         ctk.CTkLabel(row_nom, text="Nom du fichier", width=110, anchor="w").pack(side="left")
         ctk.CTkEntry(row_nom, textvariable=self._nom_fichier_var).pack(side="left", fill="x", expand=True)
 
-        frame_btn = ctk.CTkFrame(self, fg_color="transparent")
-        frame_btn.pack(fill="x", padx=20, pady=(6, 16), side="bottom")
+        # ── Boutons ───────────────────────────────────────────────────────────
+        frame_btn = ctk.CTkFrame(scroll, fg_color="transparent")
+        frame_btn.pack(fill="x", padx=20, pady=(6, 16))
         ctk.CTkButton(frame_btn, text="Annuler", width=110, fg_color="grey", command=self.destroy).pack(side="left")
         ctk.CTkButton(frame_btn, text="📋 Générer le bilan", width=180, command=self._generer).pack(side="right")
 
@@ -135,13 +179,20 @@ class BilanAGDialog(ctk.CTkToplevel):
             afficher_erreur(self, "Nom manquant", "Veuillez renseigner un nom de fichier.")
             return
 
+        type_periode = self._type_periode_var.get()
+        if type_periode == "civile":
+            periode = self._annee_civile_var.get()
+        else:
+            periode = self._annee_scolaire_var.get() or self._exercice_var.get()
+
         sections = {cle: var.get() for cle, var in self._sections_vars.items()}
         chemin = os.path.join(dossier, nom_fichier)
         ok = export_bilan_ag_pdf(
-            self._exercice_var.get(),
+            periode,
             chemin,
             sections=sections,
             avec_graphiques=self._graphiques_var.get(),
+            type_periode=type_periode,
         )
         if ok:
             afficher_info(self, "Bilan généré", f"Le bilan AG a été généré :\n{chemin}")
@@ -152,6 +203,11 @@ class BilanAGDialog(ctk.CTkToplevel):
     @staticmethod
     def _slug_exercice(exercice: str) -> str:
         return (exercice or "exercice").replace("/", "-").replace(" ", "_")
+
+    @staticmethod
+    def _generer_annees_scolaires() -> list[str]:
+        annee = datetime.now().year
+        return [f"{y}-{y + 1}" for y in range(annee - 3, annee + 2)]
 
     @staticmethod
     def _charger_exercice_courant() -> str:

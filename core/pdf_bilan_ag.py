@@ -33,6 +33,7 @@ class PdfBilanAG(BasePDF):
         sections: dict | None = None,
         avec_graphiques: bool = False,
         orientation: str = "portrait",
+        type_periode: str = "scolaire",
     ):
         super().__init__("Bilan Assemblée Générale", orientation=orientation, avec_page_garde=True)
         self.exercice = exercice or self.exercice
@@ -40,6 +41,7 @@ class PdfBilanAG(BasePDF):
         if sections:
             self._sections.update(sections)
         self._avec_graphiques = bool(avec_graphiques)
+        self._type_periode = type_periode or "scolaire"
         self._annee = self._extraire_annee(self.exercice)
 
     @staticmethod
@@ -52,6 +54,17 @@ class PdfBilanAG(BasePDF):
     def _periode(self) -> tuple[str, str]:
         if not self._annee:
             return "", ""
+        if self._type_periode == "civile":
+            return f"{self._annee}-01-01", f"{self._annee}-12-31"
+        # Année scolaire : ex "2025-2026" → sept 2025 à août 2026
+        if "-" in str(self.exercice):
+            parts = str(self.exercice).split("-")
+            try:
+                annee_debut = int(parts[0])
+                annee_fin = int(parts[1]) if len(parts) > 1 else annee_debut + 1
+                return f"{annee_debut}-09-01", f"{annee_fin}-08-31"
+            except (ValueError, IndexError):
+                pass
         return f"{self._annee}-01-01", f"{self._annee}-12-31"
 
     def _construire_contenu(self) -> list:

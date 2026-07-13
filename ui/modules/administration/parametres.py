@@ -140,23 +140,51 @@ class ParametresApp(ctk.CTkToplevel):
             entry.pack(side="left", fill="x", expand=True)
             self._asso_champs[cle] = entry
 
-        # Logo
+        # Logo de l'association
+        ctk.CTkLabel(frame, text="Logo de l'association", font=fonts.get("subtitle")).pack(
+            anchor="w", pady=(16, 4)
+        )
+
         self._logo_path_var = ctk.StringVar()
-        f_logo = ctk.CTkFrame(frame, fg_color="transparent")
-        f_logo.pack(fill="x", pady=3)
-        ctk.CTkLabel(f_logo, text="Logo", width=150, anchor="ne").pack(side="left", padx=(0, 8))
-        ctk.CTkEntry(f_logo, textvariable=self._logo_path_var, width=360).pack(
+        self._logo_position_var = ctk.StringVar(value="gauche")
+        self._logo_taille_var = ctk.StringVar(value="moyenne")
+
+        f_logo_row = ctk.CTkFrame(frame, fg_color="transparent")
+        f_logo_row.pack(fill="x", pady=3)
+        ctk.CTkLabel(f_logo_row, text="Fichier logo", width=150, anchor="ne").pack(side="left", padx=(0, 8))
+        ctk.CTkEntry(f_logo_row, textvariable=self._logo_path_var, width=300).pack(
             side="left", fill="x", expand=True
         )
-        ctk.CTkButton(f_logo, text="📁", width=40, command=self._choisir_logo).pack(
+        ctk.CTkButton(f_logo_row, text="📁 Choisir", width=90, command=self._choisir_logo).pack(
             side="left", padx=(4, 0)
         )
+        ctk.CTkButton(f_logo_row, text="🗑️ Suppr.", width=80, fg_color="#8b1a1a",
+                      hover_color="#6b1414", command=self._supprimer_logo).pack(
+            side="left", padx=(4, 0)
+        )
+
         ctk.CTkLabel(
             frame,
-            text="PNG ou JPG, max 2 Mo — utilisé dans les PDF",
+            text="Formats acceptés : PNG, JPG, GIF — max 2 Mo",
             font=fonts.get("small"),
             text_color="grey",
         ).pack(anchor="w", padx=(158, 0))
+
+        f_pos = ctk.CTkFrame(frame, fg_color="transparent")
+        f_pos.pack(fill="x", pady=3)
+        ctk.CTkLabel(f_pos, text="Position dans les exports", width=150, anchor="ne").pack(side="left", padx=(0, 8))
+        for val, lib in [("gauche", "Haut gauche"), ("centre", "Haut centre"), ("droite", "Haut droite")]:
+            ctk.CTkRadioButton(f_pos, text=lib, variable=self._logo_position_var, value=val).pack(
+                side="left", padx=(0, 12)
+            )
+
+        f_taille = ctk.CTkFrame(frame, fg_color="transparent")
+        f_taille.pack(fill="x", pady=3)
+        ctk.CTkLabel(f_taille, text="Taille dans les exports", width=150, anchor="ne").pack(side="left", padx=(0, 8))
+        for val, lib in [("petite", "Petite"), ("moyenne", "Moyenne"), ("grande", "Grande")]:
+            ctk.CTkRadioButton(f_taille, text=lib, variable=self._logo_taille_var, value=val).pack(
+                side="left", padx=(0, 12)
+            )
 
         # Séparateur — Exercice scolaire courant
         ctk.CTkLabel(
@@ -191,6 +219,16 @@ class ParametresApp(ctk.CTkToplevel):
             entry.insert(0, infos.get(cle, ""))
         self._logo_path_var.set(infos.get("logo_path", ""))
 
+        # Logo config
+        try:
+            from core.logo import get_logo_config
+            logo_cfg = get_logo_config()
+            self._logo_path_var.set(logo_cfg.get("path") or infos.get("logo_path", ""))
+            self._logo_position_var.set(logo_cfg.get("position", "gauche"))
+            self._logo_taille_var.set(logo_cfg.get("taille", "moyenne"))
+        except Exception as exc:
+            logger.warning("Impossible de charger la config logo : %s", exc)
+
         # Exercice courant depuis la table config/exercices
         try:
             from db.connection import get_connection
@@ -214,7 +252,7 @@ class ParametresApp(ctk.CTkToplevel):
         chemin = filedialog.askopenfilename(
             parent=self,
             title="Choisir le logo de l'association",
-            filetypes=[("Images", "*.png *.jpg *.jpeg"), ("Tous les fichiers", "*.*")],
+            filetypes=[("Images", "*.png *.jpg *.jpeg *.gif"), ("Tous les fichiers", "*.*")],
         )
         if chemin:
             try:
@@ -223,7 +261,25 @@ class ParametresApp(ctk.CTkToplevel):
                     return
             except OSError:
                 pass
-            self._logo_path_var.set(chemin)
+            try:
+                from core.logo import set_logo
+                if set_logo(chemin):
+                    self._logo_path_var.set(chemin)
+                else:
+                    afficher_erreur(self, "Erreur", "Impossible de copier le logo.")
+            except Exception:
+                self._logo_path_var.set(chemin)
+
+    def _supprimer_logo(self) -> None:
+        if not demander_confirmation(self, "Supprimer le logo", "Voulez-vous vraiment supprimer le logo ?"):
+            return
+        try:
+            from core.logo import supprimer_logo
+            supprimer_logo()
+            self._logo_path_var.set("")
+            afficher_info(self, "Succès", "Logo supprimé.")
+        except Exception as exc:
+            afficher_erreur(self, "Erreur", f"Impossible de supprimer le logo : {exc}")
 
     def _enregistrer_asso(self) -> None:
         erreurs = set_infos_asso(
@@ -236,6 +292,17 @@ class ParametresApp(ctk.CTkToplevel):
         if erreurs:
             afficher_erreur(self, "Erreur", "\n".join(erreurs))
             return
+
+        # Enregistrer config logo
+        try:
+            from core.logo import set_logo_config
+            set_logo_config(
+                position=self._logo_position_var.get(),
+                taille=self._logo_taille_var.get(),
+            )
+        except Exception as exc:
+            logger.warning("Impossible d'enregistrer la config logo : %s", exc)
+
         afficher_info(self, "Succès", "Les informations de l'association ont été enregistrées.")
 
     # ── Onglet Financier ──────────────────────────────────────────────────────
@@ -994,6 +1061,57 @@ class ParametresApp(ctk.CTkToplevel):
             command=self._ouvrir_polices_pdf,
         ).pack(anchor="w", padx=(158, 0), pady=(8, 0))
 
+        # ── Thème des exports ──────────────────────────────────────────────────
+        ctk.CTkLabel(frame, text="Thème des exports", font=fonts.get("subtitle")).pack(
+            anchor="w", pady=(16, 4)
+        )
+
+        from core.theme_export import get_theme_export as _get_theme
+        _theme = _get_theme()
+
+        self._export_couleur_principale_var = ctk.StringVar(
+            value=_theme.get("couleur_principale", "#1f6aa5")
+        )
+        self._export_couleur_secondaire_var = ctk.StringVar(
+            value=_theme.get("couleur_secondaire", "#144870")
+        )
+        self._export_style_tableaux_var = ctk.StringVar(
+            value=_theme.get("style_tableaux", "moderne")
+        )
+
+        # Couleur principale
+        f_cprinc = ctk.CTkFrame(frame, fg_color="transparent")
+        f_cprinc.pack(fill="x", pady=3)
+        ctk.CTkLabel(f_cprinc, text="Couleur principale", width=150, anchor="ne").pack(side="left", padx=(0, 8))
+        ctk.CTkEntry(f_cprinc, textvariable=self._export_couleur_principale_var, width=120).pack(side="left")
+        self._export_couleur_principale_btn = ctk.CTkButton(
+            f_cprinc, text="🎨", width=50,
+            command=lambda: self._choisir_couleur_export("principale"),
+        )
+        self._export_couleur_principale_btn.pack(side="left", padx=(4, 0))
+
+        # Couleur secondaire
+        f_csec = ctk.CTkFrame(frame, fg_color="transparent")
+        f_csec.pack(fill="x", pady=3)
+        ctk.CTkLabel(f_csec, text="Couleur secondaire", width=150, anchor="ne").pack(side="left", padx=(0, 8))
+        ctk.CTkEntry(f_csec, textvariable=self._export_couleur_secondaire_var, width=120).pack(side="left")
+        self._export_couleur_secondaire_btn = ctk.CTkButton(
+            f_csec, text="🎨", width=50,
+            command=lambda: self._choisir_couleur_export("secondaire"),
+        )
+        self._export_couleur_secondaire_btn.pack(side="left", padx=(4, 0))
+
+        # Style tableaux
+        f_style = ctk.CTkFrame(frame, fg_color="transparent")
+        f_style.pack(fill="x", pady=3)
+        ctk.CTkLabel(f_style, text="Style des tableaux", width=150, anchor="ne").pack(side="left", padx=(0, 8))
+        for val, lib in [("moderne", "Moderne"), ("classique", "Classique"), ("minimaliste", "Minimaliste")]:
+            ctk.CTkRadioButton(
+                f_style, text=lib, variable=self._export_style_tableaux_var, value=val
+            ).pack(side="left", padx=(0, 12))
+
+        self._maj_apercu_couleurs_export()
+
         # Modèle Bilan AG
         ctk.CTkLabel(frame, text="Bilan AG", font=fonts.get("subtitle")).pack(
             anchor="w", pady=(16, 4)
@@ -1063,6 +1181,51 @@ class ParametresApp(ctk.CTkToplevel):
         ctk.CTkButton(f_remb, text="✏️ Modifier template Remboursement", width=270, command=self._ouvrir_editeur_template_remboursement).pack(side="left")
         ctk.CTkButton(f_remb, text="🔄 Restaurer Remboursement par défaut", width=300, fg_color="#8b1a1a", hover_color="#6b1414", command=self._restaurer_template_remboursement).pack(side="left", padx=(8, 0))
 
+        # ── Templates Dossier Subvention ────────────────────────────────────
+        ctk.CTkLabel(frame, text="Templates Dossier Subvention", font=fonts.get("subtitle")).pack(
+            anchor="w", pady=(18, 4)
+        )
+        ctk.CTkLabel(
+            frame,
+            text="Personnalisez les sections textuelles du dossier de subvention.",
+            font=fonts.get("small"),
+            text_color="grey",
+        ).pack(anchor="w")
+
+        _templates_subv = [
+            ("presentation", "✏️ Présentation association"),
+            ("mot_president", "✏️ Mot du Président"),
+            ("projet", "✏️ Description du projet"),
+            ("objectifs", "✏️ Objectifs & indicateurs"),
+            ("statuts", "✏️ Statuts association"),
+            ("budget_projet", "✏️ Budget prévisionnel projet"),
+        ]
+        for i in range(0, len(_templates_subv), 2):
+            f_row = ctk.CTkFrame(frame, fg_color="transparent")
+            f_row.pack(anchor="w", pady=(4, 0))
+            cle1, lib1 = _templates_subv[i]
+            ctk.CTkButton(
+                f_row, text=lib1, width=230,
+                command=lambda k=cle1: self._ouvrir_editeur_template_subvention(k),
+            ).pack(side="left")
+            if i + 1 < len(_templates_subv):
+                cle2, lib2 = _templates_subv[i + 1]
+                ctk.CTkButton(
+                    f_row, text=lib2, width=230,
+                    command=lambda k=cle2: self._ouvrir_editeur_template_subvention(k),
+                ).pack(side="left", padx=(8, 0))
+
+        f_subv_reset = ctk.CTkFrame(frame, fg_color="transparent")
+        f_subv_reset.pack(anchor="w", pady=(6, 0))
+        ctk.CTkButton(
+            f_subv_reset,
+            text="🔄 Restaurer tous les templates par défaut",
+            width=300,
+            fg_color="#8b1a1a",
+            hover_color="#6b1414",
+            command=self._restaurer_tous_templates_subvention,
+        ).pack(side="left")
+
         f_btn = ctk.CTkFrame(frame, fg_color="transparent")
         f_btn.pack(fill="x", pady=(14, 4))
         ctk.CTkButton(
@@ -1088,6 +1251,33 @@ class ParametresApp(ctk.CTkToplevel):
             self._pdf_couleur_btn.configure(
                 fg_color=app_theme.COLORS.get("primary", "#1f6aa5")
             )
+
+    def _choisir_couleur_export(self, type_couleur: str) -> None:
+        if type_couleur == "principale":
+            var = self._export_couleur_principale_var
+            btn = self._export_couleur_principale_btn
+        else:
+            var = self._export_couleur_secondaire_var
+            btn = self._export_couleur_secondaire_btn
+        result = _askcolor(color=var.get(), parent=self)
+        couleur = result[1] if result else None
+        if couleur:
+            var.set(couleur)
+            self._maj_apercu_couleurs_export()
+
+    def _maj_apercu_couleurs_export(self) -> None:
+        try:
+            self._export_couleur_principale_btn.configure(
+                fg_color=self._export_couleur_principale_var.get()
+            )
+        except Exception:
+            pass
+        try:
+            self._export_couleur_secondaire_btn.configure(
+                fg_color=self._export_couleur_secondaire_var.get()
+            )
+        except Exception:
+            pass
 
     def _ouvrir_polices_pdf(self) -> None:
         from ui.modules.administration.polices import GestionPolices
@@ -1192,7 +1382,110 @@ class ParametresApp(ctk.CTkToplevel):
         set_parametre("type_recu_don", "cerfa" if self._type_recu_don_var.get() == "Cerfa 11580" else "simple")
         set_parametre("num_habilitation_fiscale", self._num_habilitation_var.get().strip())
         set_parametre("recu_don_num_depart", self._numero_depart_recu_var.get().strip())
+
+        # Thème des exports
+        try:
+            from core.theme_export import set_theme_export
+            set_theme_export(
+                couleur_principale=self._export_couleur_principale_var.get().strip(),
+                couleur_secondaire=self._export_couleur_secondaire_var.get().strip(),
+                style_tableaux=self._export_style_tableaux_var.get(),
+            )
+        except Exception as exc:
+            logger.warning("Impossible d'enregistrer le thème des exports : %s", exc)
+
         afficher_info(self, "Succès", "Les paramètres PDF ont été enregistrés.")
+
+    # ── Templates Dossier Subvention ──────────────────────────────────────────
+
+    def _ouvrir_editeur_template_subvention(self, cle: str) -> None:
+        """Ouvre l'éditeur pour un template du dossier de subvention."""
+        from pathlib import Path
+
+        _BASE_DIR = Path(__file__).parent.parent.parent.parent
+        _CONFIG_DIR = _BASE_DIR / "config"
+
+        noms = {
+            "presentation": "dossier_subvention_presentation.md",
+            "mot_president": "dossier_subvention_mot_president.md",
+            "projet": "dossier_subvention_projet.md",
+            "objectifs": "dossier_subvention_objectifs.md",
+            "statuts": "dossier_subvention_statuts.md",
+            "budget_projet": "dossier_subvention_budget_projet.md",
+        }
+        titres = {
+            "presentation": "✏️ Présentation de l'association",
+            "mot_president": "✏️ Mot du Président",
+            "projet": "✏️ Description du projet",
+            "objectifs": "✏️ Objectifs & indicateurs",
+            "statuts": "✏️ Statuts de l'association",
+            "budget_projet": "✏️ Budget prévisionnel projet",
+        }
+
+        nom = noms.get(cle)
+        if not nom:
+            return
+
+        chemin = _CONFIG_DIR / nom
+        chemin_defaut = _CONFIG_DIR / nom.replace(".md", ".default.md")
+
+        contenu = ""
+        if chemin.exists():
+            try:
+                contenu = chemin.read_text(encoding="utf-8")
+            except Exception:
+                pass
+        elif chemin_defaut.exists():
+            try:
+                contenu = chemin_defaut.read_text(encoding="utf-8")
+            except Exception:
+                pass
+
+        editeur = _EditeurTemplateSimple(
+            self,
+            titre=titres.get(cle, "✏️ Éditer"),
+            contenu=contenu,
+            chemin_sauvegarde=str(chemin),
+            chemin_defaut=str(chemin_defaut),
+        )
+        self.wait_window(editeur)
+
+    def _restaurer_tous_templates_subvention(self) -> None:
+        if not demander_confirmation(
+            self,
+            "Restaurer tous les templates",
+            "Toutes les modifications des templates Dossier Subvention seront perdues.\n"
+            "Voulez-vous vraiment restaurer tous les templates par défaut ?",
+        ):
+            return
+        from pathlib import Path
+        import shutil
+
+        _BASE_DIR = Path(__file__).parent.parent.parent.parent
+        _CONFIG_DIR = _BASE_DIR / "config"
+
+        noms = [
+            "dossier_subvention_presentation.md",
+            "dossier_subvention_mot_president.md",
+            "dossier_subvention_projet.md",
+            "dossier_subvention_objectifs.md",
+            "dossier_subvention_statuts.md",
+            "dossier_subvention_budget_projet.md",
+        ]
+        erreurs = []
+        for nom in noms:
+            src = _CONFIG_DIR / nom.replace(".md", ".default.md")
+            dst = _CONFIG_DIR / nom
+            try:
+                if src.exists():
+                    shutil.copy2(str(src), str(dst))
+            except Exception as exc:
+                erreurs.append(f"{nom}: {exc}")
+
+        if erreurs:
+            afficher_erreur(self, "Erreur partielle", "\n".join(erreurs))
+        else:
+            afficher_info(self, "Succès", "Tous les templates ont été restaurés par défaut.")
 
     # ── Utilitaires ───────────────────────────────────────────────────────────
 
@@ -1432,3 +1725,84 @@ class _EditeurTemplateDocument(ctk.CTkToplevel):
             afficher_info(self, "Succès", "Le modèle par défaut a été restauré.")
         except Exception as exc:
             afficher_erreur(self, "Erreur", f"Impossible de restaurer le template : {exc}")
+
+
+# ── Éditeur de template simple (Dossier Subvention) ──────────────────────────
+
+
+class _EditeurTemplateSimple(ctk.CTkToplevel):
+    """Éditeur Markdown simple pour les templates du dossier de subvention."""
+
+    def __init__(
+        self,
+        parent: Any,
+        titre: str,
+        contenu: str,
+        chemin_sauvegarde: str,
+        chemin_defaut: str,
+    ) -> None:
+        super().__init__(parent)
+        self.title(titre)
+        self.geometry("720x580")
+        self.minsize(600, 480)
+        self.resizable(True, True)
+        self.transient(parent)
+        self.grab_set()
+
+        self._chemin = chemin_sauvegarde
+        self._chemin_defaut = chemin_defaut
+        fonts = app_theme.FONTS
+
+        ctk.CTkLabel(self, text=titre, font=fonts.get("title")).pack(
+            anchor="w", padx=20, pady=(16, 8)
+        )
+        ctk.CTkLabel(
+            self,
+            text="Utilisez {{variable}} pour insérer des données dynamiques.",
+            font=fonts.get("small"),
+            text_color="grey",
+        ).pack(anchor="w", padx=20)
+
+        self._textbox = ctk.CTkTextbox(self, wrap="word", font=("Courier New", 12))
+        self._textbox.pack(fill="both", expand=True, padx=20, pady=(8, 4))
+        self._textbox.insert("1.0", contenu)
+
+        frame_btn = ctk.CTkFrame(self, fg_color="transparent")
+        frame_btn.pack(fill="x", padx=20, pady=(0, 16))
+        ctk.CTkButton(
+            frame_btn, text="Annuler", width=100, fg_color="grey", command=self.destroy
+        ).pack(side="left")
+        ctk.CTkButton(
+            frame_btn, text="🔄 Restaurer défaut", width=160,
+            fg_color="#8b1a1a", hover_color="#6b1414",
+            command=self._restaurer_defaut,
+        ).pack(side="left", padx=(8, 0))
+        ctk.CTkButton(
+            frame_btn, text="💾 Enregistrer", width=140, command=self._enregistrer
+        ).pack(side="right")
+
+    def _enregistrer(self) -> None:
+        contenu = self._textbox.get("1.0", "end-1c")
+        try:
+            from pathlib import Path
+            Path(self._chemin).parent.mkdir(parents=True, exist_ok=True)
+            Path(self._chemin).write_text(contenu, encoding="utf-8")
+            afficher_info(self, "Succès", "Le template a été enregistré.")
+            self.destroy()
+        except Exception as exc:
+            afficher_erreur(self, "Erreur", f"Impossible d'enregistrer : {exc}")
+
+    def _restaurer_defaut(self) -> None:
+        if not demander_confirmation(
+            self,
+            "Restaurer le défaut",
+            "Toutes vos modifications seront perdues. Continuer ?",
+        ):
+            return
+        try:
+            from pathlib import Path
+            contenu = Path(self._chemin_defaut).read_text(encoding="utf-8")
+            self._textbox.delete("1.0", "end")
+            self._textbox.insert("1.0", contenu)
+        except Exception as exc:
+            afficher_erreur(self, "Erreur", f"Impossible de restaurer : {exc}")

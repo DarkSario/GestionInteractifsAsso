@@ -106,6 +106,7 @@ class MainApp(ctk.CTk):
 
         menu_exports = tk.Menu(menubar, tearoff=0)
         menu_exports.add_command(label="📋 Bilan AG", command=self._ouvrir_bilan_ag)
+        menu_exports.add_command(label="📂 Dossier Subvention", command=self._ouvrir_dossier_subvention)
         menubar.add_cascade(label="Exports", menu=menu_exports)
         menubar.add_command(label="🏠 Tableau de bord", command=self._ouvrir_dashboard)
 
@@ -320,6 +321,13 @@ class MainApp(ctk.CTk):
         from ui.modules.exports.bilan_ag import BilanAGDialog
 
         fenetre = BilanAGDialog(self)
+        fenetre.grab_set()
+
+    def _ouvrir_dossier_subvention(self) -> None:
+        """Ouvre la fenêtre de génération du dossier de subvention."""
+        from ui.modules.exports.dossier_subvention import DossierSubventionDialog
+
+        fenetre = DossierSubventionDialog(self)
         fenetre.grab_set()
 
     def _ouvrir_export_base(self) -> None:
