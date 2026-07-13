@@ -18,6 +18,8 @@ from ui.components.form_dialog import FormDialog
 
 _STATUTS = {'tous': 'Tous', 'en_attente': '🟡 En attente', 'emis': '🟢 Émis', 'annule': '🔴 Annulé'}
 _TYPES = {'tous': 'Tous', 'particulier': 'Particulier', 'entreprise': 'Entreprise'}
+_DON_TYPE_LABELS = {'Particulier': 'particulier', 'Entreprise': 'entreprise'}
+_DON_NATURE_LABELS = {'Argent': 'argent', 'Don en nature': 'nature'}
 
 
 def _parse_optional_float(value: str) -> float | None:
@@ -277,8 +279,8 @@ class ListeDons(ctk.CTkToplevel):
 
 
 class _DialogDon(FormDialog):
-    _TYPE_LABELS = {'Particulier': 'particulier', 'Entreprise': 'entreprise'}
-    _NATURE_LABELS = {'Argent': 'argent', 'Don en nature': 'nature'}
+    _TYPE_LABELS = _DON_TYPE_LABELS
+    _NATURE_LABELS = _DON_NATURE_LABELS
 
     def __init__(self, parent: Any, membres: list[dict[str, Any]], exercices: dict[str, int | None], don: dict[str, Any] | None = None) -> None:
         super().__init__(
@@ -325,6 +327,10 @@ class _DialogDon(FormDialog):
     @staticmethod
     def _label_depuis_code(mapping: dict[str, str], code: str | None) -> str:
         return next((label for label, value in mapping.items() if value == code), next(iter(mapping), code or ''))
+
+    @staticmethod
+    def _code_depuis_label(mapping: dict[str, str], label: str | None, defaut: str = '') -> str:
+        return mapping.get(label or '', defaut) if label else defaut
 
     def _build(self) -> None:
         def section(titre: str) -> ctk.CTkFrame:
@@ -402,8 +408,8 @@ class _DialogDon(FormDialog):
         self._mettre_a_jour_visibilite_champs()
 
     def _mettre_a_jour_visibilite_champs(self) -> None:
-        type_code = self._TYPE_LABELS.get(self._var_type.get(), next(iter(self._TYPE_LABELS.values()), 'particulier'))
-        nature_code = self._NATURE_LABELS.get(self._var_nature.get(), next(iter(self._NATURE_LABELS.values()), 'argent'))
+        type_code = self._code_depuis_label(self._TYPE_LABELS, self._var_type.get(), next(iter(self._TYPE_LABELS.values()), 'particulier'))
+        nature_code = self._code_depuis_label(self._NATURE_LABELS, self._var_nature.get(), next(iter(self._NATURE_LABELS.values()), 'argent'))
         if type_code == 'entreprise':
             self._frame_siret.pack(fill='x', pady=4)
         else:
@@ -419,7 +425,7 @@ class _DialogDon(FormDialog):
         if not self._var_nom.get().strip():
             afficher_erreur(self, 'Dons', 'Le nom du donateur est obligatoire.')
             return
-        nature_code = self._NATURE_LABELS.get(self._var_nature.get(), 'argent')
+        nature_code = self._code_depuis_label(self._NATURE_LABELS, self._var_nature.get(), 'argent')
         if nature_code == 'argent' and not self._var_montant.get().strip():
             afficher_erreur(self, 'Dons', 'Le montant est obligatoire pour un don en argent.')
             return
@@ -441,7 +447,7 @@ class _DialogDon(FormDialog):
         except ValueError:
             afficher_erreur(self, 'Dons', 'Montant invalide.')
             return
-        type_code = self._TYPE_LABELS.get(self._var_type.get(), 'particulier')
+        type_code = self._code_depuis_label(self._TYPE_LABELS, self._var_type.get(), 'particulier')
         self.result = {
             'exercice_id': exercice_id,
             'date_don': self._var_date.get().strip(),
