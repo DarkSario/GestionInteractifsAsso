@@ -9,6 +9,9 @@ from db.models.tresorerie import get_all_categories
 MIN_VALID_YEAR = 2000
 MAX_VALID_YEAR_OFFSET = 50
 
+# Traçabilité bancaire uniquement — déjà comptabilisé dans les recettes événements
+_SOURCES_NON_COMPTABLES = {"remise_cheque", "depot_especes"}
+
 
 def to_float(value: str | float | int | None) -> float | None:
     if value is None:
@@ -107,6 +110,8 @@ def calculer_solde_compte(solde_initial: float, operations: list[dict]) -> float
 
     for operation in operations:
         if operation.get("statut") != "valide":
+            continue
+        if operation.get("source_module") in _SOURCES_NON_COMPTABLES:
             continue
 
         montant = float(operation.get("montant") or 0)

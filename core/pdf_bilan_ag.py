@@ -264,11 +264,7 @@ class PdfBilanAG(BasePDF):
 
         elements = self._titre_section("Statistiques adhérents")
         membres = get_all_membres(include_archives=True)
-        if self._annee:
-            membres = [
-                m for m in membres
-                if not m.get("date_adhesion") or str(m.get("date_adhesion")).startswith(str(self._annee))
-            ]
+        # Ne pas filtrer par année d'adhésion — afficher tous les membres actifs
         if not membres:
             return elements + [self._message_aucune_donnee()]
 

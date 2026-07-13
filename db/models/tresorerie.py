@@ -23,6 +23,9 @@ _SUBVENTION_STATUTS = {
 }
 _SUBVENTION_STATUTS_OBTENUS = {"accordee", "partielle"}
 
+# Traçabilité bancaire uniquement — déjà comptabilisé dans les recettes événements
+_SOURCES_NON_COMPTABLES = {"remise_cheque", "depot_especes"}
+
 
 def _fetch_all(query: str, params: tuple = ()) -> list[dict]:
     conn = get_connection()
@@ -56,6 +59,9 @@ def _operation_signed_amount(operation: dict) -> float:
     montant = float(operation.get("montant") or 0)
     statut = operation.get("statut")
     if statut != "valide":
+        return 0.0
+    # Traçabilité bancaire uniquement — déjà comptabilisé dans les recettes événements
+    if operation.get("source_module") in _SOURCES_NON_COMPTABLES:
         return 0.0
 
     type_operation = operation.get("type_operation")
@@ -445,6 +451,7 @@ def get_operations(
     categorie_id=None,
     statut=None,
     evenement_id=None,
+    exclude_non_comptable: bool = False,
 ) -> list[dict]:
     query = """
         SELECT o.*, c.nom AS categorie_nom, b.nom AS compte_nom,
@@ -478,6 +485,8 @@ def get_operations(
     if evenement_id:
         query += " AND o.evenement_id = ?"
         params.append(evenement_id)
+    if exclude_non_comptable:
+        query += " AND (o.source_module IS NULL OR o.source_module NOT IN ('remise_cheque', 'depot_especes'))"
 
     query += " ORDER BY o.date_operation DESC, o.id DESC"
     return _fetch_all(query, tuple(params))
@@ -615,44 +624,15 @@ def finaliser_remise(remise_id: int) -> bool:
     total = round(sum(float(d.get("montant") or 0) for d in details), 2)
     nb = len(details)
 
-    conn = get_connection()
-    try:
-        libelle = remise.get("reference") or f"REM-{remise_id:04d}"
-        op_cur = conn.execute(
-            """
-            INSERT INTO tresorerie_operations (
-                compte_id, type_operation, libelle, montant, date_operation,
-                mode_paiement, statut, est_automatique, source_module,
-                remise_cheque_id, commentaire
-            )
-            VALUES (?, 'recette', ?, ?, ?, 'cheque', 'valide', 0, 'remise_cheque', ?, ?)
-            """,
-            (
-                remise["compte_id"],
-                f"Remise de chèques {libelle}",
-                total,
-                remise["date_remise"],
-                remise_id,
-                remise.get("commentaire"),
-            ),
-        )
-        operation_id = op_cur.lastrowid
-
-        conn.execute(
-            """
-            UPDATE remises_cheques
-            SET montant_total = ?,
-                nombre_cheques = ?,
-                statut = 'remis',
-                operation_id = ?
-            WHERE id = ?
-            """,
-            (total, nb, operation_id, remise_id),
-        )
-        conn.commit()
-        return True
-    finally:
-        conn.close()
+    _execute(
+        """
+        UPDATE remises_cheques
+        SET montant_total = ?, nombre_cheques = ?, statut = 'remis', operation_id = NULL
+        WHERE id = ?
+        """,
+        (total, nb, remise_id),
+    )
+    return True
 
 
 def get_remises(compte_id=None, statut=None) -> list[dict]:
@@ -910,6 +890,7 @@ def get_stats_tresorerie(compte_id=None, date_debut=None, date_fin=None) -> dict
         date_debut=date_debut,
         date_fin=date_fin,
         statut="valide",
+        exclude_non_comptable=True,
     )
 
     total_recettes = 0.0
