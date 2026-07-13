@@ -149,9 +149,11 @@ def enregistrer_subvention_depuis_formulaire(
     # Créer automatiquement une opération de recette si la subvention est accordée
     # et qu'un compte est sélectionné et qu'il n'existe pas encore d'opération associée
     if statut == "accordee" and montant_obtenu > 0 and compte_id:
-        from db.models.tresorerie import _fetch_one  # type: ignore[attr-defined]
-        subvention_row = _fetch_one("SELECT operation_id FROM subventions WHERE id = ?", (subvention_id,))
-        if subvention_row and not subvention_row.get("operation_id"):
+        subvention_existante = next(
+            (s for s in get_all_subventions() if int(s["id"]) == int(subvention_id)),
+            None,
+        )
+        if subvention_existante and not subvention_existante.get("operation_id"):
             accorder_subvention(
                 subvention_id=int(subvention_id),
                 montant_obtenu=montant_obtenu,
