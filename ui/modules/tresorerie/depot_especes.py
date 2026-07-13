@@ -192,6 +192,8 @@ class _FormulaireDepotPopup(ctk.CTkToplevel):
                     commentaire=commentaire or None,
                 )
             else:
+                # statut='annule' : enregistrement de traçabilité bancaire uniquement,
+                # non comptabilisé dans le solde (recettes déjà dans evenement_recettes).
                 add_operation(
                     compte_id=int(compte["id"]),
                     type_operation="recette",
@@ -203,7 +205,7 @@ class _FormulaireDepotPopup(ctk.CTkToplevel):
                     numero_facture=self._var_reference.get().strip() or None,
                     evenement_id=None,
                     fournisseur_id=None,
-                    statut="informatif",  # traçabilité bancaire uniquement
+                    statut="annule",
                     est_automatique=0,
                     source_module="depot_especes",
                     source_id=None,
