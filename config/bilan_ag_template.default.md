@@ -38,6 +38,14 @@
 
 ---
 
+## Dons
+
+{{tableau_dons}}
+
+**Total des dons :** {{total_dons}}
+
+---
+
 ## Stock & Buvette
 
 - **Valeur du stock actuel :** {{valeur_stock}}

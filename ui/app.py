@@ -100,6 +100,8 @@ class MainApp(ctk.CTk):
         menu_modules.add_command(label="Événements", command=self._ouvrir_evenements)
         menu_modules.add_command(label="Buvette", command=self._ouvrir_buvette)
         menu_modules.add_command(label="Stock", command=self._ouvrir_stock)
+        menu_modules.add_command(label="💸 Remboursements", command=self._ouvrir_remboursements)
+        menu_modules.add_command(label="💝 Dons", command=self._ouvrir_dons)
         menubar.add_cascade(label="Modules", menu=menu_modules)
 
         menu_exports = tk.Menu(menubar, tearoff=0)
@@ -216,6 +218,8 @@ class MainApp(ctk.CTk):
             "buvette": self._ouvrir_buvette,
             "exercices": self._ouvrir_gestion_exercices,
             "parametres": self._ouvrir_parametres,
+            "remboursements": self._ouvrir_remboursements,
+            "dons": self._ouvrir_dons,
         }
         action = routes.get(destination)
         if action:
@@ -258,6 +262,20 @@ class MainApp(ctk.CTk):
         from ui.modules.buvette.liste import ListeBuvette
 
         fenetre = ListeBuvette(self)
+        fenetre.grab_set()
+
+    def _ouvrir_remboursements(self) -> None:
+        """Ouvre la fenêtre de suivi des remboursements."""
+        from ui.modules.remboursements.liste import ListeRemboursements
+
+        fenetre = ListeRemboursements(self)
+        fenetre.grab_set()
+
+    def _ouvrir_dons(self) -> None:
+        """Ouvre la fenêtre de gestion des dons."""
+        from ui.modules.dons.liste import ListeDons
+
+        fenetre = ListeDons(self)
         fenetre.grab_set()
 
     def _ouvrir_parametres(self) -> None:

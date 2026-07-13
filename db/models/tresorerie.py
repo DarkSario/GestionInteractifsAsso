@@ -321,6 +321,11 @@ def add_operation(
     source_module,
     source_id,
     commentaire,
+    avance_par_membre_id=None,
+    remboursement_statut='non_applicable',
+    remboursement_date=None,
+    remboursement_mode=None,
+    remboursement_reference=None,
 ) -> int:
     return _execute(
         """
@@ -328,9 +333,10 @@ def add_operation(
             compte_id, type_operation, libelle, montant, date_operation,
             categorie_id, mode_paiement, numero_facture, evenement_id,
             fournisseur_id, statut, est_automatique, source_module,
-            source_id, commentaire
+            source_id, commentaire, avance_par_membre_id, remboursement_statut,
+            remboursement_date, remboursement_mode, remboursement_reference
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             compte_id,
@@ -348,6 +354,11 @@ def add_operation(
             source_module,
             source_id,
             commentaire,
+            avance_par_membre_id,
+            remboursement_statut or 'non_applicable',
+            remboursement_date,
+            remboursement_mode,
+            remboursement_reference,
         ),
     )
 
@@ -375,6 +386,11 @@ def update_operation(operation_id, **kwargs) -> bool:
         "fournisseur_id": "UPDATE tresorerie_operations SET fournisseur_id = ? WHERE id = ?",
         "statut": "UPDATE tresorerie_operations SET statut = ? WHERE id = ?",
         "commentaire": "UPDATE tresorerie_operations SET commentaire = ? WHERE id = ?",
+        "avance_par_membre_id": "UPDATE tresorerie_operations SET avance_par_membre_id = ? WHERE id = ?",
+        "remboursement_statut": "UPDATE tresorerie_operations SET remboursement_statut = ? WHERE id = ?",
+        "remboursement_date": "UPDATE tresorerie_operations SET remboursement_date = ? WHERE id = ?",
+        "remboursement_mode": "UPDATE tresorerie_operations SET remboursement_mode = ? WHERE id = ?",
+        "remboursement_reference": "UPDATE tresorerie_operations SET remboursement_reference = ? WHERE id = ?",
     }
     updates: list[tuple[str, Any]] = []
     for key, value in kwargs.items():
@@ -431,10 +447,12 @@ def get_operations(
     evenement_id=None,
 ) -> list[dict]:
     query = """
-        SELECT o.*, c.nom AS categorie_nom, b.nom AS compte_nom
+        SELECT o.*, c.nom AS categorie_nom, b.nom AS compte_nom,
+               m.nom AS avance_par_nom, m.prenom AS avance_par_prenom
         FROM tresorerie_operations o
         LEFT JOIN tresorerie_categories c ON c.id = o.categorie_id
         LEFT JOIN comptes_bancaires b ON b.id = o.compte_id
+        LEFT JOIN membres m ON m.id = o.avance_par_membre_id
         WHERE 1 = 1
     """
     params: list[Any] = []
@@ -468,10 +486,12 @@ def get_operations(
 def get_operation_by_id(operation_id: int) -> dict | None:
     return _fetch_one(
         """
-        SELECT o.*, c.nom AS categorie_nom, b.nom AS compte_nom
+        SELECT o.*, c.nom AS categorie_nom, b.nom AS compte_nom,
+               m.nom AS avance_par_nom, m.prenom AS avance_par_prenom
         FROM tresorerie_operations o
         LEFT JOIN tresorerie_categories c ON c.id = o.categorie_id
         LEFT JOIN comptes_bancaires b ON b.id = o.compte_id
+        LEFT JOIN membres m ON m.id = o.avance_par_membre_id
         WHERE o.id = ?
         """,
         (operation_id,),

@@ -556,6 +556,11 @@ def add_depense(
     fournisseur_id: int | None,
     mode_paiement: str | None,
     commentaire: str | None,
+    avance_par_membre_id: int | None = None,
+    remboursement_statut: str = 'non_applicable',
+    remboursement_date: str | None = None,
+    remboursement_mode: str | None = None,
+    remboursement_reference: str | None = None,
 ) -> int:
     """Crée une dépense et retourne son identifiant."""
     conn = get_connection()
@@ -564,8 +569,9 @@ def add_depense(
             """
             INSERT INTO evenement_depenses
                 (evenement_id, libelle, montant, date, categorie,
-                 fournisseur_id, mode_paiement, commentaire)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                 fournisseur_id, mode_paiement, commentaire, avance_par_membre_id,
+                 remboursement_statut, remboursement_date, remboursement_mode, remboursement_reference)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 evenement_id,
@@ -576,6 +582,11 @@ def add_depense(
                 fournisseur_id,
                 mode_paiement,
                 commentaire,
+                avance_par_membre_id,
+                remboursement_statut or 'non_applicable',
+                remboursement_date,
+                remboursement_mode,
+                remboursement_reference,
             ),
         )
         conn.commit()
@@ -593,9 +604,13 @@ def get_depenses_evenement(evenement_id: int) -> list[dict]:
             SELECT d.id, d.evenement_id, d.libelle, d.montant, d.date,
                    d.categorie, d.fournisseur_id,
                    f.nom AS fournisseur_nom,
-                   d.mode_paiement, d.commentaire, d.tresorerie_id, d.created_at
+                   d.mode_paiement, d.commentaire, d.tresorerie_id, d.created_at,
+                   d.avance_par_membre_id, d.remboursement_statut, d.remboursement_date,
+                   d.remboursement_mode, d.remboursement_reference,
+                   m.nom AS avance_par_nom, m.prenom AS avance_par_prenom
             FROM evenement_depenses d
             LEFT JOIN fournisseurs f ON f.id = d.fournisseur_id
+            LEFT JOIN membres m ON m.id = d.avance_par_membre_id
             WHERE d.evenement_id = ?
             ORDER BY d.date DESC, d.id DESC
             """,
@@ -609,6 +624,8 @@ def get_depenses_evenement(evenement_id: int) -> list[dict]:
 _COLONNES_DEPENSE = frozenset({
     "libelle", "montant", "date", "categorie",
     "fournisseur_id", "mode_paiement", "commentaire", "tresorerie_id",
+    "avance_par_membre_id", "remboursement_statut", "remboursement_date",
+    "remboursement_mode", "remboursement_reference",
 })
 
 

@@ -41,4 +41,28 @@ def get_alertes() -> list[dict]:
     except Exception as exc:  # noqa: BLE001
         logger.warning("get_alertes – get_alertes_cotisations: %s", exc)
 
+    try:
+        from db.models.dons import get_all_dons
+        from db.models.remboursements import get_remboursements_en_attente
+
+        nb_remboursements = len(get_remboursements_en_attente())
+        if nb_remboursements:
+            alertes.append({
+                "niveau": "orange",
+                "message": f"{nb_remboursements} remboursements de frais en attente",
+                "module": "remboursements",
+                "lien_action": "remboursements",
+            })
+
+        nb_dons = len(get_all_dons({"statut_recu": "en_attente"}))
+        if nb_dons:
+            alertes.append({
+                "niveau": "orange",
+                "message": f"{nb_dons} dons sans reçu émis",
+                "module": "dons",
+                "lien_action": "dons",
+            })
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("get_alertes – phase17: %s", exc)
+
     return alertes

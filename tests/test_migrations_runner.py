@@ -77,6 +77,7 @@ def test_run_migrations_creates_expected_tables(tmp_db) -> None:
         "stock_inventaire_lignes",
         "buvette_couts_evenement",
         "evenement_budget",
+        "dons",
     }.issubset(tables)
     assert {
         "nom_asso",
