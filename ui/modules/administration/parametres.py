@@ -17,6 +17,21 @@ from typing import Any
 
 import customtkinter as ctk
 
+from core.bilan_ag import reset_template_bilan
+from core.recus_fiscaux import (
+    VARIABLES_TEMPLATE_ATTESTATION,
+    VARIABLES_TEMPLATE_CERFA,
+    VARIABLES_TEMPLATE_REMBOURSEMENT,
+    get_template_attestation,
+    get_template_cerfa,
+    get_template_remboursement,
+    reset_template_attestation,
+    reset_template_cerfa,
+    reset_template_remboursement,
+    save_template_attestation,
+    save_template_cerfa,
+    save_template_remboursement,
+)
 from core.parametres import (
     get_config_financiere,
     get_config_systeme,
@@ -919,6 +934,9 @@ class ParametresApp(ctk.CTkToplevel):
         self._pdf_couleur_accent_var = ctk.StringVar(
             value=get_parametre("pdf_couleur_accent", "#1f6aa5")
         )
+        self._type_recu_don_var = ctk.StringVar(value=("Cerfa 11580" if get_parametre("type_recu_don", "cerfa") == "cerfa" else "Attestation simple"))
+        self._num_habilitation_var = ctk.StringVar(value=get_parametre("num_habilitation_fiscale", ""))
+        self._numero_depart_recu_var = ctk.StringVar(value=get_parametre("recu_don_num_depart", f"{datetime.now().year}-001"))
 
         f_titre = ctk.CTkFrame(frame, fg_color="transparent")
         f_titre.pack(fill="x", pady=3)
@@ -1003,6 +1021,48 @@ class ParametresApp(ctk.CTkToplevel):
             command=self._restaurer_template_bilan,
         ).pack(side="left", padx=(8, 0))
 
+
+        ctk.CTkLabel(frame, text="Reçus de dons", font=fonts.get("subtitle")).pack(
+            anchor="w", pady=(18, 4)
+        )
+        f_type_recu = ctk.CTkFrame(frame, fg_color="transparent")
+        f_type_recu.pack(fill="x", pady=3)
+        ctk.CTkLabel(f_type_recu, text="Type de reçu par défaut", width=150, anchor="ne").pack(side="left", padx=(0, 8))
+        ctk.CTkOptionMenu(
+            f_type_recu,
+            values=["Cerfa 11580", "Attestation simple"],
+            variable=self._type_recu_don_var,
+            width=240,
+        ).pack(side="left")
+
+        f_habilitation = ctk.CTkFrame(frame, fg_color="transparent")
+        f_habilitation.pack(fill="x", pady=3)
+        ctk.CTkLabel(f_habilitation, text="N° habilitation fiscale", width=150, anchor="ne").pack(side="left", padx=(0, 8))
+        ctk.CTkEntry(f_habilitation, textvariable=self._num_habilitation_var, width=240).pack(side="left")
+
+        f_depart = ctk.CTkFrame(frame, fg_color="transparent")
+        f_depart.pack(fill="x", pady=3)
+        ctk.CTkLabel(f_depart, text="N° départ des reçus", width=150, anchor="ne").pack(side="left", padx=(0, 8))
+        ctk.CTkEntry(f_depart, textvariable=self._numero_depart_recu_var, width=240).pack(side="left")
+
+        f_recu = ctk.CTkFrame(frame, fg_color="transparent")
+        f_recu.pack(anchor="w", pady=(6, 0))
+        ctk.CTkButton(f_recu, text="✏️ Modifier template Cerfa 11580", width=240, command=self._ouvrir_editeur_template_cerfa).pack(side="left")
+        ctk.CTkButton(f_recu, text="✏️ Modifier template Attestation simple", width=260, command=self._ouvrir_editeur_template_attestation).pack(side="left", padx=(8, 0))
+
+        f_recu2 = ctk.CTkFrame(frame, fg_color="transparent")
+        f_recu2.pack(anchor="w", pady=(6, 0))
+        ctk.CTkButton(f_recu2, text="🔄 Restaurer Cerfa par défaut", width=240, fg_color="#8b1a1a", hover_color="#6b1414", command=self._restaurer_template_cerfa).pack(side="left")
+        ctk.CTkButton(f_recu2, text="🔄 Restaurer Attestation par défaut", width=260, fg_color="#8b1a1a", hover_color="#6b1414", command=self._restaurer_template_attestation).pack(side="left", padx=(8, 0))
+
+        ctk.CTkLabel(frame, text="Remboursements de frais", font=fonts.get("subtitle")).pack(
+            anchor="w", pady=(18, 4)
+        )
+        f_remb = ctk.CTkFrame(frame, fg_color="transparent")
+        f_remb.pack(anchor="w", pady=(6, 0))
+        ctk.CTkButton(f_remb, text="✏️ Modifier template Remboursement", width=270, command=self._ouvrir_editeur_template_remboursement).pack(side="left")
+        ctk.CTkButton(f_remb, text="🔄 Restaurer Remboursement par défaut", width=300, fg_color="#8b1a1a", hover_color="#6b1414", command=self._restaurer_template_remboursement).pack(side="left", padx=(8, 0))
+
         f_btn = ctk.CTkFrame(frame, fg_color="transparent")
         f_btn.pack(fill="x", pady=(14, 4))
         ctk.CTkButton(
@@ -1049,9 +1109,60 @@ class ParametresApp(ctk.CTkToplevel):
         editeur = EditeurTemplateBilan(self)
         self.wait_window(editeur)
 
-    def _restaurer_template_bilan(self) -> None:
-        from core.bilan_ag import reset_template_bilan
+    def _ouvrir_editeur_template_cerfa(self) -> None:
+        self._ouvrir_editeur_template_document(
+            titre="✏️ Modifier template Cerfa 11580",
+            variables=VARIABLES_TEMPLATE_CERFA,
+            charger=get_template_cerfa,
+            sauvegarder=save_template_cerfa,
+            restaurer=reset_template_cerfa,
+        )
 
+    def _ouvrir_editeur_template_attestation(self) -> None:
+        self._ouvrir_editeur_template_document(
+            titre="✏️ Modifier template Attestation simple",
+            variables=VARIABLES_TEMPLATE_ATTESTATION,
+            charger=get_template_attestation,
+            sauvegarder=save_template_attestation,
+            restaurer=reset_template_attestation,
+        )
+
+    def _ouvrir_editeur_template_remboursement(self) -> None:
+        self._ouvrir_editeur_template_document(
+            titre="✏️ Modifier template Remboursement de frais",
+            variables=VARIABLES_TEMPLATE_REMBOURSEMENT,
+            charger=get_template_remboursement,
+            sauvegarder=save_template_remboursement,
+            restaurer=reset_template_remboursement,
+        )
+
+    def _ouvrir_editeur_template_document(self, titre: str, variables, charger, sauvegarder, restaurer) -> None:
+        editeur = _EditeurTemplateDocument(self, titre, variables, charger, sauvegarder, restaurer)
+        self.wait_window(editeur)
+
+    def _restaurer_template_cerfa(self) -> None:
+        self._restaurer_template_generique("template Cerfa 11580", reset_template_cerfa)
+
+    def _restaurer_template_attestation(self) -> None:
+        self._restaurer_template_generique("template Attestation simple", reset_template_attestation)
+
+    def _restaurer_template_remboursement(self) -> None:
+        self._restaurer_template_generique("template Remboursement", reset_template_remboursement)
+
+    def _restaurer_template_generique(self, libelle: str, callback) -> None:
+        if not demander_confirmation(
+            self,
+            "Restaurer le modèle par défaut",
+            f"Toutes vos modifications de {libelle} seront perdues.\nVoulez-vous vraiment restaurer le modèle par défaut ?",
+        ):
+            return
+        try:
+            callback()
+            afficher_info(self, "Succès", "Le modèle par défaut a été restauré.")
+        except Exception as exc:
+            afficher_erreur(self, "Erreur", f"Impossible de restaurer le modèle : {exc}")
+
+    def _restaurer_template_bilan(self) -> None:
         if not demander_confirmation(
             self,
             "Restaurer le modèle par défaut",
@@ -1078,6 +1189,9 @@ class ParametresApp(ctk.CTkToplevel):
         set_parametre("pdf_police_corps", self._pdf_police_corps_var.get().strip())
         set_parametre("pdf_taille_base", str(taille))
         set_parametre("pdf_couleur_accent", self._pdf_couleur_accent_var.get().strip())
+        set_parametre("type_recu_don", "cerfa" if self._type_recu_don_var.get() == "Cerfa 11580" else "simple")
+        set_parametre("num_habilitation_fiscale", self._num_habilitation_var.get().strip())
+        set_parametre("recu_don_num_depart", self._numero_depart_recu_var.get().strip())
         afficher_info(self, "Succès", "Les paramètres PDF ont été enregistrés.")
 
     # ── Utilitaires ───────────────────────────────────────────────────────────

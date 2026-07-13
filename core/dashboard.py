@@ -21,7 +21,6 @@ from db.models.dashboard import (
     get_solde_global,
     get_stats_adherents_dashboard,
     get_stats_subventions_dashboard,
-    get_toutes_alertes,
 )
 from utils.logger import get_logger
 
@@ -124,9 +123,11 @@ def get_donnees_dashboard() -> dict:
         alertes_stock = {"critique": [], "faible": []}
 
     try:
-        toutes_alertes = get_toutes_alertes()
+        from core.alertes import get_alertes
+
+        toutes_alertes = get_alertes()
     except Exception as exc:  # noqa: BLE001
-        logger.warning("get_toutes_alertes: %s", exc)
+        logger.warning("get_alertes: %s", exc)
         toutes_alertes = []
 
     try:

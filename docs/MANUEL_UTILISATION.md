@@ -13,9 +13,11 @@
 4. [Trésorerie](#4-trésorerie)
 5. [Stock & Buvette](#5-stock--buvette)
 6. [Adhérents & Cotisations](#6-adhérents--cotisations)
-7. [Paramètres & Sauvegardes](#7-paramètres--sauvegardes)
-8. [Exports & Bilan AG](#8-exports--bilan-ag)
-9. [Questions fréquentes (FAQ)](#9-questions-fréquentes-faq)
+7. [Remboursements de frais](#7-remboursements-de-frais)
+8. [Dons](#8-dons)
+9. [Paramètres & Sauvegardes](#9-paramètres--sauvegardes)
+10. [Exports & Bilan AG](#10-exports--bilan-ag)
+11. [Questions fréquentes (FAQ)](#11-questions-fréquentes-faq)
 
 ---
 
@@ -287,7 +289,85 @@ Dans **Administration → ⚙️ Paramètres → 💰 Financier** :
 
 ---
 
-## 7. Paramètres & Sauvegardes
+
+## 7. Remboursements de frais
+
+**À quoi ça sert ?** Quand un bénévole avance une dépense pour un événement ou pour le fonctionnement de l'association, le logiciel permet de suivre ce qui doit lui être remboursé.
+
+### Déclarer qu'un adhérent a avancé des frais
+
+- Dans **Événements → Dépenses**, renseignez le champ **"Avancé par"** puis choisissez **"En attente"** si l'adhérent doit être remboursé.
+- Dans **Trésorerie → Opérations**, faites la même chose pour une dépense générale (ex. : fournitures de bureau, petit matériel).
+- Le champ est optionnel : laissez **"Non applicable"** pour les dépenses payées directement par l'association.
+
+### Suivre les remboursements en attente
+
+Ouvrez le module **💸 Remboursements** depuis le menu principal :
+- tableau unique (événements + trésorerie) ;
+- filtres par adhérent, période, statut et source ;
+- total affiché et montant encore en attente en bas de la fenêtre.
+
+### Marquer un remboursement comme effectué
+
+1. Sélectionnez la ligne concernée
+2. Cliquez **"✅ Marquer remboursé"**
+3. Saisissez le mode (chèque, virement, espèces...), la référence éventuelle et la date
+
+### Générer le PDF de remboursement
+
+Depuis le même module, cliquez sur **"🖨️ Générer PDF"** pour produire une feuille de remboursement prête à imprimer et signer.
+
+### Exemples concrets
+
+- Achat de matériel déco pour la fête de l'école
+- Location d'une sono avancée par un parent bénévole
+- Achat de fournitures administratives pour l'association
+
+---
+
+## 8. Dons
+
+**À quoi ça sert ?** Un **don** est un apport volontaire d'un particulier ou d'une entreprise, sans contrepartie. Ce n'est pas une subvention : les subventions restent suivies à part dans le module Trésorerie.
+
+### Enregistrer un don
+
+1. Ouvrez **💝 Dons**
+2. Cliquez **"➕ Nouveau don"**
+3. Choisissez le type de donateur (particulier ou entreprise)
+4. Renseignez le don (argent ou nature) et le mode de versement
+5. Vous pouvez lier le don à un adhérent existant pour pré-remplir les informations principales
+
+### Différence Cerfa 11580 / Attestation simple
+
+- **Cerfa 11580** : pour les associations habilitées à émettre des reçus fiscaux
+- **Attestation simple** : pour garder une preuve de don, même dans une autre association qui n'utilise pas le Cerfa fiscal
+
+Les deux modèles sont modifiables dans **Administration → Paramètres → 📄 Exports & PDF**.
+
+### Générer et émettre un reçu fiscal
+
+- Cliquez sur **"🖨️ Générer / Réimprimer reçu"** pour produire le PDF
+- Cliquez sur **"✅ Marquer reçu émis"** pour tracer qu'il a bien été transmis au donateur
+
+### Suivi des reçus émis
+
+Le tableau des dons permet de filtrer les statuts :
+- 🟡 En attente
+- 🟢 Émis
+- 🔴 Annulé
+
+### Lien avec la trésorerie
+
+Pour les dons en argent, vous pouvez cocher la création automatique d'une **recette** en trésorerie au moment de l'enregistrement.
+
+### Exemple concret
+
+Une entreprise locale donne **500 €** pour financer la fête de l'école : vous enregistrez le don, générez le Cerfa ou l'attestation, puis créez la recette correspondante dans la trésorerie.
+
+---
+
+
+## 9. Paramètres & Sauvegardes
 
 **À quoi ça sert ?** Configurer l'application selon vos besoins et protéger vos données par des sauvegardes régulières.
 
@@ -342,7 +422,7 @@ Dans l'onglet **🖥️ Système** : choisissez entre mode **🌙 Sombre** et **
 
 ---
 
-## 8. Exports & Bilan AG
+## 10. Exports & Bilan AG
 
 **À quoi ça sert ?** Générer des documents officiels pour votre association : bilan pour l'Assemblée Générale, listes des membres, relevés de trésorerie.
 
@@ -392,7 +472,7 @@ Vous pouvez modifier la structure du document sans toucher au code :
 
 ---
 
-## 9. Questions fréquentes (FAQ)
+## 11. Questions fréquentes (FAQ)
 
 ### L'application ne démarre pas
 

@@ -859,7 +859,7 @@ class FicheEvenement(ctk.CTkToplevel):
 
         self._tree_depenses = ttk.Treeview(
             frame_table,
-            columns=("id", "libelle", "montant", "date", "fournisseur", "mode"),
+            columns=("id", "libelle", "montant", "date", "fournisseur", "mode", "avance_par", "remboursement"),
             show="headings",
             height=16,
         )
@@ -869,6 +869,8 @@ class FicheEvenement(ctk.CTkToplevel):
         self._tree_depenses.heading("date", text="Date")
         self._tree_depenses.heading("fournisseur", text="Fournisseur")
         self._tree_depenses.heading("mode", text="Paiement")
+        self._tree_depenses.heading("avance_par", text="Avancé par")
+        self._tree_depenses.heading("remboursement", text="Remboursement")
 
         self._tree_depenses.column("id", width=50, anchor="center", stretch=False)
         self._tree_depenses.column("libelle", width=280)
@@ -876,6 +878,8 @@ class FicheEvenement(ctk.CTkToplevel):
         self._tree_depenses.column("date", width=100, anchor="center")
         self._tree_depenses.column("fournisseur", width=160)
         self._tree_depenses.column("mode", width=100, anchor="center")
+        self._tree_depenses.column("avance_par", width=180)
+        self._tree_depenses.column("remboursement", width=130, anchor="center")
 
         sd = ttk.Scrollbar(
             frame_table, orient="vertical", command=self._tree_depenses.yview
@@ -923,6 +927,8 @@ class FicheEvenement(ctk.CTkToplevel):
                     self._format_date(d.get("date", "")),
                     d.get("fournisseur_nom") or "",
                     MODES_DEPENSE.get(d.get("mode_paiement") or "", "—"),
+                    f"{d.get('avance_par_nom') or ''} {d.get('avance_par_prenom') or ''}".strip(),
+                    {"en_attente": "🟡 En attente", "rembourse": "🟢 Remboursé", "non_applicable": "⚫ Non applicable"}.get(d.get('remboursement_statut') or 'non_applicable', "⚫ Non applicable"),
                 ),
             )
         self._lbl_total_depenses.configure(text=f"Total dépenses : {self._fmt(total)}")
@@ -943,6 +949,8 @@ class FicheEvenement(ctk.CTkToplevel):
                 fournisseur_id=dialog.result.get("fournisseur_id"),
                 mode_paiement=dialog.result.get("mode_paiement"),
                 commentaire=dialog.result.get("commentaire"),
+                avance_par_membre_id=dialog.result.get("avance_par_membre_id"),
+                remboursement_statut=dialog.result.get("remboursement_statut") or "non_applicable",
             )
             self._charger_depenses()
             self._actualiser_resume_financier()
@@ -969,6 +977,8 @@ class FicheEvenement(ctk.CTkToplevel):
                 fournisseur_id=dialog.result.get("fournisseur_id"),
                 mode_paiement=dialog.result.get("mode_paiement"),
                 commentaire=dialog.result.get("commentaire"),
+                avance_par_membre_id=dialog.result.get("avance_par_membre_id"),
+                remboursement_statut=dialog.result.get("remboursement_statut") or "non_applicable",
             )
             self._charger_depenses()
             self._actualiser_resume_financier()
@@ -1450,7 +1460,7 @@ class _DialogDepense(ctk.CTkToplevel):
     def __init__(self, parent: Any, depense: dict | None = None) -> None:
         super().__init__(parent)
         self.title("Dépense")
-        self.geometry("460x440")
+        self.geometry("520x560")
         self.resizable(False, False)
         self.transient(parent)
         self.result: dict | None = None
@@ -1476,11 +1486,19 @@ class _DialogDepense(ctk.CTkToplevel):
         self._var_commentaire = tk.StringVar(
             value=depense.get("commentaire") or "" if depense else ""
         )
+        self._var_avance_par = tk.StringVar(value="— Aucun —")
+        self._var_remboursement = tk.StringVar(value="Non applicable")
+        self._membres = get_all_membres()
         self._fournisseurs: list[dict] = []
         self._fournisseur_id: int | None = (
             depense.get("fournisseur_id") if depense else None
         )
 
+        if depense and depense.get("avance_par_membre_id"):
+            nom = f"{depense.get('avance_par_nom') or ''} {depense.get('avance_par_prenom') or ''}".strip()
+            self._var_avance_par.set(nom or "— Aucun —")
+        if depense and depense.get("remboursement_statut") == "en_attente":
+            self._var_remboursement.set("En attente")
         try:
             self._fournisseurs = get_all_fournisseurs()
         except Exception:
@@ -1547,6 +1565,9 @@ class _DialogDepense(ctk.CTkToplevel):
                 width=240,
             ),
         )
+        membres_values = ["— Aucun —"] + [f"{m['nom']} {m['prenom']}".strip() for m in self._membres]
+        field("Avancé par", lambda p: ctk.CTkOptionMenu(p, values=membres_values, variable=self._var_avance_par, width=240))
+        field("Statut remboursement", lambda p: ctk.CTkOptionMenu(p, values=["Non applicable", "En attente"], variable=self._var_remboursement, width=240))
         field(
             "Commentaire",
             lambda p: ctk.CTkEntry(p, textvariable=self._var_commentaire, width=240),
@@ -1593,6 +1614,7 @@ class _DialogDepense(ctk.CTkToplevel):
         mode_inv = {v: k for k, v in MODES_DEPENSE.items()}
         mode = mode_inv.get(mode_label, None) or None
 
+        membre = next((m for m in self._membres if f"{m['nom']} {m['prenom']}".strip() == self._var_avance_par.get()), None)
         self.result = {
             "libelle": libelle,
             "montant": montant,
@@ -1601,6 +1623,8 @@ class _DialogDepense(ctk.CTkToplevel):
             "fournisseur_id": fournisseur_id,
             "mode_paiement": mode,
             "commentaire": self._var_commentaire.get().strip() or None,
+            "avance_par_membre_id": int(membre['id']) if membre else None,
+            "remboursement_statut": "en_attente" if self._var_remboursement.get() == "En attente" and membre else "non_applicable",
         }
         self.destroy()
 
@@ -1753,6 +1777,9 @@ class _DialogBenevole(ctk.CTkToplevel):
                 width=180,
             ),
         )
+        membres_values = ["— Aucun —"] + [f"{m['nom']} {m['prenom']}".strip() for m in self._membres]
+        field("Avancé par", lambda p: ctk.CTkOptionMenu(p, values=membres_values, variable=self._var_avance_par, width=240))
+        field("Statut remboursement", lambda p: ctk.CTkOptionMenu(p, values=["Non applicable", "En attente"], variable=self._var_remboursement, width=240))
         field(
             "Commentaire",
             lambda p: ctk.CTkEntry(p, textvariable=self._var_commentaire, width=240),

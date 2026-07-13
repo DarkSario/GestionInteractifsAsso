@@ -49,6 +49,7 @@ except ModuleNotFoundError:  # pragma: no cover - environnement sans Tk
     ctk = _DummyCTk()
 
 from core.tresorerie import formater_montant
+from db.models.membres import get_all_membres
 from db.models.tresorerie import (
     add_operation,
     delete_operation,
@@ -119,6 +120,24 @@ def _normaliser_date(value: str | None) -> str:
     return brut
 
 
+
+
+def _normaliser_mode_paiement(value: str | None) -> str:
+    brut = str(value or "autre").strip()
+    if not brut:
+        return "autre"
+    for label, code in _MOYENS_PAIEMENT.items():
+        if brut.lower() == label.lower() or brut.lower() == code.lower():
+            return code
+    alias = {
+        "cb": "carte",
+        "carte bancaire": "carte",
+        "espece": "especes",
+        "espèce": "especes",
+        "espèces": "especes",
+    }
+    return alias.get(brut.lower(), "autre")
+
 def _label_statut(statut: str | None) -> str:
     for label, code in _STATUTS.items():
         if code == statut:
@@ -159,7 +178,7 @@ def enregistrer_operation_depuis_formulaire(formulaire: dict[str, Any]) -> int:
         montant=_parse_float(formulaire.get("montant")),
         date_operation=_normaliser_date(str(formulaire.get("date_operation") or "")),
         categorie_id=categorie_id,
-        mode_paiement=str(formulaire.get("mode_paiement") or "autre").strip().lower() or "autre",
+        mode_paiement=_normaliser_mode_paiement(formulaire.get("mode_paiement")),
         numero_facture=None,
         evenement_id=None,
         fournisseur_id=None,
@@ -168,6 +187,8 @@ def enregistrer_operation_depuis_formulaire(formulaire: dict[str, Any]) -> int:
         source_module="manuel",
         source_id=None,
         commentaire=(str(formulaire.get("commentaire") or "").strip() or None),
+        avance_par_membre_id=formulaire.get("avance_par_membre_id"),
+        remboursement_statut=str(formulaire.get("remboursement_statut") or "non_applicable").strip().lower() or "non_applicable",
     )
 
 
@@ -276,6 +297,9 @@ class _OperationsTab(ctk.CTkFrame):
         self._var_statut = ctk.StringVar(value="Payé")
         self._var_compte = ctk.StringVar(value=self._comptes[0]["nom"] if self._comptes else "")
         self._var_commentaire = ctk.StringVar()
+        self._var_avance_par = ctk.StringVar(value="— Aucun —")
+        self._var_remboursement = ctk.StringVar(value="Non applicable")
+        self._membres = get_all_membres()
 
         self._lbl_titre_formulaire = ctk.CTkLabel(
             self._frame_formulaire,
@@ -329,6 +353,9 @@ class _OperationsTab(ctk.CTkFrame):
                 variable=self._var_compte,
             ),
         )
+        membres_values = ["— Aucun —"] + [f"{m['nom']} {m['prenom']}".strip() for m in self._membres]
+        champ("Avancé par", ctk.CTkOptionMenu(self._frame_formulaire, values=membres_values, variable=self._var_avance_par))
+        champ("Statut remboursement", ctk.CTkOptionMenu(self._frame_formulaire, values=["Non applicable", "En attente"], variable=self._var_remboursement))
         champ("Commentaire", ctk.CTkEntry(self._frame_formulaire, textvariable=self._var_commentaire))
 
         actions = ctk.CTkFrame(self._frame_formulaire, fg_color="transparent")
@@ -358,6 +385,8 @@ class _OperationsTab(ctk.CTkFrame):
         self._var_statut.set("Payé")
         self._var_compte.set(self._comptes[0]["nom"])
         self._var_commentaire.set("")
+        self._var_avance_par.set("— Aucun —")
+        self._var_remboursement.set("Non applicable")
         self._refresh_categories()
         if not self._frame_formulaire.winfo_manager():
             self._frame_formulaire.pack(side="right", fill="y", padx=(12, 0))
@@ -396,6 +425,9 @@ class _OperationsTab(ctk.CTkFrame):
         compte_nom = operation.get("compte_nom") or (self._comptes[0]["nom"] if self._comptes else "")
         self._var_compte.set(compte_nom)
         self._var_commentaire.set(operation.get("commentaire") or "")
+        avance_nom = f"{operation.get('avance_par_nom') or ''} {operation.get('avance_par_prenom') or ''}".strip()
+        self._var_avance_par.set(avance_nom or "— Aucun —")
+        self._var_remboursement.set("En attente" if operation.get("remboursement_statut") == "en_attente" else "Non applicable")
         cat_nom = operation.get("categorie_nom") or ""
         if cat_nom and cat_nom in [c.get("nom") or "" for c in self._categories]:
             self._var_categorie.set(cat_nom)
@@ -436,6 +468,7 @@ class _OperationsTab(ctk.CTkFrame):
         self._frame_formulaire.pack_forget()
 
     def _enregistrer(self) -> None:
+        membre = next((m for m in self._membres if f"{m['nom']} {m['prenom']}".strip() == self._var_avance_par.get()), None)
         formulaire = {
             "type_operation": self._var_type.get(),
             "libelle": self._var_libelle.get(),
@@ -449,7 +482,12 @@ class _OperationsTab(ctk.CTkFrame):
                 None,
             ),
             "commentaire": self._var_commentaire.get(),
+            "avance_par_membre_id": int(membre['id']) if membre else None,
+            "remboursement_statut": "en_attente" if self._var_remboursement.get() == "En attente" and membre else "non_applicable",
         }
+        if formulaire["type_operation"] != "depense":
+            formulaire["avance_par_membre_id"] = None
+            formulaire["remboursement_statut"] = "non_applicable"
         if self._operation_en_edition is not None:
             # Mode édition
             try:
@@ -468,6 +506,8 @@ class _OperationsTab(ctk.CTkFrame):
                     statut=formulaire["statut"],
                     compte_id=formulaire["compte_id"],
                     commentaire=formulaire["commentaire"] or None,
+                    avance_par_membre_id=formulaire["avance_par_membre_id"],
+                    remboursement_statut=formulaire["remboursement_statut"],
                 )
             except Exception as exc:
                 afficher_erreur(self, "Opérations", str(exc))

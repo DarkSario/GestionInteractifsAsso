@@ -36,6 +36,8 @@ VARIABLES_DISPONIBLES = [
     ("tableau_comptes", "Soldes par compte bancaire/caisse"),
     ("valeur_stock", "Valeur totale du stock actuel"),
     ("nb_mouvements_stock", "Nombre de mouvements de stock"),
+    ("tableau_dons", "Tableau récapitulatif des dons de l'exercice"),
+    ("total_dons", "Montant total des dons de l'exercice"),
     ("introduction", "Texte d'introduction (saisi avant export)"),
     ("conclusion", "Conclusion & perspectives (saisie avant export)"),
 ]
@@ -149,6 +151,8 @@ def collecter_donnees_bilan(
         "tableau_comptes": "_Aucun compte._",
         "valeur_stock": "0,00 €",
         "nb_mouvements_stock": "0",
+        "tableau_dons": "_Aucun don._",
+        "total_dons": "0.00 €",
     }
 
     # Nom de l'association
@@ -283,6 +287,43 @@ def collecter_donnees_bilan(
         )
     except Exception as exc:
         logger.warning("collecter_donnees_bilan – tableau_comptes: %s", exc)
+
+    # Dons
+    try:
+        from db.connection import get_connection
+
+        conn = get_connection()
+        try:
+            dons = conn.execute(
+                """
+                SELECT date_don, donateur_nom, donateur_prenom, nature_don,
+                       COALESCE(montant, valeur_estimee, 0) AS montant
+                FROM dons
+                WHERE exercice_id = ?
+                ORDER BY date_don, id
+                """,
+                (exercice_id,),
+            ).fetchall()
+        finally:
+            conn.close()
+
+        if dons:
+            lignes_dons = [
+                "| Date | Donateur | Nature | Montant |",
+                "|---|---|---|---:|",
+            ]
+            total_dons = 0.0
+            for don in dons:
+                montant = float(don["montant"] or 0)
+                total_dons += montant
+                donateur = f"{don['donateur_nom'] or ''} {don['donateur_prenom'] or ''}".strip()
+                lignes_dons.append(
+                    f"| {(don['date_don'] or '')[:10]} | {donateur} | {don['nature_don'] or ''} | {_formater_montant(montant)} |"
+                )
+            donnees["tableau_dons"] = "\n".join(lignes_dons)
+            donnees["total_dons"] = f"{total_dons:.2f} €"
+    except Exception as exc:
+        logger.warning("collecter_donnees_bilan – dons: %s", exc)
 
     # Stock
     try:

@@ -10,8 +10,10 @@ logger = get_logger(__name__)
 
 MIGRATIONS_DIR = Path(__file__).parent
 
+_SQL_IDENTIFIER_PATTERN = r"`[^`]+`|\"[^\"]+\"|\[[^\]]+\]|\w+"
 _ALTER_ADD_COLUMN_RE = re.compile(
-    r"ALTER\s+TABLE\s+\S+\s+ADD\s+COLUMN\s+",
+    rf"ALTER\s+TABLE\s+(?P<table>{_SQL_IDENTIFIER_PATTERN})\s+ADD\s+COLUMN\s+"
+    rf"(?P<column>{_SQL_IDENTIFIER_PATTERN})",
     re.IGNORECASE,
 )
 
@@ -81,7 +83,16 @@ def _execute_migration(conn, sql: str) -> None:
     statements = [s.strip() for s in sql.split(";") if s.strip()]
 
     for stmt in statements:
-        if _ALTER_ADD_COLUMN_RE.search(stmt):
+        if match := _ALTER_ADD_COLUMN_RE.search(stmt):
+            table = match.group('table').strip('`"[]')
+            column = match.group('column').strip('`"[]')
+            colonnes = {
+                row['name']
+                for row in conn.execute(f'PRAGMA table_info("{table}")').fetchall()
+            }
+            if column in colonnes:
+                logger.debug("Colonne déjà existante détectée via pragma_table_info : %s.%s", table, column)
+                continue
             try:
                 conn.execute(stmt)
             except Exception as exc:
