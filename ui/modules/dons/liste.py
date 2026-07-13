@@ -324,7 +324,7 @@ class _DialogDon(FormDialog):
 
     @staticmethod
     def _label_depuis_code(mapping: dict[str, str], code: str | None) -> str:
-        return next((label for label, value in mapping.items() if value == code), next(iter(mapping)))
+        return next((label for label, value in mapping.items() if value == code), next(iter(mapping), code or ''))
 
     def _build(self) -> None:
         def section(titre: str) -> ctk.CTkFrame:
@@ -402,8 +402,8 @@ class _DialogDon(FormDialog):
         self._mettre_a_jour_visibilite_champs()
 
     def _mettre_a_jour_visibilite_champs(self) -> None:
-        type_code = self._TYPE_LABELS.get(self._var_type.get(), 'particulier')
-        nature_code = self._NATURE_LABELS.get(self._var_nature.get(), 'argent')
+        type_code = self._TYPE_LABELS.get(self._var_type.get(), next(iter(self._TYPE_LABELS.values()), 'particulier'))
+        nature_code = self._NATURE_LABELS.get(self._var_nature.get(), next(iter(self._NATURE_LABELS.values()), 'argent'))
         if type_code == 'entreprise':
             self._frame_siret.pack(fill='x', pady=4)
         else:

@@ -174,11 +174,8 @@ class ListeRemboursements(ctk.CTkToplevel):
         identifiant = selection[0]
         return next((ligne for ligne in self._lignes if str(ligne['remboursement_id']) == identifiant), None)
 
-    def _marquer(self) -> None:
-        ligne = self._selection()
-        if not ligne:
-            return
-        dialog = _DialogMarquerRembourse(self, ligne)
+    def _appliquer_dialog_rembourse(self, ligne: dict[str, Any], titre: str, msg_ok: str, msg_err: str) -> None:
+        dialog = _DialogMarquerRembourse(self, ligne, titre=titre)
         self.wait_window(dialog)
         if not dialog.result:
             return
@@ -191,32 +188,32 @@ class ListeRemboursements(ctk.CTkToplevel):
             dialog.result.get('commentaire'),
         )
         if ok:
-            afficher_info(self, 'Remboursements', 'Le remboursement a été mis à jour.')
+            afficher_info(self, 'Remboursements', msg_ok)
             self._charger()
         else:
-            afficher_erreur(self, 'Remboursements', 'Impossible de mettre à jour ce remboursement.')
+            afficher_erreur(self, 'Remboursements', msg_err)
+
+    def _marquer(self) -> None:
+        ligne = self._selection()
+        if not ligne:
+            return
+        self._appliquer_dialog_rembourse(
+            ligne,
+            titre='✅ Marquer remboursé',
+            msg_ok='Le remboursement a été mis à jour.',
+            msg_err='Impossible de mettre à jour ce remboursement.',
+        )
 
     def _modifier(self) -> None:
         ligne = self._selection()
         if not ligne:
             return
-        dialog = _DialogMarquerRembourse(self, ligne, titre='✏️ Modifier remboursement')
-        self.wait_window(dialog)
-        if not dialog.result:
-            return
-        ok = marquer_rembourse(
-            str(ligne['source']),
-            int(ligne['source_id']),
-            dialog.result['mode'],
-            dialog.result['reference'],
-            dialog.result['date'],
-            dialog.result.get('commentaire'),
+        self._appliquer_dialog_rembourse(
+            ligne,
+            titre='✏️ Modifier remboursement',
+            msg_ok='Le remboursement a été modifié.',
+            msg_err='Impossible de modifier ce remboursement.',
         )
-        if ok:
-            afficher_info(self, 'Remboursements', 'Le remboursement a été modifié.')
-            self._charger()
-        else:
-            afficher_erreur(self, 'Remboursements', 'Impossible de modifier ce remboursement.')
 
     def _generer_pdf(self) -> None:
         ligne = self._selection()
