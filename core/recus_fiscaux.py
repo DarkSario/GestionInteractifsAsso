@@ -142,7 +142,7 @@ def render_template(template: str, donnees: dict) -> str:
     def replace_block(match: re.Match[str]) -> str:
         cle = match.group(1).strip()
         contenu = match.group(2)
-        return contenu if donnees.get(cle) else ''
+        return contenu if cle in donnees and bool(donnees[cle]) else ''
 
     rendu = re.sub(r'\{\{#([^}]+)\}\}(.*?)\{\{/\1\}\}', replace_block, template, flags=re.DOTALL)
 

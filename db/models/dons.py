@@ -19,6 +19,8 @@ _ALLOWED_FIELDS = {
     'commentaire',
 }
 
+_COLUMN_SQL = {field: field for field in _ALLOWED_FIELDS}
+
 
 def _fetch_all(query: str, params: tuple[Any, ...] = ()) -> list[dict]:
     conn = get_connection()
@@ -67,7 +69,7 @@ def add_don(**kwargs) -> int:
     champs.setdefault('statut_recu', 'en_attente')
     champs.setdefault('num_recu', get_prochain_num_recu(annee))
 
-    colonnes = ', '.join(champs)
+    colonnes = ', '.join(_COLUMN_SQL[cle] for cle in champs)
     placeholders = ', '.join(['?'] * len(champs))
     valeurs = [champs[cle] for cle in champs]
 
@@ -146,7 +148,7 @@ def update_don(don_id: int, **kwargs) -> bool:
         if cle == 'updated_at' and valeur == "datetime('now')":
             assignees.append("updated_at = datetime('now')")
             continue
-        assignees.append(f'{cle} = ?')
+        assignees.append(f'{_COLUMN_SQL[cle]} = ?')
         valeurs.append(valeur)
     valeurs.append(don_id)
 

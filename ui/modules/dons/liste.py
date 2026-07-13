@@ -19,6 +19,13 @@ _STATUTS = {'tous': 'Tous', 'en_attente': '🟡 En attente', 'emis': '🟢 Émis
 _TYPES = {'tous': 'Tous', 'particulier': 'Particulier', 'entreprise': 'Entreprise'}
 
 
+def _parse_optional_float(value: str) -> float | None:
+    brut = value.strip().replace(',', '.')
+    if not brut:
+        return None
+    return float(brut)
+
+
 class ListeDons(ctk.CTkToplevel):
     def __init__(self, parent: Any) -> None:
         super().__init__(parent)
@@ -344,9 +351,9 @@ class _DialogDon(ctk.CTkToplevel):
             'donateur_ville': self._var_ville.get().strip() or None,
             'donateur_siret': self._var_siret.get().strip() or None,
             'nature_don': self._var_nature.get().strip(),
-            'montant': float(self._var_montant.get().replace(',', '.') or 0) if self._var_montant.get().strip() else None,
+            'montant': _parse_optional_float(self._var_montant.get()),
             'description_don': self._var_description.get().strip() or None,
-            'valeur_estimee': float(self._var_valeur.get().replace(',', '.') or 0) if self._var_valeur.get().strip() else None,
+            'valeur_estimee': _parse_optional_float(self._var_valeur.get()),
             'mode_versement': self._var_mode.get().strip(),
             'commentaire': self._var_commentaire.get().strip() or None,
             'creer_tresorerie': bool(self._var_creer_treso.get()),

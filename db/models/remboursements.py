@@ -148,7 +148,11 @@ def get_remboursement_by_unified_id(remboursement_id: str | int) -> dict | None:
 
 
 def marquer_rembourse(source: str, identifiant: int, mode: str, reference: str | None, date: str) -> bool:
-    table = 'evenement_depenses' if source == 'evenement' else 'tresorerie_operations' if source == 'tresorerie' else ''
+    tables = {
+        'evenement': 'evenement_depenses',
+        'tresorerie': 'tresorerie_operations',
+    }
+    table = tables.get(source, '')
     if not table:
         return False
 

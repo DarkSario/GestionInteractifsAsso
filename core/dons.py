@@ -16,6 +16,10 @@ from db.models.parametres_globaux import get_parametre
 from db.models.tresorerie import add_operation, get_all_categories, get_all_comptes
 
 
+def _nom_donateur(don: dict) -> str:
+    return f"{(don.get('donateur_nom') or '').strip()} {(don.get('donateur_prenom') or '').strip()}".strip()
+
+
 def get_type_recu_defaut() -> str:
     type_recu = get_parametre('type_recu_don', 'cerfa').strip().lower()
     return type_recu if type_recu in {'cerfa', 'simple'} else 'cerfa'
@@ -104,7 +108,7 @@ def creer_recette_tresorerie(don_id: int) -> int:
     operation_id = add_operation(
         compte_id=compte_id,
         type_operation='recette',
-        libelle=f"Don - {(don.get('donateur_nom') or '').strip()} {(don.get('donateur_prenom') or '').strip()}".strip(),
+        libelle=f"Don - {_nom_donateur(don)}".strip(),
         montant=montant,
         date_operation=don.get('date_don') or date.today().isoformat(),
         categorie_id=categorie_id,

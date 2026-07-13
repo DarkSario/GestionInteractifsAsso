@@ -129,7 +129,13 @@ def _normaliser_mode_paiement(value: str | None) -> str:
     for label, code in _MOYENS_PAIEMENT.items():
         if brut.lower() == label.lower() or brut.lower() == code.lower():
             return code
-    alias = {"cb": "carte", "carte bancaire": "carte", "espèce": "especes", "espèces": "especes"}
+    alias = {
+        "cb": "carte",
+        "carte bancaire": "carte",
+        "espece": "especes",
+        "espèce": "especes",
+        "espèces": "especes",
+    }
     return alias.get(brut.lower(), "autre")
 
 def _label_statut(statut: str | None) -> str:

@@ -10,9 +10,10 @@ logger = get_logger(__name__)
 
 MIGRATIONS_DIR = Path(__file__).parent
 
+_SQL_IDENTIFIER_PATTERN = r"`[^`]+`|\"[^\"]+\"|\[[^\]]+\]|\w+"
 _ALTER_ADD_COLUMN_RE = re.compile(
-    r"ALTER\s+TABLE\s+(?P<table>`[^`]+`|\"[^\"]+\"|\[[^\]]+\]|\S+)\s+ADD\s+COLUMN\s+"
-    r"(?P<column>`[^`]+`|\"[^\"]+\"|\[[^\]]+\]|\w+)",
+    rf"ALTER\s+TABLE\s+(?P<table>{_SQL_IDENTIFIER_PATTERN})\s+ADD\s+COLUMN\s+"
+    rf"(?P<column>{_SQL_IDENTIFIER_PATTERN})",
     re.IGNORECASE,
 )
 
