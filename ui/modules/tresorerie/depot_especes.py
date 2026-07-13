@@ -203,7 +203,7 @@ class _FormulaireDepotPopup(ctk.CTkToplevel):
                     numero_facture=self._var_reference.get().strip() or None,
                     evenement_id=None,
                     fournisseur_id=None,
-                    statut="valide",
+                    statut="informatif",  # traçabilité bancaire uniquement
                     est_automatique=0,
                     source_module="depot_especes",
                     source_id=None,

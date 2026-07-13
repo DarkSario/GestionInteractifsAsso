@@ -84,7 +84,7 @@ def reset_template_bilan() -> None:
 
 
 def _formater_montant(valeur: float) -> str:
-    return f"{valeur:,.2f} €".replace(",", "\u202f")
+    return f"{valeur:,.2f} €".replace(",", "\u202f").replace(".", ",")
 
 
 def _construire_tableau_evenements(evenements: list[dict]) -> str:

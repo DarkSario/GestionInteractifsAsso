@@ -262,10 +262,10 @@ def test_remise_cheque_workflow(tmp_db):
     assert remise["statut"] == "remis"
     assert remise["montant_total"] == 50.0
 
+    # Plus d'opération trésorerie créée (traçabilité dans remises_cheques uniquement)
     operations = get_operations(statut="valide")
     remise_ops = [op for op in operations if op.get("source_module") == "remise_cheque"]
-    assert len(remise_ops) == 1
-    assert remise_ops[0]["montant"] == 50.0
+    assert len(remise_ops) == 0
 
     set_db_file("")
 
