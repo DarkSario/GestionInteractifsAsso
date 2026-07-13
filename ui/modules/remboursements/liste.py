@@ -17,6 +17,7 @@ from db.models.remboursements import (
 )
 from ui import theme as app_theme
 from ui.components.dialogs import afficher_erreur, afficher_info
+from ui.components.form_dialog import FormDialog
 
 _STATUTS = {
     'tous': 'Tous',
@@ -53,19 +54,25 @@ class ListeRemboursements(ctk.CTkToplevel):
         self._var_date_debut = ctk.StringVar()
         self._var_date_fin = ctk.StringVar()
 
-        def add_filter(row: Any, label: str, widget: Any) -> None:
-            bloc = ctk.CTkFrame(row, fg_color='transparent')
-            bloc.pack(side='left', padx=(0, 8))
-            ctk.CTkLabel(bloc, text=label).pack(anchor='w')
-            widget.pack(anchor='w', pady=(2, 0))
-
+        filtres.grid_columnconfigure((1, 3), weight=1)
         membres = ['Tous'] + [f"{m['nom']} {m['prenom']}".strip() for m in self._membres]
-        add_filter(filtres, 'Adhérent', ctk.CTkOptionMenu(filtres, values=membres, variable=self._var_membre, width=220))
-        add_filter(filtres, 'Période du', ctk.CTkEntry(filtres, textvariable=self._var_date_debut, width=120, placeholder_text='AAAA-MM-JJ'))
-        add_filter(filtres, 'au', ctk.CTkEntry(filtres, textvariable=self._var_date_fin, width=120, placeholder_text='AAAA-MM-JJ'))
-        add_filter(filtres, 'Statut', ctk.CTkOptionMenu(filtres, values=list(_STATUTS.values()), variable=self._var_statut, width=170))
-        add_filter(filtres, 'Source', ctk.CTkOptionMenu(filtres, values=list(_SOURCES.values()), variable=self._var_source, width=160))
-        ctk.CTkButton(filtres, text='🔄 Filtrer', width=120, command=self._charger).pack(side='right', padx=(8, 0), pady=(20, 0))
+        ctk.CTkLabel(filtres, text='Adhérent :').grid(row=0, column=0, sticky='e', padx=(10, 5), pady=5)
+        ctk.CTkOptionMenu(filtres, values=membres, variable=self._var_membre, width=220).grid(row=0, column=1, sticky='ew', padx=(0, 10), pady=5)
+        ctk.CTkLabel(filtres, text='Statut :').grid(row=0, column=2, sticky='e', padx=(10, 5), pady=5)
+        ctk.CTkOptionMenu(filtres, values=list(_STATUTS.values()), variable=self._var_statut, width=170).grid(row=0, column=3, sticky='ew', padx=(0, 10), pady=5)
+        ctk.CTkLabel(filtres, text='Source :').grid(row=1, column=0, sticky='e', padx=(10, 5), pady=5)
+        ctk.CTkOptionMenu(filtres, values=list(_SOURCES.values()), variable=self._var_source, width=160).grid(row=1, column=1, sticky='ew', padx=(0, 10), pady=5)
+        ctk.CTkLabel(filtres, text='Période du :').grid(row=1, column=2, sticky='e', padx=(10, 5), pady=5)
+        frame_periode = ctk.CTkFrame(filtres, fg_color='transparent')
+        frame_periode.grid(row=1, column=3, sticky='ew', padx=(0, 10), pady=5)
+        frame_periode.grid_columnconfigure((0, 2), weight=1)
+        ctk.CTkEntry(frame_periode, textvariable=self._var_date_debut, placeholder_text='AAAA-MM-JJ').grid(row=0, column=0, sticky='ew')
+        ctk.CTkLabel(frame_periode, text='au').grid(row=0, column=1, padx=6)
+        ctk.CTkEntry(frame_periode, textvariable=self._var_date_fin, placeholder_text='AAAA-MM-JJ').grid(row=0, column=2, sticky='ew')
+        frame_actions_filtres = ctk.CTkFrame(filtres, fg_color='transparent')
+        frame_actions_filtres.grid(row=2, column=3, sticky='e', padx=(0, 10), pady=(4, 6))
+        ctk.CTkButton(frame_actions_filtres, text='🔍 Filtrer', width=120, command=self._charger).pack(side='left')
+        ctk.CTkButton(frame_actions_filtres, text='🔄 Reset', width=110, command=self._reset_filtres).pack(side='left', padx=(8, 0))
 
         frame_table = ctk.CTkFrame(self)
         frame_table.pack(fill='both', expand=True, padx=16, pady=8)
@@ -96,7 +103,9 @@ class ListeRemboursements(ctk.CTkToplevel):
         actions = ctk.CTkFrame(self, fg_color='transparent')
         actions.pack(fill='x', padx=16, pady=(0, 6))
         ctk.CTkButton(actions, text='✅ Marquer remboursé', width=180, command=self._marquer).pack(side='left')
+        ctk.CTkButton(actions, text='✏️ Modifier', width=120, command=self._modifier).pack(side='left', padx=(8, 0))
         ctk.CTkButton(actions, text='🖨️ Générer PDF', width=150, command=self._generer_pdf).pack(side='left', padx=(8, 0))
+        ctk.CTkButton(actions, text='🔄 Actualiser', width=130, command=self._charger).pack(side='left', padx=(8, 0))
         ctk.CTkButton(actions, text='Fermer', width=110, fg_color='gray', command=self.destroy).pack(side='right')
 
         self._lbl_stats = ctk.CTkLabel(self, text='')
@@ -148,6 +157,14 @@ class ListeRemboursements(ctk.CTkToplevel):
             )
         )
 
+    def _reset_filtres(self) -> None:
+        self._var_membre.set('Tous')
+        self._var_source.set('Toutes')
+        self._var_statut.set('🟡 En attente')
+        self._var_date_debut.set('')
+        self._var_date_fin.set('')
+        self._charger()
+
     def _selection(self) -> dict[str, Any] | None:
         selection = self._tree.selection()
         if not selection:
@@ -170,12 +187,35 @@ class ListeRemboursements(ctk.CTkToplevel):
             dialog.result['mode'],
             dialog.result['reference'],
             dialog.result['date'],
+            dialog.result.get('commentaire'),
         )
         if ok:
             afficher_info(self, 'Remboursements', 'Le remboursement a été mis à jour.')
             self._charger()
         else:
             afficher_erreur(self, 'Remboursements', 'Impossible de mettre à jour ce remboursement.')
+
+    def _modifier(self) -> None:
+        ligne = self._selection()
+        if not ligne:
+            return
+        dialog = _DialogMarquerRembourse(self, ligne, titre='✏️ Modifier remboursement')
+        self.wait_window(dialog)
+        if not dialog.result:
+            return
+        ok = marquer_rembourse(
+            str(ligne['source']),
+            int(ligne['source_id']),
+            dialog.result['mode'],
+            dialog.result['reference'],
+            dialog.result['date'],
+            dialog.result.get('commentaire'),
+        )
+        if ok:
+            afficher_info(self, 'Remboursements', 'Le remboursement a été modifié.')
+            self._charger()
+        else:
+            afficher_erreur(self, 'Remboursements', 'Impossible de modifier ce remboursement.')
 
     def _generer_pdf(self) -> None:
         ligne = self._selection()
@@ -197,42 +237,36 @@ class ListeRemboursements(ctk.CTkToplevel):
             afficher_erreur(self, 'Remboursements', resultat.get('message', 'Erreur de génération PDF.'))
 
 
-class _DialogMarquerRembourse(ctk.CTkToplevel):
-    def __init__(self, parent: Any, ligne: dict[str, Any]) -> None:
-        super().__init__(parent)
-        self.title('Marquer remboursé')
-        self.geometry('420x260')
-        self.transient(parent)
-        self.grab_set()
-        self.result: dict[str, Any] | None = None
-        self._var_mode = ctk.StringVar(value='Virement')
+class _DialogMarquerRembourse(FormDialog):
+    def __init__(self, parent: Any, ligne: dict[str, Any], titre: str = '✅ Marquer remboursé') -> None:
+        super().__init__(parent, titre=titre, largeur=500, hauteur=400)
+        self._var_mode = ctk.StringVar(value=str(ligne.get('remboursement_mode') or 'Virement'))
         self._var_reference = ctk.StringVar(value=str(ligne.get('remboursement_reference') or ''))
-        self._var_date = ctk.StringVar(value=datetime.now().strftime('%Y-%m-%d'))
+        self._var_date = ctk.StringVar(value=str(ligne.get('remboursement_date') or datetime.now().strftime('%Y-%m-%d')))
+        self._var_commentaire = ctk.StringVar(value=str(ligne.get('commentaire') or ''))
         self._build()
 
     def _build(self) -> None:
-        frame = ctk.CTkFrame(self)
+        frame = ctk.CTkFrame(self.frame_content)
         frame.pack(fill='both', expand=True, padx=16, pady=16)
         for label, widget in [
             ('Mode', ctk.CTkEntry(frame, textvariable=self._var_mode)),
             ('Référence', ctk.CTkEntry(frame, textvariable=self._var_reference)),
             ('Date', ctk.CTkEntry(frame, textvariable=self._var_date)),
+            ('Commentaire', ctk.CTkEntry(frame, textvariable=self._var_commentaire)),
         ]:
             bloc = ctk.CTkFrame(frame, fg_color='transparent')
             bloc.pack(fill='x', pady=5)
             ctk.CTkLabel(bloc, text=label, width=110, anchor='e').pack(side='left', padx=(0, 8))
             widget.pack(side='left', fill='x', expand=True)
-        actions = ctk.CTkFrame(frame, fg_color='transparent')
-        actions.pack(fill='x', pady=(14, 0))
-        ctk.CTkButton(actions, text='Annuler', fg_color='gray', command=self.destroy).pack(side='left')
-        ctk.CTkButton(actions, text='Valider', command=self._valider).pack(side='right')
 
-    def _valider(self) -> None:
+    def _on_valider(self) -> None:
         if not self._var_mode.get().strip() or not self._var_date.get().strip():
             return
         self.result = {
             'mode': self._var_mode.get().strip(),
             'reference': self._var_reference.get().strip() or None,
             'date': self._var_date.get().strip(),
+            'commentaire': self._var_commentaire.get().strip() or None,
         }
         self.destroy()

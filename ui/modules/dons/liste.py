@@ -14,6 +14,7 @@ from db.models.dons import add_don, delete_don, get_all_dons, get_don_by_id, get
 from db.models.membres import get_all_membres, get_membre_by_id
 from ui import theme as app_theme
 from ui.components.dialogs import afficher_erreur, afficher_info, demander_confirmation
+from ui.components.form_dialog import FormDialog
 
 _STATUTS = {'tous': 'Tous', 'en_attente': '🟡 En attente', 'emis': '🟢 Émis', 'annule': '🔴 Annulé'}
 _TYPES = {'tous': 'Tous', 'particulier': 'Particulier', 'entreprise': 'Entreprise'}
@@ -52,19 +53,44 @@ class ListeDons(ctk.CTkToplevel):
 
         filtres = ctk.CTkFrame(self)
         filtres.pack(fill='x', padx=16, pady=(0, 8))
+        filtres.grid_columnconfigure((1, 3), weight=1)
 
-        def add_filter(parent: Any, label: str, widget: Any) -> None:
-            bloc = ctk.CTkFrame(parent, fg_color='transparent')
-            bloc.pack(side='left', padx=(0, 8))
-            ctk.CTkLabel(bloc, text=label).pack(anchor='w')
-            widget.pack(anchor='w', pady=(2, 0))
+        ctk.CTkLabel(filtres, text='Exercice :').grid(row=0, column=0, sticky='e', padx=(10, 5), pady=5)
+        ctk.CTkOptionMenu(
+            filtres,
+            values=self._charger_exercices(),
+            variable=self._var_exercice,
+            width=200,
+        ).grid(row=0, column=1, sticky='ew', padx=(0, 10), pady=5)
 
-        add_filter(filtres, 'Exercice', ctk.CTkOptionMenu(filtres, values=self._charger_exercices(), variable=self._var_exercice, width=180))
-        add_filter(filtres, 'Type', ctk.CTkOptionMenu(filtres, values=list(_TYPES.values()), variable=self._var_type, width=150))
-        add_filter(filtres, 'Statut', ctk.CTkOptionMenu(filtres, values=list(_STATUTS.values()), variable=self._var_statut, width=150))
-        add_filter(filtres, 'Période du', ctk.CTkEntry(filtres, textvariable=self._var_date_debut, width=120, placeholder_text='AAAA-MM-JJ'))
-        add_filter(filtres, 'au', ctk.CTkEntry(filtres, textvariable=self._var_date_fin, width=120, placeholder_text='AAAA-MM-JJ'))
-        ctk.CTkButton(filtres, text='🔄 Filtrer', width=120, command=self._charger).pack(side='right', padx=(8, 0), pady=(20, 0))
+        ctk.CTkLabel(filtres, text='Type :').grid(row=0, column=2, sticky='e', padx=(10, 5), pady=5)
+        ctk.CTkOptionMenu(
+            filtres,
+            values=list(_TYPES.values()),
+            variable=self._var_type,
+            width=180,
+        ).grid(row=0, column=3, sticky='ew', padx=(0, 10), pady=5)
+
+        ctk.CTkLabel(filtres, text='Statut :').grid(row=1, column=0, sticky='e', padx=(10, 5), pady=5)
+        ctk.CTkOptionMenu(
+            filtres,
+            values=list(_STATUTS.values()),
+            variable=self._var_statut,
+            width=180,
+        ).grid(row=1, column=1, sticky='ew', padx=(0, 10), pady=5)
+
+        ctk.CTkLabel(filtres, text='Période du :').grid(row=1, column=2, sticky='e', padx=(10, 5), pady=5)
+        frame_periode = ctk.CTkFrame(filtres, fg_color='transparent')
+        frame_periode.grid(row=1, column=3, sticky='ew', padx=(0, 10), pady=5)
+        frame_periode.grid_columnconfigure((0, 2), weight=1)
+        ctk.CTkEntry(frame_periode, textvariable=self._var_date_debut, placeholder_text='AAAA-MM-JJ').grid(row=0, column=0, sticky='ew')
+        ctk.CTkLabel(frame_periode, text='au').grid(row=0, column=1, padx=6)
+        ctk.CTkEntry(frame_periode, textvariable=self._var_date_fin, placeholder_text='AAAA-MM-JJ').grid(row=0, column=2, sticky='ew')
+
+        frame_actions_filtres = ctk.CTkFrame(filtres, fg_color='transparent')
+        frame_actions_filtres.grid(row=2, column=3, sticky='e', padx=(0, 10), pady=(4, 6))
+        ctk.CTkButton(frame_actions_filtres, text='🔍 Filtrer', width=120, command=self._charger).pack(side='left')
+        ctk.CTkButton(frame_actions_filtres, text='🔄 Reset', width=110, command=self._reset_filtres).pack(side='left', padx=(8, 0))
 
         frame_table = ctk.CTkFrame(self)
         frame_table.pack(fill='both', expand=True, padx=16, pady=8)
@@ -100,6 +126,7 @@ class ListeDons(ctk.CTkToplevel):
         ctk.CTkButton(actions, text='🗑️ Supprimer', width=120, fg_color='#8b1a1a', hover_color='#6b1414', command=self._supprimer).pack(side='left', padx=(8, 0))
         ctk.CTkButton(actions, text='✅ Marquer reçu émis', width=180, command=self._marquer_emis).pack(side='left', padx=(8, 0))
         ctk.CTkButton(actions, text='🖨️ Générer / Réimprimer reçu', width=230, command=self._generer_pdf).pack(side='left', padx=(8, 0))
+        ctk.CTkButton(actions, text='🔄 Actualiser', width=130, command=self._charger).pack(side='left', padx=(8, 0))
         ctk.CTkButton(actions, text='Fermer', width=110, fg_color='gray', command=self.destroy).pack(side='right')
 
         self._lbl_stats = ctk.CTkLabel(self, text='')
@@ -127,6 +154,14 @@ class ListeDons(ctk.CTkToplevel):
             'date_debut': self._var_date_debut.get().strip() or None,
             'date_fin': self._var_date_fin.get().strip() or None,
         }
+
+    def _reset_filtres(self) -> None:
+        self._var_exercice.set('Tous')
+        self._var_type.set('Tous')
+        self._var_statut.set('Tous')
+        self._var_date_debut.set('')
+        self._var_date_fin.set('')
+        self._charger()
 
     def _charger(self) -> None:
         self._dons = get_all_dons(self._filters())
@@ -241,14 +276,14 @@ class ListeDons(ctk.CTkToplevel):
         self._sauver_pdf(int(don['id']))
 
 
-class _DialogDon(ctk.CTkToplevel):
+class _DialogDon(FormDialog):
     def __init__(self, parent: Any, membres: list[dict[str, Any]], exercices: dict[str, int | None], don: dict[str, Any] | None = None) -> None:
-        super().__init__(parent)
-        self.title('Don')
-        self.geometry('560x720')
-        self.transient(parent)
-        self.grab_set()
-        self.result: dict[str, Any] | None = None
+        super().__init__(
+            parent,
+            titre='✏️ Modifier un don' if don else '➕ Nouveau don',
+            largeur=700,
+            hauteur=750,
+        )
         self._membres = membres
         self._map_exercices = exercices
         self._don = don
@@ -272,6 +307,8 @@ class _DialogDon(ctk.CTkToplevel):
         self._var_creer_treso = ctk.BooleanVar(value=False)
         self._var_generer_recu = ctk.BooleanVar(value=False)
         self._build()
+        self._toggle_type_fields()
+        self._toggle_nature_fields()
 
     def _label_exercice(self, exercice_id: Any) -> str:
         for label, value in self._map_exercices.items():
@@ -284,42 +321,50 @@ class _DialogDon(ctk.CTkToplevel):
         return f"{membre['nom']} {membre['prenom']}".strip() if membre else '— Aucun —'
 
     def _build(self) -> None:
-        scroll = ctk.CTkScrollableFrame(self)
-        scroll.pack(fill='both', expand=True, padx=16, pady=16)
+        def section(titre: str) -> ctk.CTkFrame:
+            bloc_titre = ctk.CTkFrame(self.frame_content, fg_color='transparent')
+            bloc_titre.pack(fill='x', pady=(8, 2))
+            ctk.CTkLabel(bloc_titre, text=f'── {titre} ' + '─' * 30, anchor='w').pack(fill='x')
+            bloc_contenu = ctk.CTkFrame(self.frame_content, fg_color='transparent')
+            bloc_contenu.pack(fill='x', padx=4, pady=(0, 4))
+            return bloc_contenu
 
-        def champ(label: str, widget: Any) -> None:
-            bloc = ctk.CTkFrame(scroll, fg_color='transparent')
+        section_donateur = section('Donateur')
+
+        def champ(parent: Any, label: str, widget: Any) -> ctk.CTkFrame:
+            bloc = ctk.CTkFrame(parent, fg_color='transparent')
             bloc.pack(fill='x', pady=4)
             ctk.CTkLabel(bloc, text=label, width=150, anchor='e').pack(side='left', padx=(0, 8))
             widget.pack(side='left', fill='x', expand=True)
+            return bloc
 
-        champ('Exercice', ctk.CTkOptionMenu(scroll, values=list(self._map_exercices), variable=self._var_exercice, width=260))
-        type_menu = ctk.CTkOptionMenu(scroll, values=['particulier', 'entreprise'], variable=self._var_type, width=260)
-        champ('Type donateur', type_menu)
+        champ(section_donateur, 'Exercice', ctk.CTkOptionMenu(section_donateur, values=list(self._map_exercices), variable=self._var_exercice, width=260))
+        type_menu = ctk.CTkSegmentedButton(section_donateur, values=['particulier', 'entreprise'], variable=self._var_type, command=lambda _value: self._toggle_type_fields())
+        champ(section_donateur, 'Type donateur', type_menu)
         membre_values = ['— Aucun —'] + [f"{m['nom']} {m['prenom']}".strip() for m in self._membres]
-        combo_membre = ctk.CTkOptionMenu(scroll, values=membre_values, variable=self._var_membre, width=260, command=lambda _value: self._prefill_membre())
-        champ('Lier à un adhérent', combo_membre)
-        champ('Nom / raison sociale *', ctk.CTkEntry(scroll, textvariable=self._var_nom, width=260))
-        champ('Prénom', ctk.CTkEntry(scroll, textvariable=self._var_prenom, width=260))
-        champ('Adresse', ctk.CTkEntry(scroll, textvariable=self._var_adresse, width=260))
-        champ('Code postal', ctk.CTkEntry(scroll, textvariable=self._var_cp, width=260))
-        champ('Ville', ctk.CTkEntry(scroll, textvariable=self._var_ville, width=260))
-        champ('SIRET', ctk.CTkEntry(scroll, textvariable=self._var_siret, width=260))
-        champ('Date du don', ctk.CTkEntry(scroll, textvariable=self._var_date, width=260))
-        champ('Nature', ctk.CTkOptionMenu(scroll, values=['argent', 'nature'], variable=self._var_nature, width=260))
-        champ('Montant (€)', ctk.CTkEntry(scroll, textvariable=self._var_montant, width=260))
-        champ('Description don', ctk.CTkEntry(scroll, textvariable=self._var_description, width=260))
-        champ('Valeur estimée (€)', ctk.CTkEntry(scroll, textvariable=self._var_valeur, width=260))
-        champ('Mode versement', ctk.CTkOptionMenu(scroll, values=['cheque', 'virement', 'especes', 'cb', 'autre'], variable=self._var_mode, width=260))
-        champ('Commentaire', ctk.CTkEntry(scroll, textvariable=self._var_commentaire, width=260))
-        if not self._don:
-            ctk.CTkCheckBox(scroll, text='Créer recette en trésorerie automatiquement', variable=self._var_creer_treso).pack(anchor='w', padx=160, pady=(6, 0))
-            ctk.CTkCheckBox(scroll, text='Générer le reçu immédiatement après enregistrement', variable=self._var_generer_recu).pack(anchor='w', padx=160, pady=(4, 0))
+        combo_membre = ctk.CTkOptionMenu(section_donateur, values=membre_values, variable=self._var_membre, width=260, command=lambda _value: self._prefill_membre())
+        champ(section_donateur, 'Lier à un adhérent', combo_membre)
+        champ(section_donateur, 'Nom *', ctk.CTkEntry(section_donateur, textvariable=self._var_nom, width=260))
+        champ(section_donateur, 'Prénom', ctk.CTkEntry(section_donateur, textvariable=self._var_prenom, width=260))
+        champ(section_donateur, 'Adresse', ctk.CTkEntry(section_donateur, textvariable=self._var_adresse, width=260))
+        champ(section_donateur, 'Code postal', ctk.CTkEntry(section_donateur, textvariable=self._var_cp, width=260))
+        champ(section_donateur, 'Ville', ctk.CTkEntry(section_donateur, textvariable=self._var_ville, width=260))
+        self._frame_siret = champ(section_donateur, 'SIRET', ctk.CTkEntry(section_donateur, textvariable=self._var_siret, width=260))
 
-        actions = ctk.CTkFrame(scroll, fg_color='transparent')
-        actions.pack(fill='x', pady=(14, 0))
-        ctk.CTkButton(actions, text='Annuler', fg_color='gray', command=self.destroy).pack(side='left')
-        ctk.CTkButton(actions, text='Valider', command=self._valider).pack(side='right')
+        section_don = section('Don')
+        champ(section_don, 'Date du don *', ctk.CTkEntry(section_don, textvariable=self._var_date, width=260))
+        nature = ctk.CTkSegmentedButton(section_don, values=['argent', 'nature'], variable=self._var_nature, command=lambda _value: self._toggle_nature_fields())
+        champ(section_don, 'Nature', nature)
+        champ(section_don, 'Montant (€)', ctk.CTkEntry(section_don, textvariable=self._var_montant, width=260))
+        self._frame_description = champ(section_don, 'Description', ctk.CTkEntry(section_don, textvariable=self._var_description, width=260))
+        self._frame_valeur = champ(section_don, 'Valeur estimée (€)', ctk.CTkEntry(section_don, textvariable=self._var_valeur, width=260))
+        champ(section_don, 'Mode versement', ctk.CTkOptionMenu(section_don, values=['cheque', 'virement', 'especes', 'cb', 'autre'], variable=self._var_mode, width=260))
+
+        section_options = section('Options')
+        if not self._don:
+            ctk.CTkCheckBox(section_options, text='Créer une recette en trésorerie', variable=self._var_creer_treso).pack(anchor='w', padx=158, pady=(4, 0))
+            ctk.CTkCheckBox(section_options, text='Générer le reçu immédiatement', variable=self._var_generer_recu).pack(anchor='w', padx=158, pady=(4, 0))
+        champ(section_options, 'Commentaire', ctk.CTkEntry(section_options, textvariable=self._var_commentaire, width=260))
 
     def _prefill_membre(self) -> None:
         label = self._var_membre.get()
@@ -334,15 +379,38 @@ class _DialogDon(ctk.CTkToplevel):
         self._var_nom.set(detail.get('nom') or '')
         self._var_prenom.set(detail.get('prenom') or '')
 
-    def _valider(self) -> None:
+    def _toggle_type_fields(self) -> None:
+        if self._var_type.get() == 'entreprise':
+            self._frame_siret.pack(fill='x', pady=4)
+        else:
+            self._frame_siret.pack_forget()
+
+    def _toggle_nature_fields(self) -> None:
+        if self._var_nature.get() == 'nature':
+            self._frame_description.pack(fill='x', pady=4)
+            self._frame_valeur.pack(fill='x', pady=4)
+        else:
+            self._frame_description.pack_forget()
+            self._frame_valeur.pack_forget()
+
+    def _on_valider(self) -> None:
         if not self._var_nom.get().strip():
             afficher_erreur(self, 'Dons', 'Le nom du donateur est obligatoire.')
+            return
+        if self._var_nature.get() == 'argent' and not self._var_montant.get().strip():
+            afficher_erreur(self, 'Dons', 'Le montant est obligatoire pour un don en argent.')
             return
         membre_id = None
         if self._var_membre.get() != '— Aucun —':
             membre = next((m for m in self._membres if f"{m['nom']} {m['prenom']}".strip() == self._var_membre.get()), None)
             membre_id = int(membre['id']) if membre else None
         exercice_id = self._map_exercices.get(self._var_exercice.get())
+        try:
+            montant = _parse_optional_float(self._var_montant.get())
+            valeur_estimee = _parse_optional_float(self._var_valeur.get())
+        except ValueError:
+            afficher_erreur(self, 'Dons', 'Montant invalide.')
+            return
         self.result = {
             'exercice_id': exercice_id,
             'date_don': self._var_date.get().strip(),
@@ -353,11 +421,11 @@ class _DialogDon(ctk.CTkToplevel):
             'donateur_adresse': self._var_adresse.get().strip() or None,
             'donateur_cp': self._var_cp.get().strip() or None,
             'donateur_ville': self._var_ville.get().strip() or None,
-            'donateur_siret': self._var_siret.get().strip() or None,
+            'donateur_siret': self._var_siret.get().strip() or None if self._var_type.get() == 'entreprise' else None,
             'nature_don': self._var_nature.get().strip(),
-            'montant': _parse_optional_float(self._var_montant.get()),
-            'description_don': self._var_description.get().strip() or None,
-            'valeur_estimee': _parse_optional_float(self._var_valeur.get()),
+            'montant': montant,
+            'description_don': self._var_description.get().strip() or None if self._var_nature.get() == 'nature' else None,
+            'valeur_estimee': valeur_estimee if self._var_nature.get() == 'nature' else None,
             'mode_versement': self._var_mode.get().strip(),
             'commentaire': self._var_commentaire.get().strip() or None,
             'creer_tresorerie': bool(self._var_creer_treso.get()),

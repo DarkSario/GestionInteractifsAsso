@@ -147,7 +147,14 @@ def get_remboursement_by_unified_id(remboursement_id: str | int) -> dict | None:
     return None
 
 
-def marquer_rembourse(source: str, identifiant: int, mode: str, reference: str | None, date: str) -> bool:
+def marquer_rembourse(
+    source: str,
+    identifiant: int,
+    mode: str,
+    reference: str | None,
+    date: str,
+    commentaire: str | None = None,
+) -> bool:
     tables = {
         'evenement': 'evenement_depenses',
         'tresorerie': 'tresorerie_operations',
@@ -164,10 +171,11 @@ def marquer_rembourse(source: str, identifiant: int, mode: str, reference: str |
             SET remboursement_statut = 'rembourse',
                 remboursement_date = ?,
                 remboursement_mode = ?,
-                remboursement_reference = ?
+                remboursement_reference = ?,
+                commentaire = ?
             WHERE id = ?
             """,
-            (date, mode or None, reference or None, identifiant),
+            (date, mode or None, reference or None, commentaire or None, identifiant),
         )
         conn.commit()
         return True

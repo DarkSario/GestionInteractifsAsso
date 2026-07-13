@@ -60,6 +60,14 @@ class ListeMembres(ctk.CTkToplevel):
             hover_color=colors.get("secondary", "#144870"),
             command=self._ouvrir_formulaire_ajout,
         ).pack(side="right")
+        ctk.CTkButton(
+            frame_header,
+            text="🔄 Actualiser",
+            width=120,
+            fg_color="gray",
+            hover_color="#555",
+            command=self._charger_membres,
+        ).pack(side="right", padx=(0, 8))
 
         # ── Barre de recherche ────────────────────────────────────────────────
         frame_search = ctk.CTkFrame(self, fg_color="transparent")

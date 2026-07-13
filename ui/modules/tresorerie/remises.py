@@ -275,6 +275,14 @@ class _RemisesTab(ctk.CTkFrame):
             hover_color="#555",
             command=self._modifier,
         ).pack(side="right", padx=(0, 8))
+        ctk.CTkButton(
+            header,
+            text="🔄 Actualiser",
+            width=120,
+            fg_color="gray",
+            hover_color="#555",
+            command=self.refresh,
+        ).pack(side="right", padx=(0, 8))
 
         frame_liste = ctk.CTkFrame(self)
         frame_liste.pack(fill="both", expand=True, padx=12, pady=6)

@@ -62,6 +62,7 @@ from db.models.tresorerie import (
 )
 from ui import theme as app_theme
 from ui.components.dialogs import afficher_erreur, afficher_info, demander_confirmation
+from ui.components.form_dialog import FormDialog
 
 
 COULEURS = {
@@ -192,7 +193,7 @@ def enregistrer_operation_depuis_formulaire(formulaire: dict[str, Any]) -> int:
     )
 
 
-class _FormulaireOperationPopup(ctk.CTkToplevel):
+class _DialogOperation(FormDialog):
     """Fenêtre popup pour créer ou modifier une opération de trésorerie."""
 
     def __init__(
@@ -202,13 +203,12 @@ class _FormulaireOperationPopup(ctk.CTkToplevel):
         operation: dict[str, Any] | None = None,
         on_enregistre=None,
     ) -> None:
-        super().__init__(parent)
-        self.title("✏️ Modifier l'opération" if operation else "💸 Nouvelle opération")
-        self.geometry("620x720")
-        self.minsize(600, 700)
-        self.transient(parent)
-        self.grab_set()
-        self.resizable(True, True)
+        super().__init__(
+            parent,
+            titre="✏️ Modifier l'opération" if operation else "💸 Nouvelle opération",
+            largeur=600,
+            hauteur=700,
+        )
 
         self._operation = operation
         self._on_enregistre = on_enregistre
@@ -236,14 +236,13 @@ class _FormulaireOperationPopup(ctk.CTkToplevel):
 
     def _build_ui(self) -> None:
         fonts = app_theme.FONTS
-        colors = app_theme.COLORS
 
         titre_texte = "✏️ Modifier l'opération" if self._operation else "💸 Nouvelle opération"
-        ctk.CTkLabel(self, text=titre_texte, font=fonts.get("subtitle")).pack(
+        ctk.CTkLabel(self.frame_content, text=titre_texte, font=fonts.get("subtitle")).pack(
             anchor="w", padx=20, pady=(16, 8)
         )
 
-        frame_scroll = ctk.CTkScrollableFrame(self, fg_color="transparent")
+        frame_scroll = ctk.CTkFrame(self.frame_content, fg_color="transparent")
         frame_scroll.pack(fill="both", expand=True, padx=12, pady=4)
 
         bloc_type = ctk.CTkFrame(frame_scroll, fg_color="transparent")
@@ -287,18 +286,6 @@ class _FormulaireOperationPopup(ctk.CTkToplevel):
         champ("Avancé par", ctk.CTkOptionMenu(frame_scroll, values=membres_values, variable=self._var_avance_par))
         champ("Statut remboursement", ctk.CTkOptionMenu(frame_scroll, values=["Non applicable", "En attente"], variable=self._var_remboursement))
         champ("Commentaire", ctk.CTkEntry(frame_scroll, textvariable=self._var_commentaire))
-
-        actions = ctk.CTkFrame(self, fg_color="transparent")
-        actions.pack(fill="x", padx=20, pady=(8, 16))
-        ctk.CTkButton(
-            actions, text="❌ Annuler", width=100, fg_color="grey", hover_color="#555", command=self.destroy
-        ).pack(side="left")
-        ctk.CTkButton(
-            actions,
-            text="💾 Enregistrer",
-            width=150,
-            command=self._enregistrer,
-        ).pack(side="right")
 
         self._refresh_categories()
 
@@ -388,6 +375,9 @@ class _FormulaireOperationPopup(ctk.CTkToplevel):
             self._on_enregistre()
         self.destroy()
 
+    def _on_valider(self) -> None:
+        self._enregistrer()
+
 
 class _OperationsTab(ctk.CTkFrame):
     def __init__(self, parent: ctk.CTkFrame, root: Any) -> None:
@@ -437,6 +427,14 @@ class _OperationsTab(ctk.CTkFrame):
             hover_color="#7f0000",
             command=self._supprimer_operation,
         ).pack(side="right", padx=(0, 8))
+        ctk.CTkButton(
+            header,
+            text="🔄 Actualiser",
+            width=120,
+            fg_color="gray",
+            hover_color="#555",
+            command=self.refresh,
+        ).pack(side="right", padx=(0, 8))
 
         if _periode_contient_cloture():
             bandeau = ctk.CTkFrame(self, fg_color="#fff3e0", corner_radius=6)
@@ -481,7 +479,7 @@ class _OperationsTab(ctk.CTkFrame):
         if not self._comptes:
             afficher_info(self, "Opérations", "Créez d'abord un compte actif.")
             return
-        popup = _FormulaireOperationPopup(
+        popup = _DialogOperation(
             self,
             type_operation=type_operation,
             on_enregistre=self.refresh,
@@ -504,7 +502,7 @@ class _OperationsTab(ctk.CTkFrame):
         if int(operation.get("est_automatique") or 0) == 1:
             afficher_info(self, "Opérations", "Les opérations automatiques ne peuvent pas être modifiées.")
             return
-        popup = _FormulaireOperationPopup(
+        popup = _DialogOperation(
             self,
             operation=operation,
             on_enregistre=self.refresh,
@@ -580,3 +578,6 @@ def build_tab_operations(parent: ctk.CTkFrame, root: Any) -> None:
         widget.destroy()
     tab = _OperationsTab(parent, root)
     tab.pack(fill="both", expand=True)
+
+
+_FormulaireOperationPopup = _DialogOperation

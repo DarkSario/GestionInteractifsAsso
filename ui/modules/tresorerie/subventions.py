@@ -196,6 +196,14 @@ class _SubventionsTab(ctk.CTkFrame):
             width=120,
             command=self._modifier_selection,
         ).pack(side="right", padx=(0, 8))
+        ctk.CTkButton(
+            header,
+            text="🔄 Actualiser",
+            width=120,
+            fg_color="gray",
+            hover_color="#555",
+            command=self.refresh,
+        ).pack(side="right", padx=(0, 8))
 
         contenu = ctk.CTkFrame(self, fg_color="transparent")
         contenu.pack(fill="both", expand=True, padx=12, pady=6)

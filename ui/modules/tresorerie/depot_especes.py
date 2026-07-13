@@ -256,6 +256,14 @@ class _DepotEspecesTab(ctk.CTkFrame):
             hover_color="#555",
             command=self._modifier,
         ).pack(side="right", padx=(0, 8))
+        ctk.CTkButton(
+            header,
+            text="🔄 Actualiser",
+            width=120,
+            fg_color="gray",
+            hover_color="#555",
+            command=self.refresh,
+        ).pack(side="right", padx=(0, 8))
 
         frame_table = ctk.CTkFrame(self)
         frame_table.pack(fill="both", expand=True, padx=12, pady=(0, 10))
