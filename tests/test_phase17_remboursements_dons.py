@@ -89,13 +89,14 @@ def test_remboursements_evenement_et_tresorerie(db_phase17):
     assert stats['nb_remboursements'] == 2
     assert stats['total_en_attente'] == pytest.approx(61.4)
 
-    assert marquer_rembourse('evenement', depense_id, 'Chèque', 'CHK-01', '2026-05-15') is True
+    assert marquer_rembourse('evenement', depense_id, 'Chèque', 'CHK-01', '2026-05-15', 'Remboursé en caisse') is True
     maj = db_phase17.execute(
-        'SELECT remboursement_statut, remboursement_reference FROM evenement_depenses WHERE id = ?',
+        'SELECT remboursement_statut, remboursement_reference, commentaire FROM evenement_depenses WHERE id = ?',
         (depense_id,),
     ).fetchone()
     assert maj['remboursement_statut'] == 'rembourse'
     assert maj['remboursement_reference'] == 'CHK-01'
+    assert maj['commentaire'] == 'Remboursé en caisse'
 
 
 def test_dons_crud_et_numero_recu(db_phase17):
