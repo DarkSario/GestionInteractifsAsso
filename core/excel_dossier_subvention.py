@@ -205,8 +205,8 @@ class ExcelDossierSubvention:
 
                 # Recettes
                 row = conn.execute(
-                    """SELECT COALESCE(SUM(montant), 0) as total FROM operations_tresorerie
-                       WHERE type = 'recette' AND date >= ? AND date <= ?""",
+                    """SELECT COALESCE(SUM(montant), 0) as total FROM tresorerie_operations
+                       WHERE type_operation = 'recette' AND date_operation >= ? AND date_operation <= ?""",
                     (self._date_debut, self._date_fin),
                 ).fetchone()
                 recettes = float(row["total"]) if row else 0.0
@@ -214,8 +214,8 @@ class ExcelDossierSubvention:
 
                 # Dépenses
                 row = conn.execute(
-                    """SELECT COALESCE(SUM(montant), 0) as total FROM operations_tresorerie
-                       WHERE type = 'depense' AND date >= ? AND date <= ?""",
+                    """SELECT COALESCE(SUM(montant), 0) as total FROM tresorerie_operations
+                       WHERE type_operation = 'depense' AND date_operation >= ? AND date_operation <= ?""",
                     (self._date_debut, self._date_fin),
                 ).fetchone()
                 depenses = float(row["total"]) if row else 0.0
@@ -246,13 +246,13 @@ class ExcelDossierSubvention:
             conn = get_connection()
             try:
                 rows = conn.execute(
-                    """SELECT o.date, o.libelle, c.nom as categorie, o.type, o.montant,
+                    """SELECT o.date_operation, o.libelle, c.nom as categorie, o.type_operation, o.montant,
                               cp.nom as compte
-                       FROM operations_tresorerie o
-                       LEFT JOIN categories_tresorerie c ON o.categorie_id = c.id
-                       LEFT JOIN comptes cp ON o.compte_id = cp.id
-                       WHERE o.date >= ? AND o.date <= ?
-                       ORDER BY o.date""",
+                       FROM tresorerie_operations o
+                       LEFT JOIN tresorerie_categories c ON o.categorie_id = c.id
+                       LEFT JOIN comptes_bancaires cp ON o.compte_id = cp.id
+                       WHERE o.date_operation >= ? AND o.date_operation <= ?
+                       ORDER BY o.date_operation""",
                     (self._date_debut, self._date_fin),
                 ).fetchall()
             finally:
@@ -264,14 +264,14 @@ class ExcelDossierSubvention:
                 montant = float(row["montant"] or 0)
                 row_idx = ws.max_row + 1
                 self._appliquer_ligne(ws, [
-                    row["date"],
+                    row["date_operation"],
                     row["libelle"],
                     row["categorie"] or "",
-                    "Recette" if row["type"] == "recette" else "Dépense",
+                    "Recette" if row["type_operation"] == "recette" else "Dépense",
                     montant,
                     row["compte"] or "",
                 ], row_idx)
-                if row["type"] == "recette":
+                if row["type_operation"] == "recette":
                     total_rec += montant
                 else:
                     total_dep += montant
@@ -321,14 +321,14 @@ class ExcelDossierSubvention:
             conn = get_connection()
             try:
                 rows = conn.execute(
-                    """SELECT c.nom as categorie, o.type,
+                    """SELECT c.nom as categorie, o.type_operation,
                               COUNT(*) as nb,
                               COALESCE(SUM(o.montant), 0) as total
-                       FROM operations_tresorerie o
-                       LEFT JOIN categories_tresorerie c ON o.categorie_id = c.id
-                       WHERE o.date >= ? AND o.date <= ?
-                       GROUP BY c.nom, o.type
-                       ORDER BY c.nom, o.type""",
+                       FROM tresorerie_operations o
+                       LEFT JOIN tresorerie_categories c ON o.categorie_id = c.id
+                       WHERE o.date_operation >= ? AND o.date_operation <= ?
+                       GROUP BY c.nom, o.type_operation
+                       ORDER BY c.nom, o.type_operation""",
                     (self._date_debut, self._date_fin),
                 ).fetchall()
             finally:
@@ -338,7 +338,7 @@ class ExcelDossierSubvention:
                 row_idx = ws.max_row + 1
                 self._appliquer_ligne(ws, [
                     row["categorie"] or "(Sans catégorie)",
-                    "Recette" if row["type"] == "recette" else "Dépense",
+                    "Recette" if row["type_operation"] == "recette" else "Dépense",
                     row["nb"],
                     float(row["total"]),
                 ], row_idx)
@@ -350,7 +350,7 @@ class ExcelDossierSubvention:
 
     def _onglet_evenements(self, wb) -> None:
         ws = wb.create_sheet("Événements")
-        entetes = ["Nom", "Date début", "Date fin", "Lieu", "Statut", "Participants"]
+        entetes = ["Nom", "Date début", "Date fin", "Lieu", "Statut"]
         self._appliquer_entetes(ws, entetes)
 
         try:
@@ -358,8 +358,7 @@ class ExcelDossierSubvention:
             conn = get_connection()
             try:
                 rows = conn.execute(
-                    """SELECT nom, date_debut, date_fin, lieu, statut,
-                              nb_participants_total
+                    """SELECT nom, date_debut, date_fin, lieu, statut
                        FROM evenements
                        WHERE date_debut >= ? AND date_debut <= ?
                        ORDER BY date_debut""",
@@ -376,7 +375,6 @@ class ExcelDossierSubvention:
                     row["date_fin"] or "",
                     row["lieu"] or "",
                     row["statut"] or "",
-                    row["nb_participants_total"] or 0,
                 ], row_idx)
 
         except Exception as exc:
@@ -395,7 +393,7 @@ class ExcelDossierSubvention:
             conn = get_connection()
             try:
                 rows = conn.execute(
-                    """SELECT organisme, objet, montant_demande, montant_accorde,
+                    """SELECT organisme, objet, montant_demande, montant_obtenu,
                               date_demande, statut
                        FROM subventions
                        WHERE date_demande >= ? AND date_demande <= ?
@@ -411,7 +409,7 @@ class ExcelDossierSubvention:
                     row["organisme"] or "",
                     row["objet"] or "",
                     float(row["montant_demande"] or 0),
-                    float(row["montant_accorde"] or 0),
+                    float(row["montant_obtenu"] or 0),
                     row["date_demande"] or "",
                     row["statut"] or "",
                 ], row_idx)
@@ -423,7 +421,7 @@ class ExcelDossierSubvention:
 
     def _onglet_dons(self, wb) -> None:
         ws = wb.create_sheet("Dons")
-        entetes = ["Date", "Donateur", "Montant (€)", "Type", "Objet"]
+        entetes = ["Date", "Donateur", "Montant (€)", "Nature", "Description"]
         self._appliquer_entetes(ws, entetes)
 
         try:
@@ -431,7 +429,7 @@ class ExcelDossierSubvention:
             conn = get_connection()
             try:
                 rows = conn.execute(
-                    """SELECT date_don, donateur_nom, montant, type_don, objet
+                    """SELECT date_don, donateur_nom, montant, nature_don, description_don
                        FROM dons
                        WHERE date_don >= ? AND date_don <= ?
                        ORDER BY date_don""",
@@ -448,8 +446,8 @@ class ExcelDossierSubvention:
                     row["date_don"],
                     row["donateur_nom"] or "",
                     montant,
-                    row["type_don"] or "",
-                    row["objet"] or "",
+                    row["nature_don"] or "",
+                    row["description_don"] or "",
                 ], row_idx)
                 total += montant
 
