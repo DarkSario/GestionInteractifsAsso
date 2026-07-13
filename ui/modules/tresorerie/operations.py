@@ -600,7 +600,12 @@ class _OperationsTab(ctk.CTkFrame):
         except AttributeError:
             pass
 
-        operations = get_operations(date_debut=date_debut, date_fin=date_fin)
+        # Exclure les dépôts espèces et remises chèques (traçabilité bancaire uniquement)
+        operations = get_operations(
+            date_debut=date_debut,
+            date_fin=date_fin,
+            exclude_non_comptable=True,
+        )
         for operation in operations:
             type_op = operation.get("type_operation")
             self._tree.insert(
