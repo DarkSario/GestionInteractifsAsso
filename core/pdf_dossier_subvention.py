@@ -153,7 +153,8 @@ class PdfDossierSubvention(PdfBasePro):
                 variables["nb_evenements"] = str(row["nb"]) if row else "0"
 
                 row = conn.execute(
-                    """SELECT COUNT(DISTINCT membre_id) as nb FROM participations_evenement"""
+                    """SELECT COUNT(DISTINCT membre_id) as nb FROM evenement_benevoles
+                       WHERE membre_id IS NOT NULL"""
                 ).fetchone()
                 variables["nb_benevoles"] = str(row["nb"]) if row else "0"
             finally:
@@ -313,8 +314,8 @@ class PdfDossierSubvention(PdfBasePro):
             conn = get_connection()
             try:
                 row = conn.execute(
-                    """SELECT COALESCE(SUM(montant), 0) as total FROM operations_tresorerie
-                       WHERE date >= ? AND date <= ?""",
+                    """SELECT COALESCE(SUM(montant), 0) as total FROM tresorerie_operations
+                       WHERE date_operation >= ? AND date_operation <= ?""",
                     (self._date_debut, self._date_fin),
                 ).fetchone()
                 budget = float(row["total"]) if row else 0.0
@@ -415,7 +416,7 @@ class PdfDossierSubvention(PdfBasePro):
             conn = get_connection()
             try:
                 rows = conn.execute(
-                    """SELECT nom, date_debut, lieu, statut, nb_participants_total
+                    """SELECT nom, date_debut, lieu, statut
                        FROM evenements
                        WHERE date_debut >= ? AND date_debut <= ?
                        ORDER BY date_debut""",
@@ -449,13 +450,13 @@ class PdfDossierSubvention(PdfBasePro):
             conn = get_connection()
             try:
                 rec = conn.execute(
-                    """SELECT COALESCE(SUM(montant), 0) as total FROM operations_tresorerie
-                       WHERE type = 'recette' AND date >= ? AND date <= ?""",
+                    """SELECT COALESCE(SUM(montant), 0) as total FROM tresorerie_operations
+                       WHERE type_operation = 'recette' AND date_operation >= ? AND date_operation <= ?""",
                     (self._date_debut, self._date_fin),
                 ).fetchone()
                 dep = conn.execute(
-                    """SELECT COALESCE(SUM(montant), 0) as total FROM operations_tresorerie
-                       WHERE type = 'depense' AND date >= ? AND date <= ?""",
+                    """SELECT COALESCE(SUM(montant), 0) as total FROM tresorerie_operations
+                       WHERE type_operation = 'depense' AND date_operation >= ? AND date_operation <= ?""",
                     (self._date_debut, self._date_fin),
                 ).fetchone()
             finally:
@@ -495,14 +496,14 @@ class PdfDossierSubvention(PdfBasePro):
             conn = get_connection()
             try:
                 rows = conn.execute(
-                    """SELECT c.nom as categorie, o.type,
+                    """SELECT c.nom as categorie, o.type_operation,
                               COUNT(*) as nb,
                               COALESCE(SUM(o.montant), 0) as total
-                       FROM operations_tresorerie o
-                       LEFT JOIN categories_tresorerie c ON o.categorie_id = c.id
-                       WHERE o.date >= ? AND o.date <= ?
-                       GROUP BY c.nom, o.type
-                       ORDER BY c.nom, o.type""",
+                       FROM tresorerie_operations o
+                       LEFT JOIN tresorerie_categories c ON o.categorie_id = c.id
+                       WHERE o.date_operation >= ? AND o.date_operation <= ?
+                       GROUP BY c.nom, o.type_operation
+                       ORDER BY c.nom, o.type_operation""",
                     (self._date_debut, self._date_fin),
                 ).fetchall()
             finally:
@@ -516,14 +517,14 @@ class PdfDossierSubvention(PdfBasePro):
             for row in rows:
                 donnees.append([
                     row["categorie"] or "(Sans catégorie)",
-                    "Recette" if row["type"] == "recette" else "Dépense",
+                    "Recette" if row["type_operation"] == "recette" else "Dépense",
                     str(row["nb"]),
                     self._formater_montant(row["total"]),
                 ])
             elements.append(self._creer_tableau(donnees))
 
             if self._sections_config.get("inclure_graphiques") and rows:
-                dep_data = [(r["categorie"] or "?", float(r["total"])) for r in rows if r["type"] == "depense"]
+                dep_data = [(r["categorie"] or "?", float(r["total"])) for r in rows if r["type_operation"] == "depense"]
                 if dep_data:
                     elements.extend(self._graphique_camembert(dep_data, "Répartition des dépenses par catégorie"))
         except Exception as exc:
@@ -539,10 +540,10 @@ class PdfDossierSubvention(PdfBasePro):
             try:
                 rows = conn.execute(
                     """SELECT c.nom,
-                              COALESCE(SUM(CASE WHEN o.type='recette' THEN o.montant ELSE -o.montant END), 0) as solde
-                       FROM comptes c
-                       LEFT JOIN operations_tresorerie o ON o.compte_id = c.id
-                       AND o.date >= ? AND o.date <= ?
+                              COALESCE(SUM(CASE WHEN o.type_operation='recette' THEN o.montant ELSE -o.montant END), 0) as solde
+                       FROM comptes_bancaires c
+                       LEFT JOIN tresorerie_operations o ON o.compte_id = c.id
+                       AND o.date_operation >= ? AND o.date_operation <= ?
                        WHERE c.actif = 1
                        GROUP BY c.id, c.nom
                        ORDER BY c.nom""",
@@ -571,10 +572,10 @@ class PdfDossierSubvention(PdfBasePro):
             conn = get_connection()
             try:
                 rows = conn.execute(
-                    """SELECT organisme, objet, montant_accorde, date_demande, statut
+                    """SELECT organisme, objet, montant_obtenu, date_demande, statut
                        FROM subventions
                        WHERE date_demande >= ? AND date_demande <= ?
-                       AND statut IN ('accordee', 'obtenue')
+                       AND statut = 'accordee'
                        ORDER BY date_demande""",
                     (self._date_debut, self._date_fin),
                 ).fetchall()
@@ -590,7 +591,7 @@ class PdfDossierSubvention(PdfBasePro):
                 donnees.append([
                     row["organisme"] or "—",
                     row["objet"] or "—",
-                    self._formater_montant(row["montant_accorde"] or 0),
+                    self._formater_montant(row["montant_obtenu"] or 0),
                     self._formater_date(row["date_demande"]),
                 ])
             elements.append(self._creer_tableau(donnees))
@@ -606,7 +607,7 @@ class PdfDossierSubvention(PdfBasePro):
             conn = get_connection()
             try:
                 rows = conn.execute(
-                    """SELECT date_don, donateur_nom, montant, type_don
+                    """SELECT date_don, donateur_nom, montant, nature_don
                        FROM dons
                        WHERE date_don >= ? AND date_don <= ?
                        ORDER BY date_don""",
@@ -630,7 +631,7 @@ class PdfDossierSubvention(PdfBasePro):
                     self._formater_date(row["date_don"]),
                     row["donateur_nom"] or "Anonyme",
                     self._formater_montant(row["montant"] or 0),
-                    row["type_don"] or "—",
+                    row["nature_don"] or "—",
                 ])
             if total:
                 donnees.append(["TOTAL", "", self._formater_montant(total["total"]), ""])
@@ -724,11 +725,13 @@ class PdfDossierSubvention(PdfBasePro):
             conn = get_connection()
             try:
                 rows = conn.execute(
-                    """SELECT m.nom, m.prenom, r.motif, r.montant, r.date_demande
-                       FROM remboursements r
-                       LEFT JOIN membres m ON r.membre_id = m.id
-                       WHERE r.statut = 'en_attente'
-                       ORDER BY r.date_demande""",
+                    """SELECT m.nom, m.prenom, o.libelle AS motif, o.montant, o.date_operation AS date_demande
+                       FROM tresorerie_operations o
+                       LEFT JOIN membres m ON m.id = o.avance_par_membre_id
+                       WHERE o.remboursement_statut = 'en_attente'
+                         AND o.avance_par_membre_id IS NOT NULL
+                         AND o.type_operation = 'depense'
+                       ORDER BY o.date_operation""",
                 ).fetchall()
             finally:
                 conn.close()
@@ -759,9 +762,9 @@ class PdfDossierSubvention(PdfBasePro):
             conn = get_connection()
             try:
                 rows = conn.execute(
-                    """SELECT m.nom, m.prenom, COUNT(DISTINCT pe.evenement_id) as nb_events
+                    """SELECT m.nom, m.prenom, COUNT(DISTINCT eb.evenement_id) as nb_events
                        FROM membres m
-                       JOIN participations_evenement pe ON pe.membre_id = m.id
+                       JOIN evenement_benevoles eb ON eb.membre_id = m.id
                        GROUP BY m.id, m.nom, m.prenom
                        ORDER BY nb_events DESC
                        LIMIT 20""",

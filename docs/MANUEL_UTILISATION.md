@@ -17,7 +17,8 @@
 8. [Dons](#8-dons)
 9. [Paramètres & Sauvegardes](#9-paramètres--sauvegardes)
 10. [Exports & Bilan AG](#10-exports--bilan-ag)
-11. [Questions fréquentes (FAQ)](#11-questions-fréquentes-faq)
+11. [Dossier de Subvention](#11-dossier-de-subvention)
+12. [Questions fréquentes (FAQ)](#12-questions-fréquentes-faq)
 
 ---
 
@@ -472,7 +473,66 @@ Vous pouvez modifier la structure du document sans toucher au code :
 
 ---
 
-## 11. Questions fréquentes (FAQ)
+## 11. Dossier de Subvention
+
+**À quoi ça sert ?** Générer automatiquement un dossier complet de demande de subvention (PDF et/ou Excel multi-onglets) à remettre à votre mairie, région ou autre organisme financeur. Le dossier compile toutes les données de l'association sur la période choisie.
+
+### Créer un dossier de subvention
+
+1. Allez dans **Exports → 📂 Dossier Subvention**
+2. Renseignez :
+   - **Organisme destinataire** (ex. : "Mairie de Lyon")
+   - **Objet de la demande** (ex. : "Aide au fonctionnement 2025-2026")
+   - **Montant demandé** (en euros)
+   - **Période** : scolaire (sept.–août) ou civile (janv.–déc.)
+3. Choisissez les **sections à inclure** (présentation, bilan financier, événements, bénévoles, etc.)
+4. Cliquez **"📄 Exporter PDF"** ou **"📊 Exporter Excel"**
+5. Choisissez où enregistrer le fichier
+
+### Contenu du dossier
+
+Le dossier peut inclure selon les sections cochées :
+- Page de garde (logo, titre, coordonnées)
+- Mot du Président
+- Présentation de l'association (statuts, historique)
+- Adhérents (répartition par statut, évolution)
+- Événements de la période
+- Bilan financier (recettes, dépenses, solde)
+- Trésorerie détaillée par catégorie
+- Soldes des comptes bancaires
+- Subventions reçues
+- Dons reçus
+- Remboursements en attente
+- Description du projet
+- Budget prévisionnel du projet
+- Objectifs
+- Zone de signature (Président, Trésorier, Secrétaire)
+
+Le fichier Excel contient plusieurs onglets : Résumé, Trésorerie, Par catégorie, Événements, Subventions, Dons, Adhérents, Budget projet.
+
+### Personnaliser les textes
+
+Les sections "Mot du Président", "Présentation", "Projet", "Objectifs", "Statuts" et "Budget projet" peuvent être rédigées librement :
+
+1. Allez dans **Administration → ⚙️ Paramètres → 📂 Dossier Subvention**
+2. Cliquez sur le bouton "✏️ Modifier" à côté de la section souhaitée
+3. Rédigez votre texte (les `{{variables}}` sont remplacées automatiquement)
+4. Cliquez **"💾 Enregistrer"**
+
+> Pour revenir au texte d'origine : **"🔄 Restaurer le modèle par défaut"**
+
+### Personnaliser le logo et le thème
+
+- **Logo** : Allez dans **Administration → ⚙️ Paramètres → 🏢 Association**, cliquez "📷 Choisir un logo" et sélectionnez votre fichier PNG/JPG. Vous pouvez régler la position (gauche/centre/droite) et la taille (petite/moyenne/grande).
+- **Couleurs et style** : Allez dans **Administration → ⚙️ Paramètres → 📄 Exports & PDF**, ajustez la couleur principale, la couleur secondaire et le style des tableaux.
+
+**Erreurs fréquentes :**
+- Sections vides si aucune donnée n'a été saisie pour la période choisie → normal, les sections apparaissent vides ou avec un message "aucune donnée"
+- PDF très volumineux si beaucoup de sections sont activées → décochez les sections non nécessaires
+
+---
+
+## 12. Questions fréquentes (FAQ)
 
 ### L'application ne démarre pas
 
@@ -547,4 +607,4 @@ L'application n'est pas multi-utilisateurs en temps réel. La solution la plus s
 
 ---
 
-*Document généré pour l'Association Interactifs — mise à jour Phase 16*
+*Document généré pour l'Association Interactifs — mise à jour Phase 21*
