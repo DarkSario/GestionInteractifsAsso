@@ -721,6 +721,20 @@ def update_remise_cheque(remise_id: int, **kwargs) -> bool:
         conn.close()
 
 
+def delete_remise_cheque(remise_id: int) -> bool:
+    """Supprime une remise de chèques et ses détails associés."""
+    conn = get_connection()
+    try:
+        conn.execute("DELETE FROM remises_cheques_detail WHERE remise_id = ?", (remise_id,))
+        conn.execute("DELETE FROM remises_cheques WHERE id = ?", (remise_id,))
+        conn.commit()
+        return True
+    except Exception:
+        return False
+    finally:
+        conn.close()
+
+
 # ── Subventions ───────────────────────────────────────────────────────────────
 
 

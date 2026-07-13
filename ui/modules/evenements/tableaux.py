@@ -175,8 +175,18 @@ class TableauxView(ctk.CTkFrame):
             self._tree_lignes.insert("", "end", iid=str(ligne["id"]), values=valeurs)
 
         totaux = calculer_totaux(tableau_id)
+        # Calculer aussi les totaux pour toutes les colonnes numériques
+        # (y compris celles sans afficher_total=True) pour affichage automatique
+        colonnes_numeriques = [c for c in colonnes if c.get("type_colonne") in {"nombre", "montant"}]
+        if not totaux and colonnes_numeriques:
+            from core.tableaux import calculer_total_colonne
+            lignes = get_lignes_tableau(tableau_id)
+            for col in colonnes_numeriques:
+                total = calculer_total_colonne(lignes, int(col["id"]), str(col["type_colonne"]))
+                if total is not None:
+                    totaux[int(col["id"])] = total
         if not totaux:
-            self._lbl_totaux.configure(text="Totaux : aucun total automatique")
+            self._lbl_totaux.configure(text="Totaux : aucune colonne numérique")
             return
 
         by_id = {int(c["id"]): c for c in colonnes}

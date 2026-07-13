@@ -1263,3 +1263,172 @@ class _DialogAjoutItem(ctk.CTkToplevel):
         ok = self._on_valider(nom, ordre)
         if ok:
             self.destroy()
+
+
+# ── Éditeur de template document (Cerfa, Attestation, Remboursement) ─────────
+
+
+class _EditeurTemplateDocument(ctk.CTkToplevel):
+    """Fenêtre générique pour éditer un template Markdown (Cerfa, Attestation, Remboursement…).
+
+    Signature : _EditeurTemplateDocument(parent, titre, variables, charger, sauvegarder, restaurer)
+    - ``variables``   : liste de tuples ``(nom_variable, description)``
+    - ``charger``     : callable() → str — retourne le contenu actuel
+    - ``sauvegarder`` : callable(contenu: str) → sauvegarde
+    - ``restaurer``   : callable() → remet le template par défaut
+    """
+
+    def __init__(
+        self,
+        parent: Any,
+        titre: str,
+        variables: list,
+        charger,
+        sauvegarder,
+        restaurer,
+    ) -> None:
+        super().__init__(parent)
+        self.title(titre)
+        self.geometry("1000x680")
+        self.minsize(900, 600)
+        self.transient(parent)
+        self.grab_set()
+
+        self._charger_fn = charger
+        self._sauvegarder_fn = sauvegarder
+        self._restaurer_fn = restaurer
+        self._variables = variables
+
+        self._build_ui(titre)
+        self._charger_template()
+
+    def _build_ui(self, titre: str) -> None:
+        fonts = app_theme.FONTS
+        colors = app_theme.COLORS
+
+        frame_header = ctk.CTkFrame(self, fg_color="transparent")
+        frame_header.pack(fill="x", padx=16, pady=(14, 6))
+        ctk.CTkLabel(
+            frame_header,
+            text=titre,
+            font=fonts.get("title"),
+        ).pack(side="left")
+
+        frame_main = ctk.CTkFrame(self, fg_color="transparent")
+        frame_main.pack(fill="both", expand=True, padx=16, pady=4)
+        frame_main.columnconfigure(0, weight=3)
+        frame_main.columnconfigure(1, weight=1)
+        frame_main.rowconfigure(0, weight=1)
+
+        frame_editor = ctk.CTkFrame(frame_main)
+        frame_editor.grid(row=0, column=0, sticky="nsew", padx=(0, 8))
+        ctk.CTkLabel(
+            frame_editor,
+            text="Contenu du template (Markdown)",
+            font=fonts.get("bold"),
+            anchor="w",
+        ).pack(anchor="w", padx=8, pady=(8, 2))
+        ctk.CTkLabel(
+            frame_editor,
+            text="Utilisez {{variable}} pour insérer des données dynamiques.",
+            font=fonts.get("small"),
+            text_color="grey",
+            anchor="w",
+        ).pack(anchor="w", padx=8, pady=(0, 4))
+        self._textbox = ctk.CTkTextbox(
+            frame_editor,
+            font=("Courier New", 12),
+            wrap="word",
+        )
+        self._textbox.pack(fill="both", expand=True, padx=8, pady=(0, 8))
+
+        frame_vars = ctk.CTkFrame(frame_main)
+        frame_vars.grid(row=0, column=1, sticky="nsew")
+        ctk.CTkLabel(
+            frame_vars,
+            text="Variables disponibles",
+            font=fonts.get("bold"),
+            anchor="w",
+        ).pack(anchor="w", padx=8, pady=(8, 4))
+
+        scroll_vars = ctk.CTkScrollableFrame(frame_vars, fg_color="transparent")
+        scroll_vars.pack(fill="both", expand=True, padx=4, pady=(0, 8))
+
+        for nom, description in self._variables:
+            f = ctk.CTkFrame(scroll_vars, fg_color="transparent")
+            f.pack(fill="x", pady=2)
+            ctk.CTkLabel(
+                f,
+                text=f"{{{{{nom}}}}}",
+                font=("Courier New", 11),
+                text_color=colors.get("primary", "#1f6aa5"),
+                anchor="w",
+            ).pack(anchor="w")
+            ctk.CTkLabel(
+                f,
+                text=f"  {description}",
+                font=fonts.get("small"),
+                text_color="grey",
+                anchor="w",
+            ).pack(anchor="w")
+
+        frame_buttons = ctk.CTkFrame(self, fg_color="transparent")
+        frame_buttons.pack(fill="x", padx=16, pady=(4, 14))
+
+        ctk.CTkButton(
+            frame_buttons,
+            text="❌ Annuler",
+            width=100,
+            fg_color="grey",
+            command=self.destroy,
+        ).pack(side="left")
+
+        ctk.CTkButton(
+            frame_buttons,
+            text="🔄 Restaurer le modèle par défaut",
+            width=240,
+            fg_color="#8b1a1a",
+            hover_color="#6b1414",
+            command=self._restaurer_defaut,
+        ).pack(side="left", padx=(8, 0))
+
+        ctk.CTkButton(
+            frame_buttons,
+            text="💾 Enregistrer",
+            width=150,
+            fg_color=colors.get("primary", "#1f6aa5"),
+            hover_color=colors.get("secondary", "#144870"),
+            command=self._enregistrer,
+        ).pack(side="right")
+
+    def _charger_template(self) -> None:
+        try:
+            contenu = self._charger_fn()
+            self._textbox.delete("1.0", "end")
+            self._textbox.insert("1.0", contenu)
+        except Exception as exc:
+            afficher_erreur(self, "Erreur", f"Impossible de charger le template : {exc}")
+
+    def _enregistrer(self) -> None:
+        contenu = self._textbox.get("1.0", "end")
+        try:
+            self._sauvegarder_fn(contenu)
+            afficher_info(self, "Succès", "Le modèle a été enregistré.")
+            self.destroy()
+        except Exception as exc:
+            afficher_erreur(self, "Erreur", f"Impossible d'enregistrer le template : {exc}")
+
+    def _restaurer_defaut(self) -> None:
+        if not demander_confirmation(
+            self,
+            "Restaurer le modèle par défaut",
+            "Toutes vos modifications seront perdues.\n"
+            "Voulez-vous vraiment restaurer le modèle par défaut ?",
+        ):
+            return
+        try:
+            self._restaurer_fn()
+            self._charger_template()
+            afficher_info(self, "Succès", "Le modèle par défaut a été restauré.")
+        except Exception as exc:
+            afficher_erreur(self, "Erreur", f"Impossible de restaurer le template : {exc}")

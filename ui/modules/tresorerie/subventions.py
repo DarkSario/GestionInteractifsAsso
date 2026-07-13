@@ -50,7 +50,9 @@ except ModuleNotFoundError:  # pragma: no cover - environnement sans Tk
 
 from core.tresorerie import formater_montant
 from db.models.tresorerie import (
+    accorder_subvention,
     add_subvention,
+    get_all_comptes,
     get_all_subventions,
     get_stats_subventions,
     update_subvention,
@@ -116,6 +118,7 @@ def enregistrer_subvention_depuis_formulaire(
     date_obtention = _normaliser_date(str(formulaire.get("date_obtention") or ""))
     statut = str(formulaire.get("statut") or "en_attente").strip().lower()
     commentaire = str(formulaire.get("commentaire") or "").strip() or None
+    compte_id = formulaire.get("compte_id")
 
     annee = _annee_depuis_date(date_demande)
     if subvention_id is None:
@@ -142,6 +145,21 @@ def enregistrer_subvention_depuis_formulaire(
         date_versement=date_obtention,
         commentaire=commentaire,
     )
+
+    # Créer automatiquement une opération de recette si la subvention est accordée
+    # et qu'un compte est sélectionné et qu'il n'existe pas encore d'opération associée
+    if statut == "accordee" and montant_obtenu > 0 and compte_id:
+        from db.models.tresorerie import _fetch_one  # type: ignore[attr-defined]
+        subvention_row = _fetch_one("SELECT operation_id FROM subventions WHERE id = ?", (subvention_id,))
+        if subvention_row and not subvention_row.get("operation_id"):
+            accorder_subvention(
+                subvention_id=int(subvention_id),
+                montant_obtenu=montant_obtenu,
+                date_decision=date_obtention or date_demande,
+                date_versement=date_obtention or date_demande,
+                compte_id=int(compte_id),
+            )
+
     return int(subvention_id)
 
 
@@ -221,6 +239,9 @@ class _SubventionsTab(ctk.CTkFrame):
         self._var_date_obtention = ctk.StringVar()
         self._var_statut = ctk.StringVar(value="En attente")
         self._var_commentaire = ctk.StringVar()
+        self._comptes = get_all_comptes(actif_only=True)
+        compte_defaut = self._comptes[0]["nom"] if self._comptes else ""
+        self._var_compte = ctk.StringVar(value=compte_defaut)
 
         self._titre_formulaire = ctk.CTkLabel(
             self._frame_formulaire,
@@ -249,6 +270,14 @@ class _SubventionsTab(ctk.CTkFrame):
                 variable=self._var_statut,
             ),
         )
+        champ(
+            "Compte (si obtenue)",
+            ctk.CTkOptionMenu(
+                self._frame_formulaire,
+                values=[c["nom"] for c in self._comptes] or [""],
+                variable=self._var_compte,
+            ),
+        )
         champ("Commentaire", ctk.CTkEntry(self._frame_formulaire, textvariable=self._var_commentaire))
 
         actions = ctk.CTkFrame(self._frame_formulaire, fg_color="transparent")
@@ -269,6 +298,11 @@ class _SubventionsTab(ctk.CTkFrame):
         self._var_date_obtention.set(data.get("date_decision") or data.get("date_versement") or "")
         self._var_statut.set(_STATUTS_LABELS.get(data.get("statut") or "en_attente", "En attente"))
         self._var_commentaire.set(data.get("commentaire") or "")
+        # Pré-remplir le compte si déjà associé
+        if data.get("compte_id") and self._comptes:
+            compte = next((c for c in self._comptes if int(c["id"]) == int(data["compte_id"])), None)
+            if compte:
+                self._var_compte.set(compte["nom"])
         if not self._frame_formulaire.winfo_manager():
             self._frame_formulaire.pack(side="right", fill="y", padx=(12, 0))
 
@@ -288,6 +322,10 @@ class _SubventionsTab(ctk.CTkFrame):
         self._ouvrir_formulaire(subvention)
 
     def _enregistrer(self) -> None:
+        compte_id = next(
+            (int(c["id"]) for c in self._comptes if c["nom"] == self._var_compte.get()),
+            None,
+        )
         try:
             enregistrer_subvention_depuis_formulaire(
                 {
@@ -299,6 +337,7 @@ class _SubventionsTab(ctk.CTkFrame):
                     "date_obtention": self._var_date_obtention.get(),
                     "statut": _STATUTS_INV.get(self._var_statut.get(), "en_attente"),
                     "commentaire": self._var_commentaire.get(),
+                    "compte_id": compte_id,
                 },
                 subvention_id=self._subvention_selectionnee,
             )

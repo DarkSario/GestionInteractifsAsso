@@ -150,7 +150,11 @@ class StandsView(ctk.CTkFrame):
 
     def set_evenement_id(self, evenement_id: int | None) -> None:
         self._evenement_id = evenement_id
-        self.refresh()
+        try:
+            if self.winfo_exists():
+                self.refresh()
+        except Exception:
+            return
 
     def _build_ui(self) -> None:
         contenu = ctk.CTkFrame(self, fg_color="transparent")
@@ -244,7 +248,12 @@ class StandsView(ctk.CTkFrame):
         return f"{value:,.2f}€".replace(",", " ").replace(".", ",")
 
     def refresh(self) -> None:
-        self._tree.delete(*self._tree.get_children())
+        try:
+            if not self.winfo_exists():
+                return
+            self._tree.delete(*self._tree.get_children())
+        except Exception:
+            return
         if not self._evenement_id:
             self._lbl_stats.configure(text="Stats : sauvegardez d'abord l'événement")
             self._btn_attente.configure(text="📋 Liste d'attente (0)")
