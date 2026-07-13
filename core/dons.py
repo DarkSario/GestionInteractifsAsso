@@ -20,6 +20,26 @@ def _nom_donateur(don: dict) -> str:
     return f"{(don.get('donateur_nom') or '').strip()} {(don.get('donateur_prenom') or '').strip()}".strip()
 
 
+def _get_compte_recette_defaut() -> int:
+    comptes = get_all_comptes(actif_only=True)
+    if not comptes:
+        return 0
+    compte_principal = get_parametre('compte_principal_id', '').strip()
+    for compte in comptes:
+        try:
+            compte_id = int(compte['id'])
+        except (TypeError, ValueError, KeyError):
+            continue
+        if str(compte_id) == compte_principal:
+            return compte_id
+    for compte in comptes:
+        try:
+            return int(compte['id'])
+        except (TypeError, ValueError, KeyError):
+            continue
+    return 0
+
+
 def get_type_recu_defaut() -> str:
     type_recu = get_parametre('type_recu_don', 'cerfa').strip().lower()
     return type_recu if type_recu in {'cerfa', 'simple'} else 'cerfa'
@@ -94,11 +114,9 @@ def creer_recette_tresorerie(don_id: int) -> int:
     if don.get('tresorerie_id'):
         return int(don['tresorerie_id'])
 
-    comptes = get_all_comptes(actif_only=True)
-    if not comptes:
+    compte_id = _get_compte_recette_defaut()
+    if not compte_id:
         return 0
-    compte_principal = get_parametre('compte_principal_id', '').strip()
-    compte_id = next((int(c['id']) for c in comptes if str(c['id']) == compte_principal), int(comptes[0]['id']))
     categories = get_all_categories('recette')
     categorie_id = int(categories[0]['id']) if categories else None
     montant = float(don.get('montant') or 0)

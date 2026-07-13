@@ -333,7 +333,6 @@ class _DialogDon(ctk.CTkToplevel):
             return
         self._var_nom.set(detail.get('nom') or '')
         self._var_prenom.set(detail.get('prenom') or '')
-        self._var_adresse.set(detail.get('commentaire') or self._var_adresse.get())
 
     def _valider(self) -> None:
         if not self._var_nom.get().strip():
