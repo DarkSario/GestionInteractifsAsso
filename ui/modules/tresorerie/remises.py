@@ -113,6 +113,9 @@ def enregistrer_remise_depuis_formulaire(formulaire: dict[str, Any]) -> int:
 class _FormulaireRemisePopup(ctk.CTkToplevel):
     """Fenêtre popup pour créer ou modifier une remise de chèques."""
 
+    _STATUTS_LABELS = {"en_attente": "En attente", "remis": "Remis", "encaisse": "Encaissé"}
+    _STATUTS_INV = {"En attente": "en_attente", "Remis": "remis", "Encaissé": "encaisse"}
+
     def __init__(
         self,
         parent: Any,
@@ -192,9 +195,6 @@ class _FormulaireRemisePopup(ctk.CTkToplevel):
             actions, text="❌ Annuler", width=100, fg_color="grey", hover_color="#555", command=self.destroy
         ).pack(side="left")
         ctk.CTkButton(actions, text="💾 Enregistrer", width=150, command=self._enregistrer).pack(side="right")
-
-    _STATUTS_LABELS = {"en_attente": "En attente", "remis": "Remis", "encaisse": "Encaissé"}
-    _STATUTS_INV = {"En attente": "en_attente", "Remis": "remis", "Encaissé": "encaisse"}
 
     def _pre_remplir(self, remise: dict[str, Any]) -> None:
         self._var_date.set(remise.get("date_remise") or datetime.now().strftime(_DATE_FORMAT))

@@ -278,7 +278,7 @@ class TombolaView(ctk.CTkFrame):
         ctk.CTkButton(actions, text="✏️ Modifier", command=self._modifier_lot).pack(side="left", padx=8)
         self._tree_lots = ttk.Treeview(
             self._frame_lots_liste,
-            columns=("numero", "description", "valeur", "provenance", "acheteur", "remboursement"),
+            columns=("numero", "description", "valeur", "provenance", "acheteur", "statut_remboursement"),
             show="headings",
             height=10,
         )
@@ -288,7 +288,7 @@ class TombolaView(ctk.CTkFrame):
             ("valeur", "Valeur", 90),
             ("provenance", "Provenance", 130),
             ("acheteur", "Acheteur", 130),
-            ("remboursement", "Remboursement", 120),
+            ("statut_remboursement", "Remboursement", 120),
         ]:
             self._tree_lots.heading(col, text=label)
             self._tree_lots.column(col, width=width, anchor="center")

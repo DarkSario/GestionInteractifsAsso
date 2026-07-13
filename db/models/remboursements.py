@@ -206,7 +206,7 @@ def marquer_rembourse(
         try:
             from db.models.tombola import marquer_rembourse_lot
             return marquer_rembourse_lot(identifiant, mode, reference, date)
-        except Exception as exc:  # noqa: BLE001
+        except (ImportError, OSError) as exc:
             logger.error('marquer_rembourse (tombola): %s', exc)
             return False
 
