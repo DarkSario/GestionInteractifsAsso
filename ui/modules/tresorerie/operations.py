@@ -580,4 +580,5 @@ def build_tab_operations(parent: ctk.CTkFrame, root: Any) -> None:
     tab.pack(fill="both", expand=True)
 
 
+# Alias de compatibilité pour les imports/tests historiques.
 _FormulaireOperationPopup = _DialogOperation

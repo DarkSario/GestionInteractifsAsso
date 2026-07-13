@@ -93,8 +93,19 @@ class FormDialog(ctk.CTkToplevel):
         self._btn_valider.pack(side="right")
 
         self.bind("<Escape>", lambda _e: self.destroy())
-        self.bind("<Return>", lambda _e: self._on_valider())
+        self.bind("<Return>", self._on_return_pressed)
         self.focus()
+
+    def _on_return_pressed(self, _event: Any) -> None:
+        """Valide avec Entrée sauf si le focus est sur un champ texte multiligne."""
+        try:
+            focus_widget = self.focus_get()
+            widget_name = focus_widget.winfo_class().lower() if focus_widget else ""
+        except Exception:
+            widget_name = ""
+        if "text" in widget_name:
+            return
+        self._on_valider()
 
     def _centrer_sur_parent(self, parent: Any) -> None:
         """Centre la fenêtre sur la fenêtre parent."""

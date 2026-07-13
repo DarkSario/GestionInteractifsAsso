@@ -307,8 +307,7 @@ class _DialogDon(FormDialog):
         self._var_creer_treso = ctk.BooleanVar(value=False)
         self._var_generer_recu = ctk.BooleanVar(value=False)
         self._build()
-        self._toggle_type_fields()
-        self._toggle_nature_fields()
+        self._mettre_a_jour_visibilite_champs()
 
     def _label_exercice(self, exercice_id: Any) -> str:
         for label, value in self._map_exercices.items():
@@ -380,12 +379,16 @@ class _DialogDon(FormDialog):
         self._var_prenom.set(detail.get('prenom') or '')
 
     def _toggle_type_fields(self, _value: str | None = None) -> None:
+        self._mettre_a_jour_visibilite_champs()
+
+    def _toggle_nature_fields(self, _value: str | None = None) -> None:
+        self._mettre_a_jour_visibilite_champs()
+
+    def _mettre_a_jour_visibilite_champs(self) -> None:
         if self._var_type.get() == 'entreprise':
             self._frame_siret.pack(fill='x', pady=4)
         else:
             self._frame_siret.pack_forget()
-
-    def _toggle_nature_fields(self, _value: str | None = None) -> None:
         if self._var_nature.get() == 'nature':
             self._frame_description.pack(fill='x', pady=4)
             self._frame_valeur.pack(fill='x', pady=4)
