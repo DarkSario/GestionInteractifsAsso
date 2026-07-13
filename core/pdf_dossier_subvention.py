@@ -769,9 +769,12 @@ class PdfDossierSubvention(PdfBasePro):
                     """SELECT m.nom, m.prenom, COUNT(DISTINCT eb.evenement_id) as nb_events
                        FROM membres m
                        JOIN evenement_benevoles eb ON eb.membre_id = m.id
+                       JOIN evenements e ON e.id = eb.evenement_id
+                       WHERE e.date_debut >= ? AND e.date_debut <= ?
                        GROUP BY m.id, m.nom, m.prenom
                        ORDER BY nb_events DESC
                        LIMIT 20""",
+                    (self._date_debut, self._date_fin),
                 ).fetchall()
             finally:
                 conn.close()

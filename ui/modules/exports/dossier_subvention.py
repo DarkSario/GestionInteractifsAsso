@@ -347,7 +347,6 @@ class DossierSubventionDialog(ctk.CTkToplevel):
         montant = float(self._montant_var.get().replace(",", ".").replace(" ", "") or 0)
         sections = {cle: var.get() for cle, var in self._sections_vars.items()}
 
-        self._btn_desactiver()
         progress = ctk.CTkProgressBar(self)
         progress.pack(fill="x", padx=20, pady=(0, 4), side="bottom")
         progress.configure(mode="indeterminate")
@@ -386,7 +385,6 @@ class DossierSubventionDialog(ctk.CTkToplevel):
         montant = float(self._montant_var.get().replace(",", ".").replace(" ", "") or 0)
         sections = {cle: var.get() for cle, var in self._sections_vars.items()}
 
-        self._btn_desactiver()
         progress = ctk.CTkProgressBar(self)
         progress.pack(fill="x", padx=20, pady=(0, 4), side="bottom")
         progress.configure(mode="indeterminate")
@@ -411,10 +409,6 @@ class DossierSubventionDialog(ctk.CTkToplevel):
                 self.after(0, lambda: self._fin_generation(False, chemin, progress))
 
         threading.Thread(target=_run, daemon=True).start()
-
-    def _btn_desactiver(self) -> None:
-        """Désactive temporairement les boutons."""
-        pass  # Les boutons sont déjà dans le pack, pas de référence stockée
 
     def _fin_generation(self, ok: bool, chemin: str, progress) -> None:
         try:

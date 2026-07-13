@@ -165,7 +165,7 @@ class ParametresApp(ctk.CTkToplevel):
 
         ctk.CTkLabel(
             frame,
-            text="Formats acceptés : PNG, JPG, GIF — max 2 Mo",
+            text="Formats acceptés : PNG, JPG — max 2 Mo",
             font=fonts.get("small"),
             text_color="grey",
         ).pack(anchor="w", padx=(158, 0))
@@ -252,7 +252,7 @@ class ParametresApp(ctk.CTkToplevel):
         chemin = filedialog.askopenfilename(
             parent=self,
             title="Choisir le logo de l'association",
-            filetypes=[("Images", "*.png *.jpg *.jpeg *.gif"), ("Tous les fichiers", "*.*")],
+            filetypes=[("Images", "*.png *.jpg *.jpeg"), ("Tous les fichiers", "*.*")],
         )
         if chemin:
             try:
