@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import tkinter as tk
+from collections.abc import Callable
 from datetime import date
 from tkinter import ttk
 from typing import Any
@@ -448,7 +449,7 @@ class _FormulaireCotisation(ctk.CTkToplevel):
         parent: Any,
         cotisation: dict | None = None,
         adherent_id: int | None = None,
-        on_save=None,
+        on_save: Callable[[], None] | None = None,
     ) -> None:
         super().__init__(parent)
         self.title("✏️ Cotisation" if cotisation else "+ Ajouter une cotisation")

@@ -403,7 +403,14 @@ def generer_bilan_ag(
                 elements.append(Paragraph(ligne_strip[4:], style_h3))
             elif ligne_strip.startswith("---"):
                 elements.append(Spacer(1, 0.2 * cm))
-            elif ligne_strip.startswith("*") and ligne_strip.endswith("*") and len(ligne_strip) > 2:
+            elif (
+                ligne_strip.startswith("*")
+                and ligne_strip.endswith("*")
+                and len(ligne_strip) > 2
+                and not ligne_strip.startswith("* ")
+                and not ligne_strip.startswith("**")
+            ):
+                # Italique de document (ex. : *texte italique*)
                 elements.append(Paragraph(f"<i>{ligne_strip[1:-1]}</i>", style_normal))
             else:
                 # Transformer **texte** en gras pour ReportLab

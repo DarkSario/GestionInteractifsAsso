@@ -130,7 +130,7 @@ def test_get_cotisations_exercice(db_cotisations):
 
     ids = [
         db_cotisations.execute(
-            "SELECT id FROM membres WHERE nom = ?",(nom,)
+            "SELECT id FROM membres WHERE nom = ?", (nom,)
         ).fetchone()["id"]
         for nom in ("Dupont", "Martin")
     ]
