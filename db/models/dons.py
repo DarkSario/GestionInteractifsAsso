@@ -185,10 +185,23 @@ def get_stats_dons(exercice_id: int | None = None) -> dict:
     query = """
         SELECT
             COUNT(*) AS total,
-            COUNT(DISTINCT TRIM(COALESCE(donateur_nom, '') || '|' || COALESCE(donateur_prenom, ''))) AS nb_donateurs,
+            COUNT(
+                DISTINCT COALESCE(
+                    CASE WHEN membre_id IS NOT NULL THEN 'membre:' || CAST(membre_id AS TEXT) END,
+                    'donateur:' || TRIM(COALESCE(donateur_nom, '') || '|' || COALESCE(donateur_prenom, ''))
+                )
+            ) AS nb_donateurs,
             COALESCE(SUM(CASE WHEN nature_don = 'argent' THEN COALESCE(montant, 0) ELSE 0 END), 0) AS total_argent,
             COALESCE(SUM(CASE WHEN nature_don = 'nature' THEN COALESCE(valeur_estimee, 0) ELSE 0 END), 0) AS total_nature,
-            COALESCE(SUM(COALESCE(montant, 0)), 0) + COALESCE(SUM(COALESCE(valeur_estimee, 0)), 0) AS total_montants
+            COALESCE(
+                SUM(
+                    CASE
+                        WHEN nature_don = 'nature' THEN COALESCE(valeur_estimee, 0)
+                        ELSE COALESCE(montant, 0)
+                    END
+                ),
+                0
+            ) AS total_montants
         FROM dons
         WHERE 1 = 1
     """

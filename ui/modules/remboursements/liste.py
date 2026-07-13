@@ -134,7 +134,7 @@ class ListeRemboursements(ctk.CTkToplevel):
                     ligne.get('beneficiaire') or '—',
                     ligne.get('description') or '',
                     f"{float(ligne.get('montant') or 0):.2f} €",
-                    _SOURCES.get(ligne.get('source'), ligne.get('source')).title(),
+                    (_SOURCES.get(ligne.get('source')) or ligne.get('source') or '').title(),
                     _STATUTS.get(statut, statut),
                 ),
                 tags=(statut,),

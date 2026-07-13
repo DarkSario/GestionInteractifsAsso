@@ -133,7 +133,12 @@ class ListeDons(ctk.CTkToplevel):
         self._tree.delete(*self._tree.get_children())
         for don in self._dons:
             donateur = f"{don.get('donateur_nom') or ''} {don.get('donateur_prenom') or ''}".strip()
-            montant = float(don.get('montant') or don.get('valeur_estimee') or 0)
+            montant = float(
+                don.get('valeur_estimee')
+                if don.get('nature_don') == 'nature'
+                else don.get('montant')
+                or 0
+            )
             statut = don.get('statut_recu') or 'en_attente'
             self._tree.insert(
                 '', 'end', iid=str(don['id']),
