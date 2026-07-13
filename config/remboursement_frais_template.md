@@ -5,7 +5,7 @@
 
 ---
 
-**Nom de l'Évènement :** {{nom_evenement}}
+**Nom de l'Événement :** {{nom_evenement}}
 
 **Date :** {{date_evenement}}
 
