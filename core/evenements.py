@@ -154,6 +154,7 @@ def calculer_bilan_evenement(evenement_id: int) -> dict:
     """
     from db.models.evenements import get_depenses_evenement, get_stats_billetterie
     from db.models.stands import get_stands_evenement
+    from db.models.tableaux import calculer_totaux, get_colonnes_tableau, get_tableaux_evenement
 
     stats = get_stats_billetterie(evenement_id)
     recettes_total = stats.get("total_net", 0.0)
@@ -178,6 +179,20 @@ def calculer_bilan_evenement(evenement_id: int) -> dict:
     recettes_total += recettes_stands
     depenses_total += depenses_stands
 
+    # Inclure les totaux des colonnes de type 'montant' marquées afficher_total dans les tableaux
+    tableaux = get_tableaux_evenement(evenement_id)
+    recettes_tableaux = 0.0
+    for tableau in tableaux:
+        t_id = int(tableau["id"])
+        totaux = calculer_totaux(t_id)
+        if totaux:
+            colonnes_by_id = {int(c["id"]): c for c in get_colonnes_tableau(t_id)}
+            for col_id, total in totaux.items():
+                col = colonnes_by_id.get(col_id, {})
+                if col.get("type_colonne") == "montant":
+                    recettes_tableaux += total
+    recettes_total += recettes_tableaux
+
     benefice = recettes_total - depenses_total
 
     return {
@@ -188,5 +203,6 @@ def calculer_bilan_evenement(evenement_id: int) -> dict:
             "billetterie": stats,
             "depenses": depenses,
             "stands": stands,
+            "recettes_tableaux": round(recettes_tableaux, 2),
         },
     }

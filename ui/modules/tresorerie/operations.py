@@ -43,7 +43,7 @@ except ModuleNotFoundError:  # pragma: no cover - environnement sans Tk
             return ""
 
     class _DummyCTk:
-        CTkFrame = CTkLabel = CTkButton = CTkEntry = CTkOptionMenu = CTkSegmentedButton = CTkBaseClass = _DummyWidget
+        CTkFrame = CTkLabel = CTkButton = CTkEntry = CTkOptionMenu = CTkSegmentedButton = CTkBaseClass = CTkToplevel = CTkScrollableFrame = _DummyWidget
         StringVar = _DummyVar
 
     ctk = _DummyCTk()
@@ -192,6 +192,203 @@ def enregistrer_operation_depuis_formulaire(formulaire: dict[str, Any]) -> int:
     )
 
 
+class _FormulaireOperationPopup(ctk.CTkToplevel):
+    """Fenêtre popup pour créer ou modifier une opération de trésorerie."""
+
+    def __init__(
+        self,
+        parent: Any,
+        type_operation: str = "depense",
+        operation: dict[str, Any] | None = None,
+        on_enregistre=None,
+    ) -> None:
+        super().__init__(parent)
+        self.title("✏️ Modifier l'opération" if operation else "💸 Nouvelle opération")
+        self.geometry("620x720")
+        self.minsize(600, 700)
+        self.transient(parent)
+        self.grab_set()
+        self.resizable(True, True)
+
+        self._operation = operation
+        self._on_enregistre = on_enregistre
+        self._comptes = get_all_comptes(actif_only=True)
+        self._membres = get_all_membres()
+        self._categories: list[dict[str, Any]] = []
+
+        self._var_type = ctk.StringVar(value=type_operation if not operation else operation.get("type_operation", "depense"))
+        self._var_libelle = ctk.StringVar()
+        self._var_montant = ctk.StringVar(value="0,00")
+        self._var_date = ctk.StringVar(value=datetime.now().strftime("%Y-%m-%d"))
+        self._var_categorie = ctk.StringVar(value="")
+        self._var_moyen = ctk.StringVar(value="Virement")
+        self._var_statut = ctk.StringVar(value="Payé")
+        self._var_compte = ctk.StringVar(value=self._comptes[0]["nom"] if self._comptes else "")
+        self._var_commentaire = ctk.StringVar()
+        self._var_avance_par = ctk.StringVar(value="— Aucun —")
+        self._var_remboursement = ctk.StringVar(value="Non applicable")
+
+        self._build_ui()
+        if operation:
+            self._pre_remplir(operation)
+        else:
+            self._refresh_categories()
+
+    def _build_ui(self) -> None:
+        fonts = app_theme.FONTS
+        colors = app_theme.COLORS
+
+        titre_texte = "✏️ Modifier l'opération" if self._operation else "💸 Nouvelle opération"
+        ctk.CTkLabel(self, text=titre_texte, font=fonts.get("subtitle")).pack(
+            anchor="w", padx=20, pady=(16, 8)
+        )
+
+        frame_scroll = ctk.CTkScrollableFrame(self, fg_color="transparent")
+        frame_scroll.pack(fill="both", expand=True, padx=12, pady=4)
+
+        bloc_type = ctk.CTkFrame(frame_scroll, fg_color="transparent")
+        bloc_type.pack(fill="x", padx=8, pady=4)
+        ctk.CTkLabel(bloc_type, text="Type").pack(anchor="w")
+        ctk.CTkSegmentedButton(
+            bloc_type,
+            values=["depense", "recette"],
+            variable=self._var_type,
+            command=lambda _value: self._refresh_categories(),
+        ).pack(fill="x", pady=(4, 0))
+
+        def champ(label: str, widget: ctk.CTkBaseClass) -> None:
+            bloc = ctk.CTkFrame(frame_scroll, fg_color="transparent")
+            bloc.pack(fill="x", padx=8, pady=4)
+            ctk.CTkLabel(bloc, text=label).pack(anchor="w")
+            widget.pack(fill="x", pady=(4, 0))
+
+        champ("Libellé", ctk.CTkEntry(frame_scroll, textvariable=self._var_libelle))
+        champ("Montant (€)", ctk.CTkEntry(frame_scroll, textvariable=self._var_montant))
+        champ("Date", ctk.CTkEntry(frame_scroll, textvariable=self._var_date))
+        self._menu_categorie = ctk.CTkOptionMenu(frame_scroll, values=[""], variable=self._var_categorie)
+        champ("Catégorie", self._menu_categorie)
+        champ(
+            "Moyen de paiement",
+            ctk.CTkOptionMenu(frame_scroll, values=list(_MOYENS_PAIEMENT), variable=self._var_moyen),
+        )
+        champ(
+            "Statut",
+            ctk.CTkOptionMenu(frame_scroll, values=list(_STATUTS), variable=self._var_statut),
+        )
+        champ(
+            "Compte",
+            ctk.CTkOptionMenu(
+                frame_scroll,
+                values=[c["nom"] for c in self._comptes] or [""],
+                variable=self._var_compte,
+            ),
+        )
+        membres_values = ["— Aucun —"] + [f"{m['nom']} {m['prenom']}".strip() for m in self._membres]
+        champ("Avancé par", ctk.CTkOptionMenu(frame_scroll, values=membres_values, variable=self._var_avance_par))
+        champ("Statut remboursement", ctk.CTkOptionMenu(frame_scroll, values=["Non applicable", "En attente"], variable=self._var_remboursement))
+        champ("Commentaire", ctk.CTkEntry(frame_scroll, textvariable=self._var_commentaire))
+
+        actions = ctk.CTkFrame(self, fg_color="transparent")
+        actions.pack(fill="x", padx=20, pady=(8, 16))
+        ctk.CTkButton(
+            actions, text="❌ Annuler", width=100, fg_color="grey", hover_color="#555", command=self.destroy
+        ).pack(side="left")
+        ctk.CTkButton(
+            actions,
+            text="💾 Enregistrer",
+            width=150,
+            command=self._enregistrer,
+        ).pack(side="right")
+
+        self._refresh_categories()
+
+    def _refresh_categories(self) -> None:
+        self._categories = get_all_categories(self._var_type.get())
+        noms = [c.get("nom") or "" for c in self._categories] or [""]
+        self._menu_categorie.configure(values=noms)
+        self._var_categorie.set(noms[0])
+
+    def _pre_remplir(self, operation: dict[str, Any]) -> None:
+        type_op = operation.get("type_operation", "depense")
+        self._var_type.set(type_op)
+        self._refresh_categories()
+        self._var_libelle.set(operation.get("libelle") or "")
+        montant = float(operation.get("montant") or 0)
+        self._var_montant.set(f"{montant:,.2f}".replace(",", " ").replace(".", ","))
+        self._var_date.set(operation.get("date_operation") or datetime.now().strftime("%Y-%m-%d"))
+        moyen_code = operation.get("mode_paiement") or "autre"
+        moyen_label = next((k for k, v in _MOYENS_PAIEMENT.items() if v == moyen_code), "Virement")
+        self._var_moyen.set(moyen_label)
+        statut_code = operation.get("statut") or "valide"
+        statut_label = next((k for k, v in _STATUTS.items() if v == statut_code), "Payé")
+        self._var_statut.set(statut_label)
+        compte_nom = operation.get("compte_nom") or (self._comptes[0]["nom"] if self._comptes else "")
+        self._var_compte.set(compte_nom)
+        self._var_commentaire.set(operation.get("commentaire") or "")
+        avance_nom = f"{operation.get('avance_par_nom') or ''} {operation.get('avance_par_prenom') or ''}".strip()
+        self._var_avance_par.set(avance_nom or "— Aucun —")
+        self._var_remboursement.set("En attente" if operation.get("remboursement_statut") == "en_attente" else "Non applicable")
+        cat_nom = operation.get("categorie_nom") or ""
+        if cat_nom and cat_nom in [c.get("nom") or "" for c in self._categories]:
+            self._var_categorie.set(cat_nom)
+
+    def _enregistrer(self) -> None:
+        membre = next(
+            (m for m in self._membres if f"{m['nom']} {m['prenom']}".strip() == self._var_avance_par.get()),
+            None,
+        )
+        type_op = self._var_type.get()
+        formulaire = {
+            "type_operation": type_op,
+            "libelle": self._var_libelle.get(),
+            "montant": self._var_montant.get(),
+            "date_operation": self._var_date.get(),
+            "categorie": self._var_categorie.get(),
+            "mode_paiement": _MOYENS_PAIEMENT.get(self._var_moyen.get(), "autre"),
+            "statut": _STATUTS.get(self._var_statut.get(), "valide"),
+            "compte_id": next(
+                (int(c["id"]) for c in self._comptes if c["nom"] == self._var_compte.get()),
+                None,
+            ),
+            "commentaire": self._var_commentaire.get(),
+            "avance_par_membre_id": int(membre["id"]) if membre else None,
+            "remboursement_statut": "en_attente" if self._var_remboursement.get() == "En attente" and membre else "non_applicable",
+        }
+        if type_op != "depense":
+            formulaire["avance_par_membre_id"] = None
+            formulaire["remboursement_statut"] = "non_applicable"
+
+        try:
+            if self._operation is not None:
+                categories = get_all_categories(formulaire["type_operation"])
+                cat_nom = formulaire["categorie"]
+                cat = next((c for c in categories if (c.get("nom") or "") == cat_nom), None)
+                cat_id = int(cat["id"]) if cat else None
+                update_operation(
+                    int(self._operation["id"]),
+                    type_operation=formulaire["type_operation"],
+                    libelle=formulaire["libelle"],
+                    montant=_parse_float(formulaire["montant"]),
+                    date_operation=_normaliser_date(formulaire["date_operation"]),
+                    categorie_id=cat_id,
+                    mode_paiement=formulaire["mode_paiement"],
+                    statut=formulaire["statut"],
+                    compte_id=formulaire["compte_id"],
+                    commentaire=formulaire["commentaire"] or None,
+                    avance_par_membre_id=formulaire["avance_par_membre_id"],
+                    remboursement_statut=formulaire["remboursement_statut"],
+                )
+            else:
+                enregistrer_operation_depuis_formulaire(formulaire)
+        except Exception as exc:
+            afficher_erreur(self, "Opérations", str(exc))
+            return
+
+        if self._on_enregistre:
+            self._on_enregistre()
+        self.destroy()
+
+
 class _OperationsTab(ctk.CTkFrame):
     def __init__(self, parent: ctk.CTkFrame, root: Any) -> None:
         super().__init__(parent)
@@ -254,13 +451,8 @@ class _OperationsTab(ctk.CTkFrame):
         contenu = ctk.CTkFrame(self, fg_color="transparent")
         contenu.pack(fill="both", expand=True, padx=12, pady=6)
 
-        self._frame_liste = ctk.CTkFrame(contenu)
-        self._frame_liste.pack(side="left", fill="both", expand=True)
-        self._frame_formulaire = ctk.CTkFrame(contenu, width=360)
-        self._frame_formulaire.pack_propagate(False)
-
         self._tree = ttk.Treeview(
-            self._frame_liste,
+            contenu,
             columns=("date", "libelle", "categorie", "montant", "statut"),
             show="headings",
             height=14,
@@ -277,7 +469,7 @@ class _OperationsTab(ctk.CTkFrame):
         for key, color in COULEURS.items():
             self._tree.tag_configure(key, foreground=color)
 
-        scrollbar = ttk.Scrollbar(self._frame_liste, orient="vertical", command=self._tree.yview)
+        scrollbar = ttk.Scrollbar(contenu, orient="vertical", command=self._tree.yview)
         self._tree.configure(yscrollcommand=scrollbar.set)
         self._tree.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
@@ -285,111 +477,16 @@ class _OperationsTab(ctk.CTkFrame):
         self._lbl_stats = ctk.CTkLabel(self, text="")
         self._lbl_stats.pack(anchor="w", padx=12, pady=(0, 10))
 
-        self._build_formulaire()
-
-    def _build_formulaire(self) -> None:
-        self._var_type = ctk.StringVar(value="depense")
-        self._var_libelle = ctk.StringVar()
-        self._var_montant = ctk.StringVar(value="0,00")
-        self._var_date = ctk.StringVar(value=datetime.now().strftime("%Y-%m-%d"))
-        self._var_categorie = ctk.StringVar(value="")
-        self._var_moyen = ctk.StringVar(value="Virement")
-        self._var_statut = ctk.StringVar(value="Payé")
-        self._var_compte = ctk.StringVar(value=self._comptes[0]["nom"] if self._comptes else "")
-        self._var_commentaire = ctk.StringVar()
-        self._var_avance_par = ctk.StringVar(value="— Aucun —")
-        self._var_remboursement = ctk.StringVar(value="Non applicable")
-        self._membres = get_all_membres()
-
-        self._lbl_titre_formulaire = ctk.CTkLabel(
-            self._frame_formulaire,
-            text="💸 Nouvelle opération",
-            font=app_theme.FONTS.get("subtitle"),
-        )
-        self._lbl_titre_formulaire.pack(anchor="w", padx=16, pady=(16, 12))
-
-        bloc_type = ctk.CTkFrame(self._frame_formulaire, fg_color="transparent")
-        bloc_type.pack(fill="x", padx=16, pady=4)
-        ctk.CTkLabel(bloc_type, text="Type").pack(anchor="w")
-        ctk.CTkSegmentedButton(
-            bloc_type,
-            values=["depense", "recette"],
-            variable=self._var_type,
-            command=lambda _value: self._refresh_categories(),
-        ).pack(fill="x", pady=(4, 0))
-
-        def champ(label: str, widget: ctk.CTkBaseClass) -> None:
-            bloc = ctk.CTkFrame(self._frame_formulaire, fg_color="transparent")
-            bloc.pack(fill="x", padx=16, pady=4)
-            ctk.CTkLabel(bloc, text=label).pack(anchor="w")
-            widget.pack(fill="x", pady=(4, 0))
-
-        champ("Libellé", ctk.CTkEntry(self._frame_formulaire, textvariable=self._var_libelle))
-        champ("Montant (€)", ctk.CTkEntry(self._frame_formulaire, textvariable=self._var_montant))
-        champ("Date", ctk.CTkEntry(self._frame_formulaire, textvariable=self._var_date))
-        self._menu_categorie = ctk.CTkOptionMenu(self._frame_formulaire, values=[""], variable=self._var_categorie)
-        champ("Catégorie", self._menu_categorie)
-        champ(
-            "Moyen de paiement",
-            ctk.CTkOptionMenu(
-                self._frame_formulaire,
-                values=list(_MOYENS_PAIEMENT),
-                variable=self._var_moyen,
-            ),
-        )
-        champ(
-            "Statut",
-            ctk.CTkOptionMenu(
-                self._frame_formulaire,
-                values=list(_STATUTS),
-                variable=self._var_statut,
-            ),
-        )
-        champ(
-            "Compte",
-            ctk.CTkOptionMenu(
-                self._frame_formulaire,
-                values=[c["nom"] for c in self._comptes] or [""],
-                variable=self._var_compte,
-            ),
-        )
-        membres_values = ["— Aucun —"] + [f"{m['nom']} {m['prenom']}".strip() for m in self._membres]
-        champ("Avancé par", ctk.CTkOptionMenu(self._frame_formulaire, values=membres_values, variable=self._var_avance_par))
-        champ("Statut remboursement", ctk.CTkOptionMenu(self._frame_formulaire, values=["Non applicable", "En attente"], variable=self._var_remboursement))
-        champ("Commentaire", ctk.CTkEntry(self._frame_formulaire, textvariable=self._var_commentaire))
-
-        actions = ctk.CTkFrame(self._frame_formulaire, fg_color="transparent")
-        actions.pack(fill="x", padx=16, pady=(16, 16))
-        ctk.CTkButton(actions, text="Annuler", fg_color="gray", hover_color="#555", command=self._fermer_formulaire).pack(side="left")
-        ctk.CTkButton(actions, text="💾 Enregistrer", command=self._enregistrer).pack(side="right")
-
-        self._refresh_categories()
-
-    def _refresh_categories(self) -> None:
-        self._categories = get_all_categories(self._var_type.get())
-        noms = [c.get("nom") or "" for c in self._categories] or [""]
-        self._menu_categorie.configure(values=noms)
-        self._var_categorie.set(noms[0])
-
     def _ouvrir_formulaire(self, type_operation: str) -> None:
         if not self._comptes:
             afficher_info(self, "Opérations", "Créez d'abord un compte actif.")
             return
-        self._operation_en_edition = None
-        self._lbl_titre_formulaire.configure(text="💸 Nouvelle opération")
-        self._var_type.set(type_operation)
-        self._var_libelle.set("Recette" if type_operation == "recette" else "Dépense")
-        self._var_montant.set("0,00")
-        self._var_date.set(datetime.now().strftime("%Y-%m-%d"))
-        self._var_moyen.set("Virement")
-        self._var_statut.set("Payé")
-        self._var_compte.set(self._comptes[0]["nom"])
-        self._var_commentaire.set("")
-        self._var_avance_par.set("— Aucun —")
-        self._var_remboursement.set("Non applicable")
-        self._refresh_categories()
-        if not self._frame_formulaire.winfo_manager():
-            self._frame_formulaire.pack(side="right", fill="y", padx=(12, 0))
+        popup = _FormulaireOperationPopup(
+            self,
+            type_operation=type_operation,
+            on_enregistre=self.refresh,
+        )
+        self.wait_window(popup)
 
     def _modifier_operation(self) -> None:
         selected = self._tree.selection()
@@ -407,32 +504,12 @@ class _OperationsTab(ctk.CTkFrame):
         if int(operation.get("est_automatique") or 0) == 1:
             afficher_info(self, "Opérations", "Les opérations automatiques ne peuvent pas être modifiées.")
             return
-        self._operation_en_edition = operation_id
-        self._lbl_titre_formulaire.configure(text="✏️ Modifier l'opération")
-        type_op = operation.get("type_operation", "depense")
-        self._var_type.set(type_op)
-        self._refresh_categories()
-        self._var_libelle.set(operation.get("libelle") or "")
-        montant = float(operation.get("montant") or 0)
-        self._var_montant.set(f"{montant:,.2f}".replace(",", " ").replace(".", ","))
-        self._var_date.set(operation.get("date_operation") or datetime.now().strftime("%Y-%m-%d"))
-        moyen_code = operation.get("mode_paiement") or "autre"
-        moyen_label = next((k for k, v in _MOYENS_PAIEMENT.items() if v == moyen_code), "Virement")
-        self._var_moyen.set(moyen_label)
-        statut_code = operation.get("statut") or "valide"
-        statut_label = next((k for k, v in _STATUTS.items() if v == statut_code), "Payé")
-        self._var_statut.set(statut_label)
-        compte_nom = operation.get("compte_nom") or (self._comptes[0]["nom"] if self._comptes else "")
-        self._var_compte.set(compte_nom)
-        self._var_commentaire.set(operation.get("commentaire") or "")
-        avance_nom = f"{operation.get('avance_par_nom') or ''} {operation.get('avance_par_prenom') or ''}".strip()
-        self._var_avance_par.set(avance_nom or "— Aucun —")
-        self._var_remboursement.set("En attente" if operation.get("remboursement_statut") == "en_attente" else "Non applicable")
-        cat_nom = operation.get("categorie_nom") or ""
-        if cat_nom and cat_nom in [c.get("nom") or "" for c in self._categories]:
-            self._var_categorie.set(cat_nom)
-        if not self._frame_formulaire.winfo_manager():
-            self._frame_formulaire.pack(side="right", fill="y", padx=(12, 0))
+        popup = _FormulaireOperationPopup(
+            self,
+            operation=operation,
+            on_enregistre=self.refresh,
+        )
+        self.wait_window(popup)
 
     def _supprimer_operation(self) -> None:
         selected = self._tree.selection()
@@ -463,66 +540,13 @@ class _OperationsTab(ctk.CTkFrame):
         else:
             afficher_erreur(self, "Opérations", "Impossible de supprimer cette opération.")
 
-    def _fermer_formulaire(self) -> None:
-        self._operation_en_edition = None
-        self._frame_formulaire.pack_forget()
-
-    def _enregistrer(self) -> None:
-        membre = next((m for m in self._membres if f"{m['nom']} {m['prenom']}".strip() == self._var_avance_par.get()), None)
-        formulaire = {
-            "type_operation": self._var_type.get(),
-            "libelle": self._var_libelle.get(),
-            "montant": self._var_montant.get(),
-            "date_operation": self._var_date.get(),
-            "categorie": self._var_categorie.get(),
-            "mode_paiement": _MOYENS_PAIEMENT.get(self._var_moyen.get(), "autre"),
-            "statut": _STATUTS.get(self._var_statut.get(), "valide"),
-            "compte_id": next(
-                (int(c["id"]) for c in self._comptes if c["nom"] == self._var_compte.get()),
-                None,
-            ),
-            "commentaire": self._var_commentaire.get(),
-            "avance_par_membre_id": int(membre['id']) if membre else None,
-            "remboursement_statut": "en_attente" if self._var_remboursement.get() == "En attente" and membre else "non_applicable",
-        }
-        if formulaire["type_operation"] != "depense":
-            formulaire["avance_par_membre_id"] = None
-            formulaire["remboursement_statut"] = "non_applicable"
-        if self._operation_en_edition is not None:
-            # Mode édition
-            try:
-                categories = get_all_categories(formulaire["type_operation"])
-                cat_nom = formulaire["categorie"]
-                cat = next((c for c in categories if (c.get("nom") or "") == cat_nom), None)
-                cat_id = int(cat["id"]) if cat else None
-                update_operation(
-                    self._operation_en_edition,
-                    type_operation=formulaire["type_operation"],
-                    libelle=formulaire["libelle"],
-                    montant=_parse_float(formulaire["montant"]),
-                    date_operation=_normaliser_date(formulaire["date_operation"]),
-                    categorie_id=cat_id,
-                    mode_paiement=formulaire["mode_paiement"],
-                    statut=formulaire["statut"],
-                    compte_id=formulaire["compte_id"],
-                    commentaire=formulaire["commentaire"] or None,
-                    avance_par_membre_id=formulaire["avance_par_membre_id"],
-                    remboursement_statut=formulaire["remboursement_statut"],
-                )
-            except Exception as exc:
-                afficher_erreur(self, "Opérations", str(exc))
-                return
-        else:
-            try:
-                enregistrer_operation_depuis_formulaire(formulaire)
-            except ValueError as exc:
-                afficher_erreur(self, "Opérations", str(exc))
-                return
-        self.refresh()
-        self._fermer_formulaire()
-
     def refresh(self) -> None:
-        self._tree.delete(*self._tree.get_children())
+        try:
+            if not self.winfo_exists():
+                return
+            self._tree.delete(*self._tree.get_children())
+        except Exception:
+            return
         operations = get_operations()
         for operation in operations:
             type_op = operation.get("type_operation")

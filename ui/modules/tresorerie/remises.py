@@ -43,15 +43,21 @@ except ModuleNotFoundError:  # pragma: no cover - environnement sans Tk
             return ""
 
     class _DummyCTk:
-        CTkFrame = CTkLabel = CTkButton = CTkEntry = CTkOptionMenu = CTkBaseClass = _DummyWidget
+        CTkFrame = CTkLabel = CTkButton = CTkEntry = CTkOptionMenu = CTkBaseClass = CTkToplevel = CTkScrollableFrame = _DummyWidget
         StringVar = _DummyVar
 
     ctk = _DummyCTk()
 
 from core.tresorerie import formater_montant, slug_reference_remise
-from db.models.tresorerie import add_remise_cheque, get_all_comptes, get_remises
+from db.models.tresorerie import (
+    add_remise_cheque,
+    delete_remise_cheque,
+    get_all_comptes,
+    get_remises,
+    update_remise_cheque,
+)
 from ui import theme as app_theme
-from ui.components.dialogs import afficher_erreur, afficher_info
+from ui.components.dialogs import afficher_erreur, afficher_info, demander_confirmation
 
 
 _DATE_FORMAT = "%Y-%m-%d"
@@ -104,6 +110,124 @@ def enregistrer_remise_depuis_formulaire(formulaire: dict[str, Any]) -> int:
     )
 
 
+class _FormulaireRemisePopup(ctk.CTkToplevel):
+    """Fenêtre popup pour créer ou modifier une remise de chèques."""
+
+    def __init__(
+        self,
+        parent: Any,
+        comptes: list,
+        remise: dict[str, Any] | None = None,
+        on_enregistre=None,
+    ) -> None:
+        super().__init__(parent)
+        self.title("✏️ Modifier la remise" if remise else "🏦 Nouvelle remise de chèques")
+        self.geometry("500x480")
+        self.minsize(480, 460)
+        self.transient(parent)
+        self.grab_set()
+        self.resizable(True, True)
+
+        self._comptes = comptes
+        self._remise = remise
+        self._on_enregistre = on_enregistre
+
+        self._var_date = ctk.StringVar(value=datetime.now().strftime(_DATE_FORMAT))
+        compte_defaut = comptes[0]["nom"] if comptes else ""
+        self._var_compte = ctk.StringVar(value=compte_defaut)
+        self._var_nombre = ctk.StringVar(value="0")
+        self._var_montant = ctk.StringVar(value="0,00")
+        self._var_bordereau = ctk.StringVar()
+        self._var_commentaire = ctk.StringVar()
+
+        self._build_ui()
+        if remise:
+            self._pre_remplir(remise)
+
+    def _build_ui(self) -> None:
+        fonts = app_theme.FONTS
+
+        titre_texte = "✏️ Modifier la remise" if self._remise else "🏦 Nouvelle remise de chèques"
+        ctk.CTkLabel(self, text=titre_texte, font=fonts.get("subtitle")).pack(
+            anchor="w", padx=20, pady=(16, 8)
+        )
+
+        frame = ctk.CTkFrame(self, fg_color="transparent")
+        frame.pack(fill="both", expand=True, padx=16, pady=4)
+
+        def champ(label: str, widget: ctk.CTkBaseClass) -> None:
+            bloc = ctk.CTkFrame(frame, fg_color="transparent")
+            bloc.pack(fill="x", pady=4)
+            ctk.CTkLabel(bloc, text=label).pack(anchor="w")
+            widget.pack(fill="x", pady=(4, 0))
+
+        champ("Date remise", ctk.CTkEntry(frame, textvariable=self._var_date))
+        champ(
+            "Banque / Compte",
+            ctk.CTkOptionMenu(
+                frame,
+                values=[c["nom"] for c in self._comptes] or [""],
+                variable=self._var_compte,
+            ),
+        )
+        champ("Nombre chèques", ctk.CTkEntry(frame, textvariable=self._var_nombre))
+        champ("Montant total (€)", ctk.CTkEntry(frame, textvariable=self._var_montant))
+        champ("N° Bordereau", ctk.CTkEntry(frame, textvariable=self._var_bordereau))
+        champ("Commentaire", ctk.CTkEntry(frame, textvariable=self._var_commentaire))
+
+        actions = ctk.CTkFrame(self, fg_color="transparent")
+        actions.pack(fill="x", padx=20, pady=(8, 16))
+        ctk.CTkButton(
+            actions, text="❌ Annuler", width=100, fg_color="grey", hover_color="#555", command=self.destroy
+        ).pack(side="left")
+        ctk.CTkButton(actions, text="💾 Enregistrer", width=150, command=self._enregistrer).pack(side="right")
+
+    def _pre_remplir(self, remise: dict[str, Any]) -> None:
+        self._var_date.set(remise.get("date_remise") or datetime.now().strftime(_DATE_FORMAT))
+        compte_nom = remise.get("compte_nom") or (self._comptes[0]["nom"] if self._comptes else "")
+        self._var_compte.set(compte_nom)
+        self._var_nombre.set(str(remise.get("nombre_cheques") or 0))
+        montant = float(remise.get("montant_total") or 0)
+        self._var_montant.set(f"{montant:,.2f}".replace(",", " ").replace(".", ","))
+        self._var_bordereau.set(remise.get("numero_bordereau") or "")
+        self._var_commentaire.set(remise.get("commentaire") or "")
+
+    def _enregistrer(self) -> None:
+        compte_id = next(
+            (int(c["id"]) for c in self._comptes if c["nom"] == self._var_compte.get()),
+            None,
+        )
+        try:
+            if self._remise is not None:
+                update_remise_cheque(
+                    int(self._remise["id"]),
+                    date_remise=_normaliser_date(self._var_date.get()),
+                    compte_id=compte_id,
+                    nombre_cheques=_parse_int(self._var_nombre.get()),
+                    montant_total=_parse_float(self._var_montant.get()),
+                    numero_bordereau=self._var_bordereau.get().strip() or None,
+                    commentaire=self._var_commentaire.get().strip() or None,
+                )
+            else:
+                enregistrer_remise_depuis_formulaire(
+                    {
+                        "date_remise": self._var_date.get(),
+                        "compte_id": compte_id,
+                        "nombre_cheques": self._var_nombre.get(),
+                        "montant_total": self._var_montant.get(),
+                        "numero_bordereau": self._var_bordereau.get(),
+                        "commentaire": self._var_commentaire.get(),
+                    }
+                )
+        except Exception as exc:
+            afficher_erreur(self, "Remises", str(exc))
+            return
+
+        if self._on_enregistre:
+            self._on_enregistre()
+        self.destroy()
+
+
 class _RemisesTab(ctk.CTkFrame):
     def __init__(self, parent: ctk.CTkFrame, root: Any) -> None:
         super().__init__(parent)
@@ -134,17 +258,29 @@ class _RemisesTab(ctk.CTkFrame):
             command=self._ouvrir_formulaire,
         ).pack(side="right")
 
-        contenu = ctk.CTkFrame(self, fg_color="transparent")
-        contenu.pack(fill="both", expand=True, padx=12, pady=6)
+        ctk.CTkButton(
+            header,
+            text="🗑️ Supprimer",
+            width=110,
+            fg_color="#b71c1c",
+            hover_color="#7f0000",
+            command=self._supprimer,
+        ).pack(side="right", padx=(0, 8))
 
-        self._frame_liste = ctk.CTkFrame(contenu)
-        self._frame_liste.pack(side="left", fill="both", expand=True)
+        ctk.CTkButton(
+            header,
+            text="✏️ Modifier",
+            width=110,
+            fg_color="gray",
+            hover_color="#555",
+            command=self._modifier,
+        ).pack(side="right", padx=(0, 8))
 
-        self._frame_formulaire = ctk.CTkFrame(contenu, width=340)
-        self._frame_formulaire.pack_propagate(False)
+        frame_liste = ctk.CTkFrame(self)
+        frame_liste.pack(fill="both", expand=True, padx=12, pady=6)
 
         self._tree = ttk.Treeview(
-            self._frame_liste,
+            frame_liste,
             columns=("date", "compte", "nb", "montant", "bordereau", "statut"),
             show="headings",
             height=14,
@@ -160,92 +296,67 @@ class _RemisesTab(ctk.CTkFrame):
             self._tree.heading(col, text=label)
             self._tree.column(col, width=width, anchor=anchor)
 
-        scrollbar = ttk.Scrollbar(self._frame_liste, orient="vertical", command=self._tree.yview)
+        scrollbar = ttk.Scrollbar(frame_liste, orient="vertical", command=self._tree.yview)
         self._tree.configure(yscrollcommand=scrollbar.set)
         self._tree.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
 
-        self._build_formulaire()
-
-    def _build_formulaire(self) -> None:
-        self._var_date = ctk.StringVar(value=datetime.now().strftime(_DATE_FORMAT))
-        compte_defaut = self._comptes[0]["nom"] if self._comptes else ""
-        self._var_compte = ctk.StringVar(value=compte_defaut)
-        self._var_nombre = ctk.StringVar(value="0")
-        self._var_montant = ctk.StringVar(value="0,00")
-        self._var_bordereau = ctk.StringVar()
-        self._var_commentaire = ctk.StringVar()
-
-        ctk.CTkLabel(
-            self._frame_formulaire,
-            text="🏦 Nouvelle remise de chèques",
-            font=app_theme.FONTS.get("subtitle"),
-        ).pack(anchor="w", padx=16, pady=(16, 12))
-
-        def champ(label: str, widget: ctk.CTkBaseClass) -> None:
-            bloc = ctk.CTkFrame(self._frame_formulaire, fg_color="transparent")
-            bloc.pack(fill="x", padx=16, pady=4)
-            ctk.CTkLabel(bloc, text=label).pack(anchor="w")
-            widget.pack(fill="x", pady=(4, 0))
-
-        champ("Date remise", ctk.CTkEntry(self._frame_formulaire, textvariable=self._var_date))
-        champ(
-            "Banque / Compte",
-            ctk.CTkOptionMenu(
-                self._frame_formulaire,
-                values=[c["nom"] for c in self._comptes] or [""],
-                variable=self._var_compte,
-            ),
-        )
-        champ("Nombre chèques", ctk.CTkEntry(self._frame_formulaire, textvariable=self._var_nombre))
-        champ("Montant total (€)", ctk.CTkEntry(self._frame_formulaire, textvariable=self._var_montant))
-        champ("N° Bordereau", ctk.CTkEntry(self._frame_formulaire, textvariable=self._var_bordereau))
-        champ("Commentaire", ctk.CTkEntry(self._frame_formulaire, textvariable=self._var_commentaire))
-
-        actions = ctk.CTkFrame(self._frame_formulaire, fg_color="transparent")
-        actions.pack(fill="x", padx=16, pady=(16, 16))
-        ctk.CTkButton(actions, text="Annuler", fg_color="gray", hover_color="#555", command=self._fermer_formulaire).pack(side="left")
-        ctk.CTkButton(actions, text="💾 Enregistrer", command=self._enregistrer).pack(side="right")
-
-    def _ouvrir_formulaire(self) -> None:
+    def _ouvrir_formulaire(self, remise: dict[str, Any] | None = None) -> None:
         if not self._comptes:
             afficher_info(self, "Remises", "Créez d'abord un compte actif.")
             return
-        self._var_date.set(datetime.now().strftime(_DATE_FORMAT))
-        self._var_compte.set(self._comptes[0]["nom"])
-        self._var_nombre.set("0")
-        self._var_montant.set("0,00")
-        self._var_bordereau.set("")
-        self._var_commentaire.set("")
-        if not self._frame_formulaire.winfo_manager():
-            self._frame_formulaire.pack(side="right", fill="y", padx=(12, 0))
+        popup = _FormulaireRemisePopup(
+            self,
+            comptes=self._comptes,
+            remise=remise,
+            on_enregistre=self.refresh,
+        )
+        self.wait_window(popup)
 
-    def _fermer_formulaire(self) -> None:
-        self._frame_formulaire.pack_forget()
-
-    def _enregistrer(self) -> None:
-        try:
-            enregistrer_remise_depuis_formulaire(
-                {
-                    "date_remise": self._var_date.get(),
-                    "compte_id": next(
-                        (int(c["id"]) for c in self._comptes if c["nom"] == self._var_compte.get()),
-                        None,
-                    ),
-                    "nombre_cheques": self._var_nombre.get(),
-                    "montant_total": self._var_montant.get(),
-                    "numero_bordereau": self._var_bordereau.get(),
-                    "commentaire": self._var_commentaire.get(),
-                }
-            )
-        except ValueError as exc:
-            afficher_erreur(self, "Remises", str(exc))
+    def _modifier(self) -> None:
+        selected = self._tree.selection()
+        if not selected:
+            afficher_info(self, "Remises", "Sélectionnez une remise à modifier.")
             return
-        self.refresh()
-        self._fermer_formulaire()
+        try:
+            remise_id = int(selected[0])
+        except (TypeError, ValueError):
+            return
+        remises = get_remises()
+        remise = next((r for r in remises if int(r["id"]) == remise_id), None)
+        if not remise:
+            afficher_erreur(self, "Remises", "Remise introuvable.")
+            return
+        self._ouvrir_formulaire(remise)
+
+    def _supprimer(self) -> None:
+        selected = self._tree.selection()
+        if not selected:
+            afficher_info(self, "Remises", "Sélectionnez une remise à supprimer.")
+            return
+        try:
+            remise_id = int(selected[0])
+        except (TypeError, ValueError):
+            return
+        if not demander_confirmation(
+            self,
+            "Supprimer la remise",
+            "Supprimer définitivement cette remise de chèques ?\nCette action est irréversible.",
+        ):
+            return
+        ok = delete_remise_cheque(remise_id)
+        if ok:
+            self.refresh()
+        else:
+            afficher_erreur(self, "Remises", "Impossible de supprimer cette remise.")
 
     def refresh(self) -> None:
-        self._tree.delete(*self._tree.get_children())
+        try:
+            if not self.winfo_exists():
+                return
+            self._tree.delete(*self._tree.get_children())
+        except Exception:
+            return
         for remise in get_remises():
             self._tree.insert(
                 "",
