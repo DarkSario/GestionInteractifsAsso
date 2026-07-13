@@ -38,6 +38,17 @@ except ModuleNotFoundError:  # pragma: no cover - environnement sans Tk
 from ui import theme as app_theme
 
 
+def afficher_succes(parent: Any, titre: str, message: str) -> None:
+    """Affiche un message de succès bref (auto-fermant après 2 secondes).
+
+    Args:
+        parent: Widget parent (pour le positionnement).
+        titre: Titre de la fenêtre.
+        message: Corps du message de succès.
+    """
+    _SuccesDialog(parent, titre, message).show()
+
+
 def afficher_info(parent: Any, titre: str, message: str) -> None:
     """Affiche une boîte de dialogue d'information.
 
@@ -76,6 +87,45 @@ def demander_confirmation(parent: Any, titre: str, message: str) -> bool:
 
 
 # ── Classes internes ─────────────────────────────────────────────────────────
+
+
+class _SuccesDialog(ctk.CTkToplevel):
+    """Boîte de dialogue de succès auto-fermante (2 secondes)."""
+
+    def __init__(self, parent: Any, titre: str, message: str) -> None:
+        super().__init__(parent)
+        self.title(titre)
+        self.resizable(False, False)
+        self.transient(parent)
+
+        fonts = app_theme.FONTS
+
+        ctk.CTkLabel(
+            self,
+            text=f"✅  {titre}",
+            font=fonts.get("subtitle"),
+        ).pack(padx=25, pady=(20, 5))
+
+        ctk.CTkLabel(
+            self,
+            text=message,
+            font=fonts.get("normal"),
+            wraplength=380,
+            justify="left",
+        ).pack(padx=25, pady=(0, 15))
+
+        ctk.CTkButton(self, text="Fermer", width=100, command=self.destroy).pack(
+            pady=(0, 20)
+        )
+
+    def show(self) -> None:
+        """Affiche le message de succès et le ferme automatiquement après 2 secondes."""
+        self.grab_set()
+        try:
+            self.after(2000, self.destroy)
+        except Exception:
+            pass
+        self.wait_window()
 
 
 class _Dialog(ctk.CTkToplevel):

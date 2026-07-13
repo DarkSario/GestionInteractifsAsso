@@ -449,6 +449,22 @@ class _OperationsTab(ctk.CTkFrame):
         contenu = ctk.CTkFrame(self, fg_color="transparent")
         contenu.pack(fill="both", expand=True, padx=12, pady=6)
 
+        # Barre de filtres
+        barre_filtres = ctk.CTkFrame(contenu, fg_color="transparent")
+        barre_filtres.pack(fill="x", pady=(0, 6))
+        self._var_exercice_filtre = ctk.StringVar(value="Tous")
+        ctk.CTkLabel(barre_filtres, text="Exercice :").pack(side="left")
+        self._menu_exercice_filtre = ctk.CTkOptionMenu(
+            barre_filtres,
+            values=["Tous"],
+            variable=self._var_exercice_filtre,
+            width=220,
+            command=lambda _v: self.refresh(),
+        )
+        self._menu_exercice_filtre.pack(side="left", padx=(6, 12))
+        ctk.CTkButton(barre_filtres, text="🔄", width=40, fg_color="gray", hover_color="#555", command=self.refresh).pack(side="left")
+        self._charger_exercices()
+
         self._tree = ttk.Treeview(
             contenu,
             columns=("date", "libelle", "categorie", "montant", "statut"),
@@ -538,6 +554,37 @@ class _OperationsTab(ctk.CTkFrame):
         else:
             afficher_erreur(self, "Opérations", "Impossible de supprimer cette opération.")
 
+    def _charger_exercices(self) -> None:
+        """Charge la liste des exercices disponibles pour le filtre."""
+        try:
+            from db.connection import get_connection
+
+            conn = get_connection()
+            try:
+                rows = conn.execute(
+                    "SELECT id, date_debut, date_fin FROM exercices ORDER BY date_debut DESC"
+                ).fetchall()
+            finally:
+                conn.close()
+            exercices = [dict(r) for r in rows]
+        except Exception:
+            exercices = []
+
+        labels = ["Tous"]
+        self._exercices_map: dict[str, tuple[str | None, str | None]] = {"Tous": (None, None)}
+        for ex in exercices:
+            debut = str(ex.get("date_debut") or "")[:10]
+            fin = str(ex.get("date_fin") or "")[:10]
+            annee = debut[:4] if debut else "?"
+            label = f"{annee} ({debut} → {fin})" if debut and fin else f"Exercice #{ex.get('id')}"
+            labels.append(label)
+            self._exercices_map[label] = (debut or None, fin or None)
+
+        try:
+            self._menu_exercice_filtre.configure(values=labels)
+        except Exception:
+            pass
+
     def refresh(self) -> None:
         try:
             if not self.winfo_exists():
@@ -545,7 +592,15 @@ class _OperationsTab(ctk.CTkFrame):
             self._tree.delete(*self._tree.get_children())
         except Exception:
             return
-        operations = get_operations()
+
+        date_debut, date_fin = None, None
+        try:
+            exercice_label = self._var_exercice_filtre.get()
+            date_debut, date_fin = self._exercices_map.get(exercice_label, (None, None))
+        except AttributeError:
+            pass
+
+        operations = get_operations(date_debut=date_debut, date_fin=date_fin)
         for operation in operations:
             type_op = operation.get("type_operation")
             self._tree.insert(
@@ -562,7 +617,7 @@ class _OperationsTab(ctk.CTkFrame):
                 tags=(type_op,),
             )
 
-        stats = get_stats_tresorerie()
+        stats = get_stats_tresorerie(date_debut=date_debut, date_fin=date_fin)
         self._lbl_stats.configure(
             text=(
                 f"Recettes : +{formater_montant(stats['total_recettes'])}  |  "

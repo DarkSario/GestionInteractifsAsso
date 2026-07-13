@@ -15,6 +15,14 @@ from utils.logger import get_logger
 
 logger = get_logger(__name__)
 
+_COTISATION_FILTRES = {
+    "Tous": None,
+    "Payée": "payee",
+    "En attente": "en_attente",
+    "Offerte": "offerte",
+    "Non renseignée": "",
+}
+
 
 class ListeMembres(ctk.CTkToplevel):
     """Fenêtre de gestion des membres de l'association."""
@@ -31,6 +39,8 @@ class ListeMembres(ctk.CTkToplevel):
         self._afficher_archives = tk.BooleanVar(value=False)
         self._recherche_var = tk.StringVar()
         self._recherche_var.trace_add("write", self._on_recherche_change)
+        self._var_cotisation = tk.StringVar(value="Tous")
+        self._cotisations_index: dict[int, str] = {}
 
         self._build_ui()
         self._charger_membres()
@@ -94,6 +104,15 @@ class ListeMembres(ctk.CTkToplevel):
             command=self._on_toggle_archives,
             font=fonts.get("normal"),
         ).pack(side="left", padx=(20, 0))
+
+        ctk.CTkLabel(frame_search, text="Cotisation :", font=fonts.get("normal")).pack(side="left", padx=(20, 5))
+        ctk.CTkOptionMenu(
+            frame_search,
+            values=list(_COTISATION_FILTRES),
+            variable=self._var_cotisation,
+            width=150,
+            command=lambda _v: self._afficher_liste(),
+        ).pack(side="left")
 
         # ── Tableau ───────────────────────────────────────────────────────────
         frame_table = ctk.CTkFrame(self)
@@ -230,11 +249,23 @@ class ListeMembres(ctk.CTkToplevel):
         except Exception as exc:
             logger.exception("Erreur lors du chargement des membres : %s", exc)
             self._tous_les_membres = []
+
+        # Charger les cotisations de l'exercice courant
+        try:
+            from db.models.cotisations import get_cotisations_exercice
+            from datetime import datetime
+            annee_courante = datetime.now().year
+            cotisations = get_cotisations_exercice(annee_courante)
+            self._cotisations_index = {int(c["adherent_id"]): str(c.get("statut") or "") for c in cotisations}
+        except Exception:
+            self._cotisations_index = {}
+
         self._afficher_liste()
 
     def _afficher_liste(self) -> None:
         """Filtre et affiche la liste des membres dans le Treeview."""
         terme = self._recherche_var.get().strip().lower()
+        filtre_cotisation = _COTISATION_FILTRES.get(self._var_cotisation.get(), None)
 
         self._tree.delete(*self._tree.get_children())
 
@@ -247,6 +278,15 @@ class ListeMembres(ctk.CTkToplevel):
                     (m.get("statut") or "").lower(),
                 )
                 if not any(terme in c for c in champs):
+                    continue
+
+            if filtre_cotisation is not None:
+                statut_cotisation = self._cotisations_index.get(int(m.get("id") or 0), "")
+                if filtre_cotisation == "":
+                    # Non renseignée : membre sans cotisation enregistrée
+                    if statut_cotisation:
+                        continue
+                elif statut_cotisation != filtre_cotisation:
                     continue
 
             membres_affiches.append(m)

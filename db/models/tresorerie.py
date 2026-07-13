@@ -696,6 +696,11 @@ def update_remise_statut(remise_id: int, statut: str) -> bool:
 
 def update_remise_cheque(remise_id: int, **kwargs) -> bool:
     """Met à jour une remise de chèques."""
+    if "statut" in kwargs:
+        statut_val = kwargs["statut"]
+        if statut_val not in {"en_attente", "remis", "encaisse"}:
+            raise ValueError(f"Statut invalide : {statut_val!r}. Valeurs autorisées : en_attente, remis, encaisse.")
+
     allowed = {
         "date_remise": "UPDATE remises_cheques SET date_remise = ? WHERE id = ?",
         "reference": "UPDATE remises_cheques SET reference = ? WHERE id = ?",
@@ -704,6 +709,7 @@ def update_remise_cheque(remise_id: int, **kwargs) -> bool:
         "montant_total": "UPDATE remises_cheques SET montant_total = ? WHERE id = ?",
         "numero_bordereau": "UPDATE remises_cheques SET numero_bordereau = ? WHERE id = ?",
         "compte_id": "UPDATE remises_cheques SET compte_id = ? WHERE id = ?",
+        "statut": "UPDATE remises_cheques SET statut = ? WHERE id = ?",
     }
     updates: list[tuple[str, Any]] = []
     for key, value in kwargs.items():

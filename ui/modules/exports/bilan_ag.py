@@ -42,6 +42,8 @@ class BilanAGDialog(ctk.CTkToplevel):
             "evenements": ctk.BooleanVar(value=True),
             "buvette": ctk.BooleanVar(value=True),
             "adherents": ctk.BooleanVar(value=True),
+            "dons": ctk.BooleanVar(value=True),
+            "remboursements": ctk.BooleanVar(value=False),
             "signatures": ctk.BooleanVar(value=True),
         }
 
@@ -77,6 +79,8 @@ class BilanAGDialog(ctk.CTkToplevel):
             ("☑ Événements (récapitulatif)", "evenements"),
             ("☑ Buvette", "buvette"),
             ("☑ Adhérents", "adherents"),
+            ("☑ Dons reçus", "dons"),
+            ("☐ Remboursements en attente", "remboursements"),
             ("☑ Zone signatures", "signatures"),
         ]
         for text, key in labels:

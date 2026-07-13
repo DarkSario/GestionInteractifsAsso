@@ -21,9 +21,15 @@ def get_lots_evenement(evenement_id: int) -> list[dict]:
             """
             SELECT l.id, l.evenement_id, l.numero, l.description, l.valeur_estimee, l.valeur_lot,
                    l.type_lot, l.fournisseur_id, f.nom AS fournisseur_nom, l.donateur,
-                   l.sponsor_nom, l.numero_gagnant, l.statut, l.date_tirage, l.commentaire
+                   l.sponsor_nom, l.numero_gagnant, l.statut, l.date_tirage, l.commentaire,
+                   l.type_provenance, l.acheteur_membre_id,
+                   m.nom AS acheteur_nom, m.prenom AS acheteur_prenom,
+                   l.montant_avance, l.remboursement_statut, l.remboursement_date,
+                   l.remboursement_mode, l.remboursement_reference,
+                   l.donateur_externe, l.remarque
             FROM tombola_lots l
             LEFT JOIN fournisseurs f ON f.id = l.fournisseur_id
+            LEFT JOIN membres m ON m.id = l.acheteur_membre_id
             WHERE l.evenement_id = ?
             ORDER BY l.numero ASC, l.id ASC
             """,
@@ -45,6 +51,12 @@ def add_lot(
     sponsor_nom,
     commentaire,
     donateur=None,
+    type_provenance=None,
+    acheteur_membre_id=None,
+    montant_avance=None,
+    remboursement_statut=None,
+    donateur_externe=None,
+    remarque=None,
 ) -> int:
     """Ajoute un lot de tombola et retourne son identifiant."""
     conn = get_connection()
@@ -53,8 +65,10 @@ def add_lot(
             """
             INSERT INTO tombola_lots
                 (evenement_id, numero, description, valeur_estimee, type_lot,
-                 valeur_lot, fournisseur_id, sponsor_nom, commentaire, donateur)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 valeur_lot, fournisseur_id, sponsor_nom, commentaire, donateur,
+                 type_provenance, acheteur_membre_id, montant_avance,
+                 remboursement_statut, donateur_externe, remarque)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 evenement_id,
@@ -67,6 +81,12 @@ def add_lot(
                 sponsor_nom,
                 commentaire,
                 donateur,
+                type_provenance or "association",
+                acheteur_membre_id or None,
+                montant_avance or None,
+                remboursement_statut or "non_applicable",
+                donateur_externe or None,
+                remarque or None,
             ),
         )
         conn.commit()
@@ -89,6 +109,15 @@ _COLONNES_LOT = frozenset(
         "statut",
         "date_tirage",
         "commentaire",
+        "type_provenance",
+        "acheteur_membre_id",
+        "montant_avance",
+        "remboursement_statut",
+        "remboursement_date",
+        "remboursement_mode",
+        "remboursement_reference",
+        "donateur_externe",
+        "remarque",
     }
 )
 _UPDATE_LOT_SQL = {
@@ -129,6 +158,56 @@ def delete_lot(lot_id: int) -> bool:
     except Exception as exc:
         logger.error("delete_lot: %s", exc)
         return False
+    finally:
+        conn.close()
+
+
+def marquer_rembourse_lot(
+    lot_id: int,
+    mode: str,
+    reference: str | None,
+    date: str,
+) -> bool:
+    """Marque un lot comme remboursé."""
+    return update_lot(
+        lot_id,
+        remboursement_statut="rembourse",
+        remboursement_mode=mode or None,
+        remboursement_reference=reference or None,
+        remboursement_date=date,
+    )
+
+
+def get_lots_remboursement_en_attente() -> list[dict]:
+    """Retourne les lots de tombola dont le remboursement est en attente."""
+    conn = get_connection()
+    try:
+        rows = conn.execute(
+            """
+            SELECT
+                tl.id,
+                'tombola' AS source,
+                'tombola:' || tl.id AS remboursement_id,
+                e.nom AS evenement_nom,
+                m.nom AS membre_nom,
+                m.prenom AS membre_prenom,
+                tl.description AS description,
+                tl.montant_avance AS montant,
+                tl.remboursement_statut,
+                tl.remboursement_date,
+                tl.remboursement_mode,
+                tl.remboursement_reference,
+                tl.acheteur_membre_id AS membre_id,
+                e.date_debut AS date_evenement
+            FROM tombola_lots tl
+            LEFT JOIN evenements e ON e.id = tl.evenement_id
+            LEFT JOIN membres m ON m.id = tl.acheteur_membre_id
+            WHERE tl.remboursement_statut = 'en_attente'
+              AND tl.acheteur_membre_id IS NOT NULL
+            ORDER BY tl.id DESC
+            """
+        ).fetchall()
+        return [dict(r) for r in rows]
     finally:
         conn.close()
 

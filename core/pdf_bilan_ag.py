@@ -18,6 +18,8 @@ _SECTIONS_PAR_DEFAUT = {
     "evenements": True,
     "buvette": True,
     "adherents": True,
+    "dons": True,
+    "remboursements": False,
     "signatures": True,
 }
 
@@ -73,6 +75,10 @@ class PdfBilanAG(BasePDF):
                 elements.extend(self._section_buvette())
             if self._sections.get("adherents"):
                 elements.extend(self._section_adherents())
+            if self._sections.get("dons"):
+                elements.extend(self._section_dons())
+            if self._sections.get("remboursements"):
+                elements.extend(self._section_remboursements())
             if self._sections.get("signatures"):
                 elements.extend(self._section_signatures())
             return elements
@@ -267,6 +273,85 @@ class PdfBilanAG(BasePDF):
         donnees.append(["Archivés", str(archives)])
         donnees.append(["Total", str(len(membres))])
         elements.append(self._creer_tableau(donnees, col_widths=[8 * cm, 4 * cm], avec_total=True))
+        return elements
+
+    def _section_dons(self) -> list:
+        elements = self._titre_section("Dons reçus")
+        try:
+            from db.models.dons import get_all_dons
+
+            filtres: dict = {}
+            if self._annee:
+                filtres["exercice_annee"] = self._annee
+            dons = get_all_dons(filtres) if filtres else get_all_dons()
+        except Exception:
+            dons = []
+
+        if not dons:
+            return elements + [self._message_aucune_donnee()]
+
+        donnees = [["Date", "Donateur", "Nature", "Montant", "N° Reçu"]]
+        total = 0.0
+        for don in dons:
+            montant = float(don.get("montant") or don.get("valeur_estimee") or 0)
+            total += montant
+            donateur = (don.get("donateur_nom") or "").strip()
+            prenom = (don.get("donateur_prenom") or "").strip()
+            if prenom:
+                donateur = f"{donateur} {prenom}".strip()
+            nature = "Nature" if don.get("nature_don") == "nature" else "Argent"
+            donnees.append(
+                [
+                    self._formater_date(don.get("date_don")),
+                    donateur or "—",
+                    nature,
+                    self._formater_montant(montant),
+                    don.get("num_recu") or "—",
+                ]
+            )
+        donnees.append(["Total", "", "", self._formater_montant(total), ""])
+        elements.append(
+            self._creer_tableau(
+                donnees,
+                col_widths=[2.5 * cm, 5 * cm, 2.5 * cm, 2.5 * cm, 3.5 * cm],
+                avec_total=True,
+            )
+        )
+        return elements
+
+    def _section_remboursements(self) -> list:
+        elements = self._titre_section("Remboursements en attente")
+        try:
+            from db.models.remboursements import get_remboursements_en_attente
+
+            lignes = get_remboursements_en_attente()
+        except Exception:
+            lignes = []
+
+        if not lignes:
+            return elements + [self._message_aucune_donnee()]
+
+        donnees = [["Bénéficiaire", "Description", "Montant", "Source"]]
+        total = 0.0
+        for ligne in lignes:
+            montant = float(ligne.get("montant") or 0)
+            total += montant
+            donnees.append(
+                [
+                    ligne.get("beneficiaire") or "—",
+                    ligne.get("description") or "—",
+                    self._formater_montant(montant),
+                    ligne.get("source") or "—",
+                ]
+            )
+        donnees.append(["Total en attente", "", self._formater_montant(total), ""])
+        elements.append(
+            self._creer_tableau(
+                donnees,
+                col_widths=[4 * cm, 6 * cm, 2.5 * cm, 3.5 * cm],
+                avec_total=True,
+            )
+        )
         return elements
 
     def _section_signatures(self) -> list:

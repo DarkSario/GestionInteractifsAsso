@@ -61,6 +61,18 @@ def _formater_date(v: str | None) -> str:
     return str(v)
 
 
+def _get_avance_par(operation: dict) -> str:
+    """Retourne le nom du membre ayant avancé les frais pour une opération."""
+    membre_nom = operation.get('avance_par_nom') or operation.get('avance_membre_nom') or ''
+    membre_prenom = operation.get('avance_par_prenom') or operation.get('avance_membre_prenom') or ''
+    if membre_nom:
+        return f"{membre_nom} {membre_prenom}".strip()
+    membre_id = operation.get('avance_par_membre_id')
+    if membre_id:
+        return f"Membre #{membre_id}"
+    return ''
+
+
 def _ecrire_entete_colonne(ws, row: int, colonnes: list[str]) -> None:
     """Écrit une ligne d'en-tête avec style."""
     for col_idx, nom in enumerate(colonnes, start=1):
@@ -654,7 +666,7 @@ class ExcelTresorerie:
             return False
 
     def _construire_operations(self, ws, operations: list[dict]) -> None:
-        headers = ["Date", "Libellé", "Type", "Catégorie", "Compte", "Montant", "Statut"]
+        headers = ["Date", "Libellé", "Type", "Catégorie", "Compte", "Montant", "Statut", "Avancé par", "Statut remboursement"]
         _ecrire_entete_colonne_p9(ws, 1, headers)
 
         total = 0.0
@@ -669,6 +681,8 @@ class ExcelTresorerie:
             cell_montant = ws.cell(row=row_idx, column=6, value=round(montant_signe, 2))
             cell_montant.number_format = '#,##0.00'
             ws.cell(row=row_idx, column=7, value=operation.get('statut') or '')
+            ws.cell(row=row_idx, column=8, value=_get_avance_par(operation))
+            ws.cell(row=row_idx, column=9, value=operation.get('remboursement_statut') or '')
 
         total_row = max(2, ws.max_row + 1)
         ws.cell(row=total_row, column=1, value='Total')
@@ -677,7 +691,7 @@ class ExcelTresorerie:
         _appliquer_ligne_total_p9(ws, total_row, len(headers))
 
         if ws.max_row >= 1:
-            ws.auto_filter.ref = f"A1:G{max(1, total_row - 1)}"
+            ws.auto_filter.ref = f"A1:I{max(1, total_row - 1)}"
         _ajuster_largeurs(ws)
 
     def _construire_par_categorie(self, ws, operations: list[dict]) -> None:

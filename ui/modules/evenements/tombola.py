@@ -65,6 +65,7 @@ except ModuleNotFoundError:  # pragma: no cover - environnement sans Tk
 
     ctk = _DummyCTk()
 
+from db.models.membres import get_all_membres
 from db.models.tombola import (
     add_carnet,
     add_lot,
@@ -81,7 +82,7 @@ from db.models.tombola import (
     update_config_tombola_evenement,
     update_lot,
 )
-from ui.components.dialogs import afficher_erreur, afficher_info, demander_confirmation
+from ui.components.dialogs import afficher_erreur, afficher_info, afficher_succes, demander_confirmation
 
 
 _STATUTS_LOT = {
@@ -90,6 +91,21 @@ _STATUTS_LOT = {
     "Gagné": "gagne",
     "Remis": "remis",
 }
+
+_PROVENANCES_LOT = {
+    "Don externe": "don_externe",
+    "Acheté par un membre": "achete_membre",
+    "Fourni par l'association": "association",
+    "Autre": "autre",
+}
+_PROVENANCES_LOT_INV = {v: k for k, v in _PROVENANCES_LOT.items()}
+
+_REMBOURSEMENT_STATUTS_LOT = {
+    "Non applicable": "non_applicable",
+    "En attente": "en_attente",
+    "Remboursé": "rembourse",
+}
+_REMBOURSEMENT_STATUTS_LOT_INV = {v: k for k, v in _REMBOURSEMENT_STATUTS_LOT.items()}
 
 
 def _label_statut_lot(statut: str | None) -> str:
@@ -123,6 +139,12 @@ def enregistrer_lot_depuis_formulaire(
     # Les lots offerts peuvent être saisis sans valorisation initiale.
     if valeur_lot <= 0:
         valeur_lot = valeur_estimee
+
+    type_provenance = str(formulaire.get("type_provenance") or "association").strip()
+    acheteur_membre_id_val = formulaire.get("acheteur_membre_id")
+    montant_avance_val = _parse_float(formulaire.get("montant_avance")) or None
+    remboursement_statut_val = str(formulaire.get("remboursement_statut") or "non_applicable").strip()
+
     donnees = {
         "numero": _parse_int(formulaire.get("numero")),
         "description": str(formulaire.get("description") or "").strip(),
@@ -132,6 +154,12 @@ def enregistrer_lot_depuis_formulaire(
         "numero_gagnant": str(formulaire.get("numero_gagnant") or "").strip() or None,
         "statut": _STATUTS_LOT.get(str(formulaire.get("statut") or "Disponible"), "disponible"),
         "commentaire": str(formulaire.get("commentaire") or "").strip() or None,
+        "type_provenance": type_provenance,
+        "acheteur_membre_id": int(acheteur_membre_id_val) if acheteur_membre_id_val else None,
+        "montant_avance": montant_avance_val,
+        "remboursement_statut": remboursement_statut_val,
+        "donateur_externe": str(formulaire.get("donateur_externe") or "").strip() or None,
+        "remarque": str(formulaire.get("remarque") or "").strip() or None,
     }
     if lot_id is None:
         return add_lot(
@@ -145,6 +173,12 @@ def enregistrer_lot_depuis_formulaire(
             None,
             donnees["commentaire"],
             donateur=donnees["donateur"],
+            type_provenance=donnees["type_provenance"],
+            acheteur_membre_id=donnees["acheteur_membre_id"],
+            montant_avance=donnees["montant_avance"],
+            remboursement_statut=donnees["remboursement_statut"],
+            donateur_externe=donnees["donateur_externe"],
+            remarque=donnees["remarque"],
         )
     update_lot(lot_id, **donnees)
     return int(lot_id)
@@ -244,16 +278,17 @@ class TombolaView(ctk.CTkFrame):
         ctk.CTkButton(actions, text="✏️ Modifier", command=self._modifier_lot).pack(side="left", padx=8)
         self._tree_lots = ttk.Treeview(
             self._frame_lots_liste,
-            columns=("numero", "description", "valeur", "donateur", "statut"),
+            columns=("numero", "description", "valeur", "provenance", "acheteur", "statut_remboursement"),
             show="headings",
             height=10,
         )
         for col, label, width in [
-            ("numero", "N°", 60),
-            ("description", "Description", 240),
-            ("valeur", "Valeur", 100),
-            ("donateur", "Donateur", 160),
-            ("statut", "Statut", 120),
+            ("numero", "N°", 55),
+            ("description", "Description", 200),
+            ("valeur", "Valeur", 90),
+            ("provenance", "Provenance", 130),
+            ("acheteur", "Acheteur", 130),
+            ("statut_remboursement", "Remboursement", 120),
         ]:
             self._tree_lots.heading(col, text=label)
             self._tree_lots.column(col, width=width, anchor="center")
@@ -271,6 +306,13 @@ class TombolaView(ctk.CTkFrame):
         self._var_statut_lot = ctk.StringVar(value="Disponible")
         self._var_numero_gagnant_lot = ctk.StringVar()
         self._var_commentaire_lot = ctk.StringVar()
+        self._var_provenance_lot = ctk.StringVar(value="Fourni par l'association")
+        self._var_acheteur_lot = ctk.StringVar(value="—")
+        self._var_montant_avance_lot = ctk.StringVar(value="0,00")
+        self._var_remboursement_statut_lot = ctk.StringVar(value="Non applicable")
+        self._var_donateur_externe_lot = ctk.StringVar()
+        self._var_remarque_lot = ctk.StringVar()
+        self._membres_list = get_all_membres()
 
         self._titre_form_lot = ctk.CTkLabel(
             self._frame_lot_formulaire,
@@ -279,24 +321,72 @@ class TombolaView(ctk.CTkFrame):
         )
         self._titre_form_lot.pack(anchor="w", padx=16, pady=(16, 12))
 
-        def champ(label: str, widget: ctk.CTkBaseClass) -> None:
-            bloc = ctk.CTkFrame(self._frame_lot_formulaire, fg_color="transparent")
-            bloc.pack(fill="x", padx=16, pady=4)
-            ctk.CTkLabel(bloc, text=label).pack(anchor="w")
-            widget.pack(fill="x", pady=(4, 0))
+        scroll = ctk.CTkScrollableFrame(self._frame_lot_formulaire, fg_color="transparent")
+        scroll.pack(fill="both", expand=True, padx=8)
 
-        champ("Numéro lot", ctk.CTkEntry(self._frame_lot_formulaire, textvariable=self._var_numero_lot))
-        champ("Description", ctk.CTkEntry(self._frame_lot_formulaire, textvariable=self._var_description_lot))
-        champ("Valeur estimée (€)", ctk.CTkEntry(self._frame_lot_formulaire, textvariable=self._var_valeur_lot))
-        champ("Donateur", ctk.CTkEntry(self._frame_lot_formulaire, textvariable=self._var_donateur_lot))
-        champ("Statut", ctk.CTkOptionMenu(self._frame_lot_formulaire, values=list(_STATUTS_LOT), variable=self._var_statut_lot))
-        champ("Numéro gagnant", ctk.CTkEntry(self._frame_lot_formulaire, textvariable=self._var_numero_gagnant_lot))
-        champ("Commentaire", ctk.CTkEntry(self._frame_lot_formulaire, textvariable=self._var_commentaire_lot))
+        def champ(label: str, widget: ctk.CTkBaseClass) -> ctk.CTkFrame:
+            bloc = ctk.CTkFrame(scroll, fg_color="transparent")
+            bloc.pack(fill="x", padx=8, pady=4)
+            ctk.CTkLabel(bloc, text=label, anchor="w").pack(fill="x")
+            widget.pack(fill="x", pady=(2, 0))
+            return bloc
+
+        champ("Numéro lot", ctk.CTkEntry(scroll, textvariable=self._var_numero_lot))
+        champ("Description *", ctk.CTkEntry(scroll, textvariable=self._var_description_lot))
+        champ("Valeur estimée (€)", ctk.CTkEntry(scroll, textvariable=self._var_valeur_lot))
+        champ("Statut", ctk.CTkOptionMenu(scroll, values=list(_STATUTS_LOT), variable=self._var_statut_lot))
+        champ("Numéro gagnant", ctk.CTkEntry(scroll, textvariable=self._var_numero_gagnant_lot))
+
+        # ── Provenance ──────────────────────────────────────────────
+        champ(
+            "Type de provenance",
+            ctk.CTkOptionMenu(
+                scroll,
+                values=list(_PROVENANCES_LOT),
+                variable=self._var_provenance_lot,
+                command=self._on_provenance_change,
+            ),
+        )
+
+        # Bloc acheteur (visible si "Acheté par un membre")
+        self._bloc_acheteur = ctk.CTkFrame(scroll, fg_color="transparent")
+        noms_membres = ["—"] + [f"{m['nom']} {m['prenom']}".strip() for m in self._membres_list]
+        ctk.CTkLabel(self._bloc_acheteur, text="Acheté par", anchor="w").pack(fill="x", padx=8)
+        ctk.CTkOptionMenu(self._bloc_acheteur, values=noms_membres, variable=self._var_acheteur_lot).pack(fill="x", padx=8, pady=(2, 4))
+        ctk.CTkLabel(self._bloc_acheteur, text="Montant avancé (€)", anchor="w").pack(fill="x", padx=8)
+        ctk.CTkEntry(self._bloc_acheteur, textvariable=self._var_montant_avance_lot).pack(fill="x", padx=8, pady=(2, 4))
+        ctk.CTkLabel(self._bloc_acheteur, text="Remboursement", anchor="w").pack(fill="x", padx=8)
+        ctk.CTkOptionMenu(self._bloc_acheteur, values=list(_REMBOURSEMENT_STATUTS_LOT), variable=self._var_remboursement_statut_lot).pack(fill="x", padx=8, pady=(2, 4))
+
+        # Bloc donateur externe (visible si "Don externe")
+        self._bloc_donateur_ext = ctk.CTkFrame(scroll, fg_color="transparent")
+        ctk.CTkLabel(self._bloc_donateur_ext, text="Donateur (nom)", anchor="w").pack(fill="x", padx=8)
+        ctk.CTkEntry(self._bloc_donateur_ext, textvariable=self._var_donateur_externe_lot).pack(fill="x", padx=8, pady=(2, 4))
+
+        champ("Remarque", ctk.CTkEntry(scroll, textvariable=self._var_remarque_lot))
+        champ("Commentaire", ctk.CTkEntry(scroll, textvariable=self._var_commentaire_lot))
+
+        # Déclencher visibilité initiale
+        self._on_provenance_change(self._var_provenance_lot.get())
 
         actions = ctk.CTkFrame(self._frame_lot_formulaire, fg_color="transparent")
-        actions.pack(fill="x", padx=16, pady=(16, 16))
+        actions.pack(fill="x", padx=16, pady=(8, 16))
         ctk.CTkButton(actions, text="Annuler", fg_color="gray", hover_color="#555", command=self._fermer_formulaire_lot).pack(side="left")
         ctk.CTkButton(actions, text="💾 Enregistrer", command=self._enregistrer_lot).pack(side="right")
+
+    def _on_provenance_change(self, valeur: str) -> None:
+        code = _PROVENANCES_LOT.get(valeur, "association")
+        if code == "achete_membre":
+            if not self._bloc_acheteur.winfo_manager():
+                self._bloc_acheteur.pack(fill="x", padx=8, pady=2)
+            self._bloc_donateur_ext.pack_forget()
+        elif code == "don_externe":
+            self._bloc_acheteur.pack_forget()
+            if not self._bloc_donateur_ext.winfo_manager():
+                self._bloc_donateur_ext.pack(fill="x", padx=8, pady=2)
+        else:
+            self._bloc_acheteur.pack_forget()
+            self._bloc_donateur_ext.pack_forget()
 
     def _build_tab_solidaire(self, parent: Any) -> None:
         contenu = ctk.CTkFrame(parent, fg_color="transparent")
@@ -451,6 +541,17 @@ class TombolaView(ctk.CTkFrame):
         lots = get_lots_evenement(self._evenement_id)
         for lot in lots:
             valeur_lot = lot.get("valeur_lot") if lot.get("valeur_lot") is not None else lot.get("valeur_estimee")
+            provenance_code = lot.get("type_provenance") or "association"
+            provenance_label = _PROVENANCES_LOT_INV.get(provenance_code, provenance_code.replace("_", " ").title())
+            acheteur = ""
+            if provenance_code == "achete_membre":
+                nom = (lot.get("acheteur_nom") or "").strip()
+                prenom = (lot.get("acheteur_prenom") or "").strip()
+                acheteur = f"{nom} {prenom}".strip() or "—"
+            elif provenance_code == "don_externe":
+                acheteur = lot.get("donateur_externe") or "—"
+            remb_code = lot.get("remboursement_statut") or "non_applicable"
+            remb_label = _REMBOURSEMENT_STATUTS_LOT_INV.get(remb_code, "—")
             self._tree_lots.insert(
                 "",
                 "end",
@@ -459,8 +560,9 @@ class TombolaView(ctk.CTkFrame):
                     lot.get("numero"),
                     lot.get("description"),
                     self._fmt(float(valeur_lot or 0)),
-                    lot.get("donateur") or "—",
-                    str(lot.get("statut") or "").replace("_", " ").title(),
+                    provenance_label,
+                    acheteur or "—",
+                    remb_label,
                 ),
             )
         available_lots = [lot for lot in lots if lot.get("statut") == "disponible"]
@@ -534,6 +636,29 @@ class TombolaView(ctk.CTkFrame):
         self._var_statut_lot.set(_label_statut_lot(lot.get("statut")) if lot else "Disponible")
         self._var_numero_gagnant_lot.set(lot.get("numero_gagnant") or "" if lot else "")
         self._var_commentaire_lot.set(lot.get("commentaire") or "" if lot else "")
+
+        # Nouveaux champs provenance
+        provenance_code = lot.get("type_provenance") or "association" if lot else "association"
+        provenance_label = _PROVENANCES_LOT_INV.get(provenance_code, "Fourni par l'association")
+        self._var_provenance_lot.set(provenance_label)
+
+        if lot and lot.get("acheteur_membre_id"):
+            nom = (lot.get("acheteur_nom") or "").strip()
+            prenom = (lot.get("acheteur_prenom") or "").strip()
+            acheteur_label = f"{nom} {prenom}".strip()
+            self._var_acheteur_lot.set(acheteur_label if acheteur_label else "—")
+        else:
+            self._var_acheteur_lot.set("—")
+
+        montant_av = float(lot.get("montant_avance") or 0) if lot else 0.0
+        self._var_montant_avance_lot.set(f"{montant_av:.2f}".replace(".", ","))
+        remb_code = lot.get("remboursement_statut") or "non_applicable" if lot else "non_applicable"
+        self._var_remboursement_statut_lot.set(_REMBOURSEMENT_STATUTS_LOT_INV.get(remb_code, "Non applicable"))
+        self._var_donateur_externe_lot.set(lot.get("donateur_externe") or "" if lot else "")
+        self._var_remarque_lot.set(lot.get("remarque") or "" if lot else "")
+
+        self._on_provenance_change(self._var_provenance_lot.get())
+
         if not self._frame_lot_formulaire.winfo_manager():
             self._frame_lot_formulaire.pack(side="right", fill="y", padx=(12, 0))
 
@@ -556,6 +681,20 @@ class TombolaView(ctk.CTkFrame):
     def _enregistrer_lot(self) -> None:
         if not self._check_evenement():
             return
+
+        provenance_label = self._var_provenance_lot.get()
+        provenance_code = _PROVENANCES_LOT.get(provenance_label, "association")
+
+        acheteur_membre_id = None
+        if provenance_code == "achete_membre":
+            acheteur_label = self._var_acheteur_lot.get()
+            if acheteur_label and acheteur_label != "—":
+                membre = next(
+                    (m for m in self._membres_list if f"{m['nom']} {m['prenom']}".strip() == acheteur_label),
+                    None,
+                )
+                acheteur_membre_id = int(membre["id"]) if membre else None
+
         enregistrer_lot_depuis_formulaire(
             self._evenement_id,
             {
@@ -566,11 +705,22 @@ class TombolaView(ctk.CTkFrame):
                 "statut": self._var_statut_lot.get(),
                 "numero_gagnant": self._var_numero_gagnant_lot.get(),
                 "commentaire": self._var_commentaire_lot.get(),
+                "type_provenance": provenance_code,
+                "acheteur_membre_id": acheteur_membre_id,
+                "montant_avance": self._var_montant_avance_lot.get() if provenance_code == "achete_membre" else None,
+                "remboursement_statut": (
+                    _REMBOURSEMENT_STATUTS_LOT.get(self._var_remboursement_statut_lot.get(), "non_applicable")
+                    if provenance_code == "achete_membre"
+                    else "non_applicable"
+                ),
+                "donateur_externe": self._var_donateur_externe_lot.get() if provenance_code == "don_externe" else None,
+                "remarque": self._var_remarque_lot.get(),
             },
             lot_id=self._lot_selectionne,
         )
         self._refresh_lots()
         self._fermer_formulaire_lot()
+        afficher_succes(self, 'Tombola', 'Le lot a été enregistré avec succès.')
 
     def _ouvrir_formulaire_solidaire(self) -> None:
         if not self._check_evenement():
