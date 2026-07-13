@@ -139,6 +139,7 @@ class _FormulaireRemisePopup(ctk.CTkToplevel):
         self._var_montant = ctk.StringVar(value="0,00")
         self._var_bordereau = ctk.StringVar()
         self._var_commentaire = ctk.StringVar()
+        self._var_statut = ctk.StringVar(value="En attente")
 
         self._build_ui()
         if remise:
@@ -175,12 +176,25 @@ class _FormulaireRemisePopup(ctk.CTkToplevel):
         champ("N° Bordereau", ctk.CTkEntry(frame, textvariable=self._var_bordereau))
         champ("Commentaire", ctk.CTkEntry(frame, textvariable=self._var_commentaire))
 
+        if self._remise is not None:
+            champ(
+                "Statut",
+                ctk.CTkOptionMenu(
+                    frame,
+                    values=["En attente", "Remis", "Encaissé"],
+                    variable=self._var_statut,
+                ),
+            )
+
         actions = ctk.CTkFrame(self, fg_color="transparent")
         actions.pack(fill="x", padx=20, pady=(8, 16))
         ctk.CTkButton(
             actions, text="❌ Annuler", width=100, fg_color="grey", hover_color="#555", command=self.destroy
         ).pack(side="left")
         ctk.CTkButton(actions, text="💾 Enregistrer", width=150, command=self._enregistrer).pack(side="right")
+
+    _STATUTS_LABELS = {"en_attente": "En attente", "remis": "Remis", "encaisse": "Encaissé"}
+    _STATUTS_INV = {"En attente": "en_attente", "Remis": "remis", "Encaissé": "encaisse"}
 
     def _pre_remplir(self, remise: dict[str, Any]) -> None:
         self._var_date.set(remise.get("date_remise") or datetime.now().strftime(_DATE_FORMAT))
@@ -191,6 +205,8 @@ class _FormulaireRemisePopup(ctk.CTkToplevel):
         self._var_montant.set(f"{montant:,.2f}".replace(",", " ").replace(".", ","))
         self._var_bordereau.set(remise.get("numero_bordereau") or "")
         self._var_commentaire.set(remise.get("commentaire") or "")
+        statut_code = remise.get("statut") or "en_attente"
+        self._var_statut.set(self._STATUTS_LABELS.get(statut_code, "En attente"))
 
     def _enregistrer(self) -> None:
         compte_id = next(
@@ -207,6 +223,7 @@ class _FormulaireRemisePopup(ctk.CTkToplevel):
                     montant_total=_parse_float(self._var_montant.get()),
                     numero_bordereau=self._var_bordereau.get().strip() or None,
                     commentaire=self._var_commentaire.get().strip() or None,
+                    statut=self._STATUTS_INV.get(self._var_statut.get(), "en_attente"),
                 )
             else:
                 enregistrer_remise_depuis_formulaire(

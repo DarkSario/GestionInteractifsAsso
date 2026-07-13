@@ -654,13 +654,23 @@ class ExcelTresorerie:
             return False
 
     def _construire_operations(self, ws, operations: list[dict]) -> None:
-        headers = ["Date", "Libellé", "Type", "Catégorie", "Compte", "Montant", "Statut"]
+        headers = ["Date", "Libellé", "Type", "Catégorie", "Compte", "Montant", "Statut", "Avancé par", "Statut remboursement"]
         _ecrire_entete_colonne_p9(ws, 1, headers)
 
         total = 0.0
         for row_idx, operation in enumerate(operations, start=2):
             montant_signe = montant_signe_operation(operation)
             total += montant_signe
+            avance_par = ""
+            membre_nom = operation.get('avance_par_nom') or operation.get('avance_membre_nom') or ''
+            membre_prenom = operation.get('avance_par_prenom') or operation.get('avance_membre_prenom') or ''
+            if not membre_nom:
+                # Fallback : chercher via avance_par_membre_id dans les membres si dispo
+                membre_id = operation.get('avance_par_membre_id')
+                if membre_id:
+                    avance_par = f"Membre #{membre_id}"
+            else:
+                avance_par = f"{membre_nom} {membre_prenom}".strip()
             ws.cell(row=row_idx, column=1, value=_formater_date(operation.get('date_operation')))
             ws.cell(row=row_idx, column=2, value=operation.get('libelle') or '')
             ws.cell(row=row_idx, column=3, value=operation.get('type_operation') or '')
@@ -669,6 +679,8 @@ class ExcelTresorerie:
             cell_montant = ws.cell(row=row_idx, column=6, value=round(montant_signe, 2))
             cell_montant.number_format = '#,##0.00'
             ws.cell(row=row_idx, column=7, value=operation.get('statut') or '')
+            ws.cell(row=row_idx, column=8, value=avance_par)
+            ws.cell(row=row_idx, column=9, value=operation.get('remboursement_statut') or '')
 
         total_row = max(2, ws.max_row + 1)
         ws.cell(row=total_row, column=1, value='Total')
@@ -677,7 +689,7 @@ class ExcelTresorerie:
         _appliquer_ligne_total_p9(ws, total_row, len(headers))
 
         if ws.max_row >= 1:
-            ws.auto_filter.ref = f"A1:G{max(1, total_row - 1)}"
+            ws.auto_filter.ref = f"A1:I{max(1, total_row - 1)}"
         _ajuster_largeurs(ws)
 
     def _construire_par_categorie(self, ws, operations: list[dict]) -> None:

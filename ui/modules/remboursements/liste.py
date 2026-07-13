@@ -16,7 +16,7 @@ from db.models.remboursements import (
     marquer_rembourse,
 )
 from ui import theme as app_theme
-from ui.components.dialogs import afficher_erreur, afficher_info
+from ui.components.dialogs import afficher_erreur, afficher_info, afficher_succes
 from ui.components.form_dialog import FormDialog
 
 _STATUTS = {
@@ -25,7 +25,7 @@ _STATUTS = {
     'rembourse': '🟢 Remboursé',
     'non_applicable': '⚫ Non applicable',
 }
-_SOURCES = {'tous': 'Toutes', 'evenement': 'Événement', 'tresorerie': 'Trésorerie'}
+_SOURCES = {'tous': 'Toutes', 'evenement': 'Événement', 'tresorerie': 'Trésorerie', 'tombola': 'Tombola'}
 _MODE_REMBOURSEMENT_DEFAUT = 'Virement'
 
 
@@ -188,7 +188,7 @@ class ListeRemboursements(ctk.CTkToplevel):
             dialog.result.get('commentaire'),
         )
         if ok:
-            afficher_info(self, 'Remboursements', msg_ok)
+            afficher_succes(self, 'Remboursements', msg_ok)
             self._charger()
         else:
             afficher_erreur(self, 'Remboursements', msg_err)
@@ -247,16 +247,17 @@ class _DialogMarquerRembourse(FormDialog):
     def _build(self) -> None:
         frame = ctk.CTkFrame(self.frame_content)
         frame.pack(fill='both', expand=True, padx=16, pady=16)
-        for label, widget in [
-            ('Mode', ctk.CTkEntry(frame, textvariable=self._var_mode)),
-            ('Référence', ctk.CTkEntry(frame, textvariable=self._var_reference)),
-            ('Date', ctk.CTkEntry(frame, textvariable=self._var_date)),
+        champs = [
+            ('Mode de remboursement', ctk.CTkOptionMenu(frame, values=['Virement', 'Chèque', 'Espèces', 'CB', 'Autre'], variable=self._var_mode)),
+            ('Référence (N° chèque, virement...)', ctk.CTkEntry(frame, textvariable=self._var_reference)),
+            ('Date du remboursement (AAAA-MM-JJ)', ctk.CTkEntry(frame, textvariable=self._var_date)),
             ('Commentaire', ctk.CTkEntry(frame, textvariable=self._var_commentaire)),
-        ]:
+        ]
+        for label, widget in champs:
             bloc = ctk.CTkFrame(frame, fg_color='transparent')
             bloc.pack(fill='x', pady=5)
-            ctk.CTkLabel(bloc, text=label, width=110, anchor='e').pack(side='left', padx=(0, 8))
-            widget.pack(side='left', fill='x', expand=True)
+            ctk.CTkLabel(bloc, text=label, anchor='w').pack(fill='x')
+            widget.pack(fill='x', pady=(2, 0))
 
     def _on_valider(self) -> None:
         if not self._var_mode.get().strip() or not self._var_date.get().strip():

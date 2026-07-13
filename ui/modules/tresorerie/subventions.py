@@ -147,8 +147,9 @@ def enregistrer_subvention_depuis_formulaire(
     )
 
     # Créer automatiquement une opération de recette si la subvention est accordée
-    # et qu'un compte est sélectionné et qu'il n'existe pas encore d'opération associée
-    if statut == "accordee" and montant_obtenu > 0 and compte_id:
+    # (totalement ou partiellement) et qu'un compte est sélectionné et qu'il n'existe
+    # pas encore d'opération associée
+    if statut in {"accordee", "partielle"} and montant_obtenu > 0 and compte_id:
         subvention_existante = next(
             (s for s in get_all_subventions() if int(s["id"]) == int(subvention_id)),
             None,

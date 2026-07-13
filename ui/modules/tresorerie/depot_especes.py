@@ -125,16 +125,18 @@ class _FormulaireDepotPopup(ctk.CTkToplevel):
 
         labels_comptes = [c["nom"] for c in self._comptes] or ["Compte courant"]
         champs = [
-            ("Date", ctk.CTkEntry(form, textvariable=self._var_date, width=160)),
-            ("Montant (€)", ctk.CTkEntry(form, textvariable=self._var_montant, width=160)),
-            ("Compte destination", ctk.CTkComboBox(form, values=labels_comptes, variable=self._var_compte, width=240)),
-            ("Origine", ctk.CTkEntry(form, textvariable=self._var_origine, width=240)),
-            ("Référence", ctk.CTkEntry(form, textvariable=self._var_reference, width=180)),
-            ("Commentaire", ctk.CTkEntry(form, textvariable=self._var_commentaire, width=280)),
+            ("Date", ctk.CTkEntry(form, textvariable=self._var_date)),
+            ("Montant (€)", ctk.CTkEntry(form, textvariable=self._var_montant)),
+            ("Compte destination", ctk.CTkComboBox(form, values=labels_comptes, variable=self._var_compte)),
+            ("Origine", ctk.CTkEntry(form, textvariable=self._var_origine)),
+            ("Référence", ctk.CTkEntry(form, textvariable=self._var_reference)),
+            ("Commentaire", ctk.CTkEntry(form, textvariable=self._var_commentaire)),
         ]
-        for i, (label, widget) in enumerate(champs):
-            ctk.CTkLabel(form, text=label).grid(row=i, column=0, sticky="w", padx=8, pady=4)
-            widget.grid(row=i, column=1, sticky="w", padx=8, pady=4)
+        for label, widget in champs:
+            bloc = ctk.CTkFrame(form, fg_color="transparent")
+            bloc.pack(fill="x", pady=4)
+            ctk.CTkLabel(bloc, text=label, anchor="w").pack(fill="x")
+            widget.pack(fill="x", pady=(2, 0))
 
         actions = ctk.CTkFrame(self, fg_color="transparent")
         actions.pack(fill="x", padx=20, pady=(8, 16))

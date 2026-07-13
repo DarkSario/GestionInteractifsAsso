@@ -63,6 +63,32 @@ _QUERY_TRESORERIE = """
 """
 
 
+_QUERY_TOMBOLA = """
+    SELECT
+        'tombola' AS source,
+        tl.id AS source_id,
+        'tombola:' || tl.id AS remboursement_id,
+        tl.remboursement_date AS date_piece,
+        tl.description AS description,
+        tl.montant_avance AS montant,
+        COALESCE(tl.remboursement_statut, 'non_applicable') AS remboursement_statut,
+        tl.remboursement_date,
+        tl.remboursement_mode,
+        tl.remboursement_reference,
+        tl.acheteur_membre_id AS membre_id,
+        m.nom AS membre_nom,
+        m.prenom AS membre_prenom,
+        COALESCE(e.nom, 'Tombola') AS nom_evenement,
+        COALESCE(e.date_debut, tl.remboursement_date) AS date_evenement,
+        tl.remarque AS commentaire
+    FROM tombola_lots tl
+    LEFT JOIN membres m ON m.id = tl.acheteur_membre_id
+    LEFT JOIN evenements e ON e.id = tl.evenement_id
+    WHERE tl.acheteur_membre_id IS NOT NULL
+      AND COALESCE(tl.remboursement_statut, 'non_applicable') != 'non_applicable'
+"""
+
+
 def _fetch_all(query: str, params: tuple[Any, ...] = ()) -> list[dict]:
     conn = get_connection()
     try:
@@ -74,12 +100,28 @@ def _fetch_all(query: str, params: tuple[Any, ...] = ()) -> list[dict]:
 
 def _query_unifiee(filters: dict[str, Any] | None = None) -> tuple[str, list[Any]]:
     filters = filters or {}
+
+    # Vérifier si la table tombola_lots dispose des nouvelles colonnes
+    try:
+        from db.connection import get_connection as _gc
+        _conn = _gc()
+        try:
+            _cols = {row['name'] for row in _conn.execute("PRAGMA table_info(tombola_lots)").fetchall()}
+        finally:
+            _conn.close()
+        _tombola_enrichie = 'remboursement_statut' in _cols
+    except Exception:
+        _tombola_enrichie = False
+
+    if _tombola_enrichie:
+        union_body = f"{_QUERY_EVENEMENTS}\nUNION ALL\n{_QUERY_TRESORERIE}\nUNION ALL\n{_QUERY_TOMBOLA}"
+    else:
+        union_body = f"{_QUERY_EVENEMENTS}\nUNION ALL\n{_QUERY_TRESORERIE}"
+
     query = f"""
         SELECT *
         FROM (
-            {_QUERY_EVENEMENTS}
-            UNION ALL
-            {_QUERY_TRESORERIE}
+            {union_body}
         ) r
         WHERE 1 = 1
     """
@@ -159,6 +201,15 @@ def marquer_rembourse(
         'evenement': 'evenement_depenses',
         'tresorerie': 'tresorerie_operations',
     }
+
+    if source == 'tombola':
+        try:
+            from db.models.tombola import marquer_rembourse_lot
+            return marquer_rembourse_lot(identifiant, mode, reference, date)
+        except Exception as exc:  # noqa: BLE001
+            logger.error('marquer_rembourse (tombola): %s', exc)
+            return False
+
     table = tables.get(source, '')
     if not table:
         return False

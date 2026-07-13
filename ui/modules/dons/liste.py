@@ -13,7 +13,7 @@ from db.connection import get_connection
 from db.models.dons import add_don, delete_don, get_all_dons, get_don_by_id, get_stats_dons, marquer_recu_emis, update_don
 from db.models.membres import get_all_membres, get_membre_by_id
 from ui import theme as app_theme
-from ui.components.dialogs import afficher_erreur, afficher_info, demander_confirmation
+from ui.components.dialogs import afficher_erreur, afficher_info, afficher_succes, demander_confirmation
 from ui.components.form_dialog import FormDialog
 
 _STATUTS = {'tous': 'Tous', 'en_attente': '🟡 En attente', 'emis': '🟢 Émis', 'annule': '🔴 Annulé'}
@@ -222,6 +222,7 @@ class ListeDons(ctk.CTkToplevel):
         if generer_recu:
             self._sauver_pdf(don_id)
         self._charger()
+        afficher_succes(self, 'Don enregistré', 'Le don a été enregistré avec succès.')
 
     def _modifier(self) -> None:
         don = self._selection()
@@ -236,6 +237,7 @@ class ListeDons(ctk.CTkToplevel):
         payload.pop('generer_recu', None)
         update_don(int(don['id']), **payload)
         self._charger()
+        afficher_succes(self, 'Don modifié', 'Le don a été modifié avec succès.')
 
     def _supprimer(self) -> None:
         don = self._selection()
@@ -341,16 +343,15 @@ class _DialogDon(FormDialog):
             bloc_contenu.pack(fill='x', padx=4, pady=(0, 4))
             return bloc_contenu
 
-        section_donateur = section('Donateur')
-
         def champ(parent: Any, label: str, widget: Any) -> ctk.CTkFrame:
             bloc = ctk.CTkFrame(parent, fg_color='transparent')
             bloc.pack(fill='x', pady=4)
-            ctk.CTkLabel(bloc, text=label, width=150, anchor='e').pack(side='left', padx=(0, 8))
-            widget.pack(side='left', fill='x', expand=True)
+            ctk.CTkLabel(bloc, text=label, anchor='w').pack(fill='x')
+            widget.pack(fill='x', pady=(2, 0))
             return bloc
 
-        champ(section_donateur, 'Exercice', ctk.CTkOptionMenu(section_donateur, values=list(self._map_exercices), variable=self._var_exercice, width=260))
+        section_donateur = section('Donateur')
+        champ(section_donateur, 'Exercice', ctk.CTkOptionMenu(section_donateur, values=list(self._map_exercices), variable=self._var_exercice))
         type_menu = ctk.CTkSegmentedButton(
             section_donateur,
             values=list(self._TYPE_LABELS),
@@ -359,17 +360,32 @@ class _DialogDon(FormDialog):
         )
         champ(section_donateur, 'Type donateur', type_menu)
         membre_values = ['— Aucun —'] + [f"{m['nom']} {m['prenom']}".strip() for m in self._membres]
-        combo_membre = ctk.CTkOptionMenu(section_donateur, values=membre_values, variable=self._var_membre, width=260, command=lambda _value: self._prefill_membre())
+        combo_membre = ctk.CTkOptionMenu(section_donateur, values=membre_values, variable=self._var_membre, command=lambda _value: self._prefill_membre())
         champ(section_donateur, 'Lier à un adhérent', combo_membre)
-        champ(section_donateur, 'Nom / raison sociale *', ctk.CTkEntry(section_donateur, textvariable=self._var_nom, width=260))
-        champ(section_donateur, 'Prénom', ctk.CTkEntry(section_donateur, textvariable=self._var_prenom, width=260))
-        champ(section_donateur, 'Adresse', ctk.CTkEntry(section_donateur, textvariable=self._var_adresse, width=260))
-        champ(section_donateur, 'Code postal', ctk.CTkEntry(section_donateur, textvariable=self._var_cp, width=260))
-        champ(section_donateur, 'Ville', ctk.CTkEntry(section_donateur, textvariable=self._var_ville, width=260))
-        self._frame_siret = champ(section_donateur, 'SIRET', ctk.CTkEntry(section_donateur, textvariable=self._var_siret, width=260))
+
+        row_nom_prenom = ctk.CTkFrame(section_donateur, fg_color='transparent')
+        row_nom_prenom.pack(fill='x', pady=4)
+        row_nom_prenom.columnconfigure((0, 1), weight=1)
+        ctk.CTkLabel(row_nom_prenom, text='Nom / raison sociale *', anchor='w').grid(row=0, column=0, sticky='ew', padx=(0, 4))
+        ctk.CTkLabel(row_nom_prenom, text='Prénom', anchor='w').grid(row=0, column=1, sticky='ew', padx=(4, 0))
+        ctk.CTkEntry(row_nom_prenom, textvariable=self._var_nom).grid(row=1, column=0, sticky='ew', padx=(0, 4), pady=(2, 0))
+        ctk.CTkEntry(row_nom_prenom, textvariable=self._var_prenom).grid(row=1, column=1, sticky='ew', padx=(4, 0), pady=(2, 0))
+
+        champ(section_donateur, 'Adresse', ctk.CTkEntry(section_donateur, textvariable=self._var_adresse))
+
+        row_cp_ville = ctk.CTkFrame(section_donateur, fg_color='transparent')
+        row_cp_ville.pack(fill='x', pady=4)
+        row_cp_ville.columnconfigure(0, weight=1)
+        row_cp_ville.columnconfigure(1, weight=3)
+        ctk.CTkLabel(row_cp_ville, text='Code postal', anchor='w').grid(row=0, column=0, sticky='ew', padx=(0, 4))
+        ctk.CTkLabel(row_cp_ville, text='Ville', anchor='w').grid(row=0, column=1, sticky='ew', padx=(4, 0))
+        ctk.CTkEntry(row_cp_ville, textvariable=self._var_cp).grid(row=1, column=0, sticky='ew', padx=(0, 4), pady=(2, 0))
+        ctk.CTkEntry(row_cp_ville, textvariable=self._var_ville).grid(row=1, column=1, sticky='ew', padx=(4, 0), pady=(2, 0))
+
+        self._frame_siret = champ(section_donateur, 'SIRET', ctk.CTkEntry(section_donateur, textvariable=self._var_siret))
 
         section_don = section('Don')
-        champ(section_don, 'Date du don *', ctk.CTkEntry(section_don, textvariable=self._var_date, width=260))
+        champ(section_don, 'Date du don *', ctk.CTkEntry(section_don, textvariable=self._var_date))
         nature = ctk.CTkSegmentedButton(
             section_don,
             values=list(self._NATURE_LABELS),
@@ -377,16 +393,16 @@ class _DialogDon(FormDialog):
             command=self._toggle_nature_fields,
         )
         champ(section_don, 'Nature', nature)
-        champ(section_don, 'Montant (€)', ctk.CTkEntry(section_don, textvariable=self._var_montant, width=260))
-        self._frame_description = champ(section_don, 'Description', ctk.CTkEntry(section_don, textvariable=self._var_description, width=260))
-        self._frame_valeur = champ(section_don, 'Valeur estimée (€)', ctk.CTkEntry(section_don, textvariable=self._var_valeur, width=260))
-        self._frame_mode = champ(section_don, 'Mode versement', ctk.CTkOptionMenu(section_don, values=['cheque', 'virement', 'especes', 'cb', 'autre'], variable=self._var_mode, width=260))
+        champ(section_don, 'Montant (€)', ctk.CTkEntry(section_don, textvariable=self._var_montant))
+        self._frame_description = champ(section_don, 'Description', ctk.CTkEntry(section_don, textvariable=self._var_description))
+        self._frame_valeur = champ(section_don, 'Valeur estimée (€)', ctk.CTkEntry(section_don, textvariable=self._var_valeur))
+        self._frame_mode = champ(section_don, 'Mode versement', ctk.CTkOptionMenu(section_don, values=['cheque', 'virement', 'especes', 'cb', 'autre'], variable=self._var_mode))
 
         section_options = section('Options')
         if not self._don:
-            ctk.CTkCheckBox(section_options, text='Créer une recette en trésorerie', variable=self._var_creer_treso).pack(anchor='w', padx=158, pady=(4, 0))
-            ctk.CTkCheckBox(section_options, text='Générer le reçu immédiatement', variable=self._var_generer_recu).pack(anchor='w', padx=158, pady=(4, 0))
-        champ(section_options, 'Commentaire', ctk.CTkEntry(section_options, textvariable=self._var_commentaire, width=260))
+            ctk.CTkCheckBox(section_options, text='Créer une recette en trésorerie', variable=self._var_creer_treso).pack(anchor='w', pady=(4, 0))
+            ctk.CTkCheckBox(section_options, text='Générer le reçu immédiatement', variable=self._var_generer_recu).pack(anchor='w', pady=(4, 0))
+        champ(section_options, 'Commentaire', ctk.CTkEntry(section_options, textvariable=self._var_commentaire))
 
     def _prefill_membre(self) -> None:
         label = self._var_membre.get()
