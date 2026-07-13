@@ -84,7 +84,15 @@ def reset_template_bilan() -> None:
 
 
 def _formater_montant(valeur: float) -> str:
-    return f"{valeur:,.2f} €".replace(",", "\u202f").replace(".", ",")
+    """Formate un montant (ASCII uniquement, compatible Helvetica)."""
+    try:
+        val = float(valeur or 0)
+        entier = f"{int(abs(val)):,}".replace(",", " ")
+        decimales = round(abs(val) % 1 * 100)
+        signe = "-" if val < 0 else ""
+        return f"{signe}{entier},{decimales:02d} EUR"
+    except (TypeError, ValueError):
+        return "0,00 EUR"
 
 
 def _construire_tableau_evenements(evenements: list[dict]) -> str:
@@ -321,7 +329,7 @@ def collecter_donnees_bilan(
                     f"| {(don['date_don'] or '')[:10]} | {donateur} | {don['nature_don'] or ''} | {_formater_montant(montant)} |"
                 )
             donnees["tableau_dons"] = "\n".join(lignes_dons)
-            donnees["total_dons"] = f"{total_dons:.2f} €"
+            donnees["total_dons"] = _formater_montant(total_dons)
     except Exception as exc:
         logger.warning("collecter_donnees_bilan – dons: %s", exc)
 

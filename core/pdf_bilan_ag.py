@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from reportlab.lib import colors
 from reportlab.lib.units import cm
-from reportlab.platypus import Paragraph, Spacer, Table, TableStyle
+from reportlab.platypus import CondPageBreak, KeepTogether, Paragraph, Spacer, Table, TableStyle
 
 from core.pdf_base import BasePDF
 from utils.logger import get_logger
@@ -76,28 +76,39 @@ class PdfBilanAG(BasePDF):
         elements.append(Spacer(1, 0.2 * cm))
 
         try:
-            if self._sections.get("resume_financier"):
-                elements.extend(self._section_resume_financier())
-            if self._sections.get("tresorerie_detail"):
-                elements.extend(self._section_tresorerie_detail())
-            if self._sections.get("subventions"):
-                elements.extend(self._section_subventions())
-            if self._sections.get("evenements"):
-                elements.extend(self._section_evenements())
-            if self._sections.get("buvette"):
-                elements.extend(self._section_buvette())
-            if self._sections.get("adherents"):
-                elements.extend(self._section_adherents())
-            if self._sections.get("dons"):
-                elements.extend(self._section_dons())
-            if self._sections.get("remboursements"):
-                elements.extend(self._section_remboursements())
-            if self._sections.get("signatures"):
-                elements.extend(self._section_signatures())
+            sections = [
+                ("resume_financier", self._section_resume_financier),
+                ("tresorerie_detail", self._section_tresorerie_detail),
+                ("subventions", self._section_subventions),
+                ("evenements", self._section_evenements),
+                ("buvette", self._section_buvette),
+                ("adherents", self._section_adherents),
+                ("dons", self._section_dons),
+                ("remboursements", self._section_remboursements),
+                ("signatures", self._section_signatures),
+            ]
+            for section_key, section_fn in sections:
+                if self._sections.get(section_key):
+                    elements.append(CondPageBreak(6 * cm))
+                    elements.extend(self._envelopper_section(section_fn()))
             return elements
         except Exception as exc:
             logger.exception("PdfBilanAG._construire_contenu: %s", exc)
             return elements + [self._message_aucune_donnee()]
+
+    def _envelopper_section(self, elements_section: list) -> list:
+        """Garde titre + début de section ensemble sur la même page."""
+        if not elements_section:
+            return elements_section
+        try:
+            if len(elements_section) <= 15:
+                return [KeepTogether(elements_section)]
+            # Pour les sections longues, garder au moins le titre + 2 premiers éléments ensemble
+            tete = elements_section[:4]
+            suite = elements_section[4:]
+            return [KeepTogether(tete)] + suite
+        except Exception:
+            return elements_section
 
     def _section_resume_financier(self) -> list:
         from db.models.tresorerie import get_all_comptes, get_stats_tresorerie

@@ -55,6 +55,7 @@ from db.models.tresorerie import (
     get_all_comptes,
     get_remises,
     update_remise_cheque,
+    update_remise_statut,
 )
 from ui import theme as app_theme
 from ui.components.dialogs import afficher_erreur, afficher_info, demander_confirmation
@@ -165,7 +166,7 @@ class _FormulaireRemisePopup(ctk.CTkToplevel):
             ctk.CTkLabel(bloc, text=label).pack(anchor="w")
             widget.pack(fill="x", pady=(4, 0))
 
-        champ("Date remise", ctk.CTkEntry(frame, textvariable=self._var_date))
+        champ("Date remise (AAAA-MM-JJ)", ctk.CTkEntry(frame, textvariable=self._var_date))
         champ(
             "Banque / Compte",
             ctk.CTkOptionMenu(
@@ -174,20 +175,18 @@ class _FormulaireRemisePopup(ctk.CTkToplevel):
                 variable=self._var_compte,
             ),
         )
-        champ("Nombre chèques", ctk.CTkEntry(frame, textvariable=self._var_nombre))
-        champ("Montant total (€)", ctk.CTkEntry(frame, textvariable=self._var_montant))
-        champ("N° Bordereau", ctk.CTkEntry(frame, textvariable=self._var_bordereau))
+        champ("Référence / N° Bordereau", ctk.CTkEntry(frame, textvariable=self._var_bordereau))
+        champ("Nombre de chèques", ctk.CTkEntry(frame, textvariable=self._var_nombre))
+        champ("Montant total (EUR)", ctk.CTkEntry(frame, textvariable=self._var_montant))
+        champ(
+            "Statut",
+            ctk.CTkOptionMenu(
+                frame,
+                values=["En attente", "Remis", "Encaissé"],
+                variable=self._var_statut,
+            ),
+        )
         champ("Commentaire", ctk.CTkEntry(frame, textvariable=self._var_commentaire))
-
-        if self._remise is not None:
-            champ(
-                "Statut",
-                ctk.CTkOptionMenu(
-                    frame,
-                    values=["En attente", "Remis", "Encaissé"],
-                    variable=self._var_statut,
-                ),
-            )
 
         actions = ctk.CTkFrame(self, fg_color="transparent")
         actions.pack(fill="x", padx=20, pady=(8, 16))
@@ -213,6 +212,7 @@ class _FormulaireRemisePopup(ctk.CTkToplevel):
             (int(c["id"]) for c in self._comptes if c["nom"] == self._var_compte.get()),
             None,
         )
+        statut_code = self._STATUTS_INV.get(self._var_statut.get(), "en_attente")
         try:
             if self._remise is not None:
                 update_remise_cheque(
@@ -223,10 +223,10 @@ class _FormulaireRemisePopup(ctk.CTkToplevel):
                     montant_total=_parse_float(self._var_montant.get()),
                     numero_bordereau=self._var_bordereau.get().strip() or None,
                     commentaire=self._var_commentaire.get().strip() or None,
-                    statut=self._STATUTS_INV.get(self._var_statut.get(), "en_attente"),
+                    statut=statut_code,
                 )
             else:
-                enregistrer_remise_depuis_formulaire(
+                remise_id = enregistrer_remise_depuis_formulaire(
                     {
                         "date_remise": self._var_date.get(),
                         "compte_id": compte_id,
@@ -236,6 +236,8 @@ class _FormulaireRemisePopup(ctk.CTkToplevel):
                         "commentaire": self._var_commentaire.get(),
                     }
                 )
+                if statut_code != "en_attente":
+                    update_remise_statut(remise_id, statut_code)
         except Exception as exc:
             afficher_erreur(self, "Remises", str(exc))
             return
@@ -306,25 +308,33 @@ class _RemisesTab(ctk.CTkFrame):
 
         self._tree = ttk.Treeview(
             frame_liste,
-            columns=("date", "compte", "nb", "montant", "bordereau", "statut"),
+            columns=("date", "compte", "nb", "montant", "bordereau", "statut", "commentaire"),
             show="headings",
             height=14,
         )
         for col, label, width, anchor in [
-            ("date", "Date", 110, "center"),
-            ("compte", "Compte", 190, "w"),
-            ("nb", "Nb chèques", 100, "center"),
-            ("montant", "Montant", 120, "e"),
-            ("bordereau", "Bordereau", 150, "w"),
-            ("statut", "Statut", 100, "center"),
+            ("date", "Date", 100, "center"),
+            ("compte", "Compte", 170, "w"),
+            ("nb", "Nb chèques", 90, "center"),
+            ("montant", "Montant", 110, "e"),
+            ("bordereau", "Bordereau", 130, "w"),
+            ("statut", "Statut", 90, "center"),
+            ("commentaire", "Commentaire", 200, "w"),
         ]:
             self._tree.heading(col, text=label)
             self._tree.column(col, width=width, anchor=anchor)
+
+        # Couleurs par statut
+        self._tree.tag_configure("en_attente", foreground="#e67e22")
+        self._tree.tag_configure("remis", foreground="#2980b9")
+        self._tree.tag_configure("encaisse", foreground="#27ae60")
 
         scrollbar = ttk.Scrollbar(frame_liste, orient="vertical", command=self._tree.yview)
         self._tree.configure(yscrollcommand=scrollbar.set)
         self._tree.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
+
+        self._tree.bind("<Double-1>", lambda _e: self._modifier())
 
     def _ouvrir_formulaire(self, remise: dict[str, Any] | None = None) -> None:
         if not self._comptes:
@@ -383,17 +393,21 @@ class _RemisesTab(ctk.CTkFrame):
         except Exception:
             return
         for remise in get_remises():
+            statut_code = remise.get("statut") or "en_attente"
+            statut_label = _FormulaireRemisePopup._STATUTS_LABELS.get(statut_code, statut_code)
             self._tree.insert(
                 "",
                 "end",
                 iid=str(remise.get("id") or ""),
+                tags=(statut_code,),
                 values=(
                     remise.get("date_remise") or "",
                     remise.get("compte_nom") or "",
                     remise.get("nombre_cheques") or 0,
                     formater_montant(float(remise.get("montant_total") or 0)),
                     remise.get("numero_bordereau") or "—",
-                    remise.get("statut") or "",
+                    statut_label,
+                    remise.get("commentaire") or "",
                 ),
             )
 

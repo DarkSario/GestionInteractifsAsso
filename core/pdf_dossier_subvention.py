@@ -11,8 +11,10 @@ from reportlab.lib import colors
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import cm
 from reportlab.platypus import (
+    CondPageBreak,
     HRFlowable,
     Image,
+    KeepTogether,
     PageBreak,
     Paragraph,
     Spacer,
@@ -806,43 +808,53 @@ class PdfDossierSubvention(PdfBasePro):
             elements.append(PageBreak())
 
         if sec.get("presentation"):
-            elements.extend(self._section_presentation())
+            elements.append(CondPageBreak(6 * cm))
+            elements.extend(self._envelopper_section(self._section_presentation()))
             elements.append(Spacer(1, 0.5 * cm))
 
         if sec.get("adherents"):
-            elements.extend(self._section_adherents())
+            elements.append(CondPageBreak(6 * cm))
+            elements.extend(self._envelopper_section(self._section_adherents()))
             elements.append(Spacer(1, 0.5 * cm))
 
         if sec.get("evenements"):
-            elements.extend(self._section_evenements())
+            elements.append(CondPageBreak(6 * cm))
+            elements.extend(self._envelopper_section(self._section_evenements()))
             elements.append(Spacer(1, 0.5 * cm))
 
         if sec.get("benevoles"):
-            elements.extend(self._section_benevoles())
+            elements.append(CondPageBreak(6 * cm))
+            elements.extend(self._envelopper_section(self._section_benevoles()))
             elements.append(Spacer(1, 0.5 * cm))
 
         if sec.get("resume_financier"):
-            elements.extend(self._section_resume_financier())
+            elements.append(CondPageBreak(6 * cm))
+            elements.extend(self._envelopper_section(self._section_resume_financier()))
             elements.append(Spacer(1, 0.5 * cm))
 
         if sec.get("tresorerie_detail"):
-            elements.extend(self._section_tresorerie_detail())
+            elements.append(CondPageBreak(6 * cm))
+            elements.extend(self._envelopper_section(self._section_tresorerie_detail()))
             elements.append(Spacer(1, 0.5 * cm))
 
         if sec.get("soldes_comptes"):
-            elements.extend(self._section_soldes_comptes())
+            elements.append(CondPageBreak(6 * cm))
+            elements.extend(self._envelopper_section(self._section_soldes_comptes()))
             elements.append(Spacer(1, 0.5 * cm))
 
         if sec.get("subventions_recues"):
-            elements.extend(self._section_subventions_recues())
+            elements.append(CondPageBreak(6 * cm))
+            elements.extend(self._envelopper_section(self._section_subventions_recues()))
             elements.append(Spacer(1, 0.5 * cm))
 
         if sec.get("dons_recus"):
-            elements.extend(self._section_dons_recus())
+            elements.append(CondPageBreak(6 * cm))
+            elements.extend(self._envelopper_section(self._section_dons_recus()))
             elements.append(Spacer(1, 0.5 * cm))
 
         if sec.get("remboursements"):
-            elements.extend(self._section_remboursements())
+            elements.append(CondPageBreak(6 * cm))
+            elements.extend(self._envelopper_section(self._section_remboursements()))
             elements.append(Spacer(1, 0.5 * cm))
 
         if sec.get("projet"):
@@ -851,11 +863,13 @@ class PdfDossierSubvention(PdfBasePro):
             elements.append(Spacer(1, 0.5 * cm))
 
         if sec.get("budget_projet"):
-            elements.extend(self._section_budget_projet())
+            elements.append(CondPageBreak(6 * cm))
+            elements.extend(self._envelopper_section(self._section_budget_projet()))
             elements.append(Spacer(1, 0.5 * cm))
 
         if sec.get("objectifs"):
-            elements.extend(self._section_objectifs())
+            elements.append(CondPageBreak(6 * cm))
+            elements.extend(self._envelopper_section(self._section_objectifs()))
             elements.append(Spacer(1, 0.5 * cm))
 
         if sec.get("statuts"):
@@ -869,3 +883,16 @@ class PdfDossierSubvention(PdfBasePro):
             elements.extend(self._zone_signature(signataires))
 
         return elements
+
+    def _envelopper_section(self, elements_section: list) -> list:
+        """Garde titre + début de section ensemble sur la même page."""
+        if not elements_section:
+            return elements_section
+        try:
+            if len(elements_section) <= 15:
+                return [KeepTogether(elements_section)]
+            tete = elements_section[:4]
+            suite = elements_section[4:]
+            return [KeepTogether(tete)] + suite
+        except Exception:
+            return elements_section
