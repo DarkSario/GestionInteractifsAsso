@@ -181,7 +181,7 @@ def test_collecter_bilan_inclut_dons(db_phase17):
     donnees = collecter_donnees_bilan(exercice_id, 'Intro', 'Conclusion')
     assert 'tableau_dons' in donnees
     assert 'Durand' in donnees['tableau_dons']
-    assert donnees['total_dons'] == '75.00 €'
+    assert donnees['total_dons'] == '75,00 EUR'
 
 
 def test_alertes_phase17(db_phase17):

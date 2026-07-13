@@ -43,7 +43,7 @@ except ModuleNotFoundError:  # pragma: no cover - environnement sans Tk
             return ""
 
     class _DummyCTk:
-        CTkFrame = CTkLabel = CTkButton = CTkEntry = CTkComboBox = CTkBaseClass = _DummyWidget
+        CTkFrame = CTkLabel = CTkButton = CTkEntry = CTkComboBox = CTkOptionMenu = CTkBaseClass = CTkToplevel = _DummyWidget
         StringVar = _DummyVar
 
     ctk = _DummyCTk()
@@ -54,11 +54,43 @@ from ui import theme as app_theme
 from ui.components.dialogs import afficher_erreur, afficher_info, demander_confirmation
 
 
+_STATUTS_LABELS_DEPOT = {
+    "en_attente": "En attente",
+    "depose": "Déposé",
+    "verifie": "Vérifié",
+}
+_STATUTS_INV_DEPOT = {
+    "En attente": "en_attente",
+    "Déposé": "depose",
+    "Vérifié": "verifie",
+}
+
+
 def _parse_float(value: str | None) -> float:
     try:
         return float(str(value or "0").replace(",", ".").strip() or 0)
     except (TypeError, ValueError):
         return 0.0
+
+
+def _parse_commentaire_depot(commentaire: str) -> tuple[str, str, str, str]:
+    """Analyse le commentaire structuré et retourne (statut_code, origine, reference, commentaire_pur)."""
+    parties = [p.strip() for p in (commentaire or "").split("|")]
+    idx = 0
+    statut_code = "en_attente"
+    if parties and parties[0].startswith("statut_tracabilite:"):
+        statut_code = parties[0][len("statut_tracabilite:"):].strip()
+        if statut_code not in _STATUTS_LABELS_DEPOT:
+            statut_code = "en_attente"
+        idx = 1
+    origine = ""
+    if idx < len(parties) and parties[idx].startswith("Origine:"):
+        origine = parties[idx][len("Origine:"):].strip()
+        idx += 1
+    reference = parties[idx] if idx < len(parties) else ""
+    idx += 1
+    comment_pur = parties[idx] if idx < len(parties) else ""
+    return statut_code, origine, reference, comment_pur
 
 
 def _get_depots() -> list[dict]:
@@ -90,8 +122,8 @@ class _FormulaireDepotPopup(ctk.CTkToplevel):
     ) -> None:
         super().__init__(parent)
         self.title("✏️ Modifier le dépôt" if depot_id else "💵 Nouveau dépôt d'espèces")
-        self.geometry("500x440")
-        self.minsize(480, 420)
+        self.geometry("500x520")
+        self.minsize(480, 500)
         self.transient(parent)
         self.grab_set()
         self.resizable(True, True)
@@ -106,6 +138,7 @@ class _FormulaireDepotPopup(ctk.CTkToplevel):
         self._var_compte = ctk.StringVar(value=labels_comptes[0])
         self._var_origine = ctk.StringVar(value="Caisse")
         self._var_reference = ctk.StringVar(value="")
+        self._var_statut = ctk.StringVar(value="En attente")
         self._var_commentaire = ctk.StringVar(value="")
 
         self._build_ui()
@@ -124,19 +157,26 @@ class _FormulaireDepotPopup(ctk.CTkToplevel):
         form.pack(fill="both", expand=True, padx=16, pady=4)
 
         labels_comptes = [c["nom"] for c in self._comptes] or ["Compte courant"]
-        champs = [
-            ("Date", ctk.CTkEntry(form, textvariable=self._var_date)),
-            ("Montant (€)", ctk.CTkEntry(form, textvariable=self._var_montant)),
-            ("Compte destination", ctk.CTkComboBox(form, values=labels_comptes, variable=self._var_compte)),
-            ("Origine", ctk.CTkEntry(form, textvariable=self._var_origine)),
-            ("Référence", ctk.CTkEntry(form, textvariable=self._var_reference)),
-            ("Commentaire", ctk.CTkEntry(form, textvariable=self._var_commentaire)),
-        ]
-        for label, widget in champs:
+
+        def champ(label: str, widget: Any) -> None:
             bloc = ctk.CTkFrame(form, fg_color="transparent")
             bloc.pack(fill="x", pady=4)
             ctk.CTkLabel(bloc, text=label, anchor="w").pack(fill="x")
             widget.pack(fill="x", pady=(2, 0))
+
+        champ("Date du dépôt (AAAA-MM-JJ)", ctk.CTkEntry(form, textvariable=self._var_date))
+        champ(
+            "Compte de destination",
+            ctk.CTkOptionMenu(form, values=labels_comptes, variable=self._var_compte),
+        )
+        champ("Montant (EUR)", ctk.CTkEntry(form, textvariable=self._var_montant))
+        champ("Origine", ctk.CTkEntry(form, textvariable=self._var_origine))
+        champ("Référence (bordereau / ticket)", ctk.CTkEntry(form, textvariable=self._var_reference))
+        champ(
+            "Statut",
+            ctk.CTkOptionMenu(form, values=["En attente", "Déposé", "Vérifié"], variable=self._var_statut),
+        )
+        champ("Commentaire", ctk.CTkEntry(form, textvariable=self._var_commentaire))
 
         actions = ctk.CTkFrame(self, fg_color="transparent")
         actions.pack(fill="x", padx=20, pady=(8, 16))
@@ -155,16 +195,11 @@ class _FormulaireDepotPopup(ctk.CTkToplevel):
         compte_nom = operation.get("compte_nom") or (self._comptes[0]["nom"] if self._comptes else "")
         self._var_compte.set(compte_nom)
         commentaire = operation.get("commentaire") or ""
-        # Tente de parser le commentaire structuré "Origine: X | ref | comment"
-        parties = [p.strip() for p in commentaire.split("|")]
-        if parties:
-            origine_part = parties[0]
-            if origine_part.startswith("Origine:"):
-                self._var_origine.set(origine_part[len("Origine:"):].strip())
-            if len(parties) > 1:
-                self._var_reference.set(parties[1])
-            if len(parties) > 2:
-                self._var_commentaire.set(parties[2])
+        statut_code, origine, reference, comment_pur = _parse_commentaire_depot(commentaire)
+        self._var_statut.set(_STATUTS_LABELS_DEPOT.get(statut_code, "En attente"))
+        self._var_origine.set(origine or "Caisse")
+        self._var_reference.set(reference)
+        self._var_commentaire.set(comment_pur)
 
     def _enregistrer(self) -> None:
         try:
@@ -176,14 +211,22 @@ class _FormulaireDepotPopup(ctk.CTkToplevel):
         if not compte:
             afficher_erreur(self, "Dépôt espèces", "Compte invalide.")
             return
+
+        statut_code = _STATUTS_INV_DEPOT.get(self._var_statut.get(), "en_attente")
+        # Le statut de traçabilité est encodé dans le commentaire.
+        # Le statut DB reste 'annule' pour ne pas comptabiliser dans le solde.
         comment_parts = [
+            f"statut_tracabilite:{statut_code}",
             f"Origine: {self._var_origine.get().strip()}",
             self._var_reference.get().strip(),
             self._var_commentaire.get().strip(),
         ]
         commentaire = " | ".join(part for part in comment_parts if part)
+
         try:
             if self._depot_id is not None:
+                # Ne PAS modifier le statut DB (doit rester 'annule').
+                # Seuls montant, date, compte et commentaire sont mis à jour.
                 update_operation(
                     self._depot_id,
                     montant=montant,
@@ -193,7 +236,7 @@ class _FormulaireDepotPopup(ctk.CTkToplevel):
                 )
             else:
                 # statut='annule' : enregistrement de traçabilité bancaire uniquement,
-                # non comptabilisé dans le solde (recettes déjà dans evenement_recettes).
+                # non comptabilisé dans le solde.
                 add_operation(
                     compte_id=int(compte["id"]),
                     type_operation="recette",
@@ -273,22 +316,33 @@ class _DepotEspecesTab(ctk.CTkFrame):
         frame_table.pack(fill="both", expand=True, padx=12, pady=(0, 10))
         self._tree = ttk.Treeview(
             frame_table,
-            columns=("date", "compte", "montant", "commentaire"),
+            columns=("date", "compte", "montant", "origine", "reference", "statut", "commentaire"),
             show="headings",
             height=10,
         )
-        self._tree.heading("date", text="Date")
-        self._tree.heading("compte", text="Compte")
-        self._tree.heading("montant", text="Montant")
-        self._tree.heading("commentaire", text="Commentaire")
-        self._tree.column("date", width=110, anchor="center")
-        self._tree.column("compte", width=180)
-        self._tree.column("montant", width=120, anchor="e")
-        self._tree.column("commentaire", width=460)
+        for col, label, width, anchor in [
+            ("date", "Date", 100, "center"),
+            ("compte", "Compte", 160, "w"),
+            ("montant", "Montant", 100, "e"),
+            ("origine", "Origine", 150, "w"),
+            ("reference", "Référence", 120, "w"),
+            ("statut", "Statut", 90, "center"),
+            ("commentaire", "Commentaire", 200, "w"),
+        ]:
+            self._tree.heading(col, text=label)
+            self._tree.column(col, width=width, anchor=anchor)
+
+        # Couleurs par statut de traçabilité
+        self._tree.tag_configure("en_attente", foreground="#e67e22")
+        self._tree.tag_configure("depose", foreground="#2980b9")
+        self._tree.tag_configure("verifie", foreground="#27ae60")
+
         self._tree.pack(fill="both", expand=True, side="left")
         scrollbar = ttk.Scrollbar(frame_table, orient="vertical", command=self._tree.yview)
         self._tree.configure(yscrollcommand=scrollbar.set)
         scrollbar.pack(side="right", fill="y")
+
+        self._tree.bind("<Double-1>", lambda _e: self._modifier())
 
     def _ouvrir_formulaire(self, depot_id: int | None = None) -> None:
         if not self._comptes:
@@ -342,15 +396,26 @@ class _DepotEspecesTab(ctk.CTkFrame):
         except Exception:
             return
         for row in _get_depots():
+            commentaire = row.get("commentaire") or ""
+            statut_code, origine, reference, comment_pur = _parse_commentaire_depot(commentaire)
+            statut_label = _STATUTS_LABELS_DEPOT.get(statut_code, statut_code)
+            montant = float(row.get("montant") or 0)
+            montant_fmt = f"{int(abs(montant)):,}".replace(",", " ") + f",{round(abs(montant) % 1 * 100):02d} EUR"
+            if montant < 0:
+                montant_fmt = "-" + montant_fmt
             self._tree.insert(
                 "",
                 "end",
                 iid=str(row.get("id") or ""),
+                tags=(statut_code,),
                 values=(
                     row.get("date_operation") or "",
                     row.get("compte_nom") or "—",
-                    f"{float(row.get('montant') or 0):,.2f} €".replace(",", " ").replace(".", ","),
-                    row.get("commentaire") or "",
+                    montant_fmt,
+                    origine or "—",
+                    reference or "—",
+                    statut_label,
+                    comment_pur or "",
                 ),
             )
 
@@ -360,3 +425,4 @@ def build_tab_depot_especes(parent: ctk.CTkFrame, root: Any) -> None:
         widget.destroy()
     tab = _DepotEspecesTab(parent, root)
     tab.pack(fill="both", expand=True)
+

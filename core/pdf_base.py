@@ -338,9 +338,13 @@ class BasePDF:
         ]
 
     def _formater_montant(self, v) -> str:
-        """Formate un montant en euros."""
+        """Formate un montant en euros (caracteres ASCII uniquement, compatible Helvetica)."""
         try:
-            return f"{float(v):,.2f} €".replace(",", "\u202f").replace(".", ",")
+            val = float(v or 0)
+            entier = f"{int(abs(val)):,}".replace(",", " ")
+            decimales = round(abs(val) % 1 * 100)
+            signe = "-" if val < 0 else ""
+            return f"{signe}{entier},{decimales:02d} EUR"
         except (TypeError, ValueError):
             return "—"
 
