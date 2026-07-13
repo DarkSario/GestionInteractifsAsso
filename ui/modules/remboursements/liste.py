@@ -26,6 +26,7 @@ _STATUTS = {
     'non_applicable': '⚫ Non applicable',
 }
 _SOURCES = {'tous': 'Toutes', 'evenement': 'Événement', 'tresorerie': 'Trésorerie'}
+_MODE_REMBOURSEMENT_DEFAUT = 'Virement'
 
 
 class ListeRemboursements(ctk.CTkToplevel):
@@ -240,7 +241,7 @@ class ListeRemboursements(ctk.CTkToplevel):
 class _DialogMarquerRembourse(FormDialog):
     def __init__(self, parent: Any, ligne: dict[str, Any], titre: str = '✅ Marquer remboursé') -> None:
         super().__init__(parent, titre=titre, largeur=500, hauteur=400)
-        self._var_mode = ctk.StringVar(value=str(ligne.get('remboursement_mode') or 'Virement'))
+        self._var_mode = ctk.StringVar(value=str(ligne.get('remboursement_mode') or _MODE_REMBOURSEMENT_DEFAUT))
         self._var_reference = ctk.StringVar(value=str(ligne.get('remboursement_reference') or ''))
         self._var_date = ctk.StringVar(value=str(ligne.get('remboursement_date') or datetime.now().strftime('%Y-%m-%d')))
         self._var_commentaire = ctk.StringVar(value=str(ligne.get('commentaire') or ''))

@@ -124,7 +124,11 @@ class FormDialog(ctk.CTkToplevel):
             pass
 
     def _on_valider(self) -> None:
-        """À surcharger dans les sous-classes."""
+        """À surcharger dans les sous-classes.
+
+        Les sous-classes doivent renseigner ``self.result`` puis fermer la fenêtre.
+        L'implémentation de base ferme simplement le dialogue.
+        """
         self.destroy()
 
     def ajouter_champ(self, label: str, widget_factory: Callable[..., Any], **kwargs: Any) -> Any:
