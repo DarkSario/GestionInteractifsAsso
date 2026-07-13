@@ -289,6 +289,24 @@ class ParametresApp(ctk.CTkToplevel):
         self._modes_frame = ctk.CTkFrame(frame, fg_color="transparent")
         self._modes_frame.pack(fill="x", pady=4)
 
+        # Cotisations
+        ctk.CTkLabel(frame, text="Cotisations adhérents", font=fonts.get("subtitle")).pack(
+            anchor="w", pady=(16, 4)
+        )
+        f_cot = ctk.CTkFrame(frame, fg_color="transparent")
+        f_cot.pack(fill="x", pady=3)
+        ctk.CTkLabel(f_cot, text="Montant par défaut (€)", width=150, anchor="ne").pack(
+            side="left", padx=(0, 8)
+        )
+        self._cotisation_montant_entry = ctk.CTkEntry(f_cot, width=100)
+        self._cotisation_montant_entry.pack(side="left")
+        ctk.CTkLabel(
+            frame,
+            text="0 = cotisation offerte automatiquement",
+            font=fonts.get("small"),
+            text_color="grey",
+        ).pack(anchor="w", padx=(158, 0))
+
         # Boutons
         f_btn = ctk.CTkFrame(frame, fg_color="transparent")
         f_btn.pack(fill="x", pady=(12, 4))
@@ -336,6 +354,16 @@ class ParametresApp(ctk.CTkToplevel):
                 command=lambda mid=mode["id"], v=var: self._toggle_mode(mid, v),
             ).grid(row=i // 3, column=i % 3, padx=10, pady=4, sticky="w")
 
+        # Montant cotisation par défaut
+        try:
+            from core.cotisations import get_montant_cotisation_defaut
+
+            montant_defaut = get_montant_cotisation_defaut()
+            self._cotisation_montant_entry.delete(0, "end")
+            self._cotisation_montant_entry.insert(0, f"{montant_defaut:.2f}")
+        except Exception as exc:
+            logger.warning("Impossible de charger le montant cotisation : %s", exc)
+
     def _toggle_mode(self, mode_id: int, var: ctk.BooleanVar) -> None:
         ok = toggle_mode_paiement(mode_id)
         if not ok:
@@ -374,6 +402,19 @@ class ParametresApp(ctk.CTkToplevel):
             compte_principal_id=cp_id,
             compte_caisse_id=cc_id,
         )
+
+        # Montant cotisation par défaut
+        montant_cot_str = self._cotisation_montant_entry.get().strip().replace(",", ".")
+        try:
+            montant_cot = float(montant_cot_str)
+            if montant_cot < 0:
+                raise ValueError
+            from core.cotisations import set_montant_cotisation_defaut
+            set_montant_cotisation_defaut(montant_cot)
+        except ValueError:
+            afficher_erreur(self, "Erreur", "Le montant de cotisation doit être un nombre positif ou nul.")
+            return
+
         afficher_info(self, "Succès", "Les paramètres financiers ont été enregistrés.")
 
     # ── Onglet Événements ─────────────────────────────────────────────────────
@@ -935,6 +976,33 @@ class ParametresApp(ctk.CTkToplevel):
             command=self._ouvrir_polices_pdf,
         ).pack(anchor="w", padx=(158, 0), pady=(8, 0))
 
+        # Modèle Bilan AG
+        ctk.CTkLabel(frame, text="Bilan AG", font=fonts.get("subtitle")).pack(
+            anchor="w", pady=(16, 4)
+        )
+        ctk.CTkLabel(
+            frame,
+            text="Personnalisez le template Markdown du Bilan AG.",
+            font=fonts.get("small"),
+            text_color="grey",
+        ).pack(anchor="w")
+        f_bilan = ctk.CTkFrame(frame, fg_color="transparent")
+        f_bilan.pack(anchor="w", pady=(6, 0))
+        ctk.CTkButton(
+            f_bilan,
+            text="✏️ Modifier le modèle Bilan AG",
+            width=240,
+            command=self._ouvrir_editeur_template_bilan,
+        ).pack(side="left")
+        ctk.CTkButton(
+            f_bilan,
+            text="🔄 Restaurer le modèle par défaut",
+            width=240,
+            fg_color="#8b1a1a",
+            hover_color="#6b1414",
+            command=self._restaurer_template_bilan,
+        ).pack(side="left", padx=(8, 0))
+
         f_btn = ctk.CTkFrame(frame, fg_color="transparent")
         f_btn.pack(fill="x", pady=(14, 4))
         ctk.CTkButton(
@@ -974,6 +1042,28 @@ class ParametresApp(ctk.CTkToplevel):
             self._pdf_police_titre_var.set(valeurs_polices[0])
         if self._pdf_police_corps_var.get() not in valeurs_polices:
             self._pdf_police_corps_var.set(valeurs_polices[0])
+
+    def _ouvrir_editeur_template_bilan(self) -> None:
+        from ui.modules.administration.editeur_template_bilan import EditeurTemplateBilan
+
+        editeur = EditeurTemplateBilan(self)
+        self.wait_window(editeur)
+
+    def _restaurer_template_bilan(self) -> None:
+        from core.bilan_ag import reset_template_bilan
+
+        if not demander_confirmation(
+            self,
+            "Restaurer le modèle par défaut",
+            "Toutes vos modifications du modèle Bilan AG seront perdues.\n"
+            "Voulez-vous vraiment restaurer le modèle par défaut ?",
+        ):
+            return
+        try:
+            reset_template_bilan()
+            afficher_info(self, "Succès", "Le modèle Bilan AG par défaut a été restauré.")
+        except Exception as exc:
+            afficher_erreur(self, "Erreur", f"Impossible de restaurer le modèle : {exc}")
 
     def _enregistrer_pdf(self) -> None:
         try:

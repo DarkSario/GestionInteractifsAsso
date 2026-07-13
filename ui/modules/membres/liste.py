@@ -199,6 +199,16 @@ class ListeMembres(ctk.CTkToplevel):
             command=self._archiver_selection,
         ).pack(side="left", padx=5)
 
+        ctk.CTkButton(
+            self._frame_actions,
+            text="💳 Cotisations",
+            width=130,
+            font=fonts.get("normal"),
+            fg_color=colors.get("primary", "#1f6aa5"),
+            hover_color=colors.get("secondary", "#144870"),
+            command=self._ouvrir_cotisations,
+        ).pack(side="left", padx=5)
+
         return tree
 
     # ── Chargement et affichage des données ───────────────────────────────────
@@ -328,6 +338,12 @@ class ListeMembres(ctk.CTkToplevel):
         form.grab_set()
         self.wait_window(form)
         self._charger_membres()
+
+    def _ouvrir_cotisations(self) -> None:
+        from ui.modules.membres.cotisations import GestionCotisations
+
+        fenetre = GestionCotisations(self)
+        self.wait_window(fenetre)
 
     # ── Utilitaires ───────────────────────────────────────────────────────────
 
