@@ -117,7 +117,16 @@ class FormDialog(ctk.CTkToplevel):
         self.destroy()
 
     def ajouter_champ(self, label: str, widget_factory: Callable[..., Any], **kwargs: Any) -> Any:
-        """Ajoute un champ label + widget dans frame_content."""
+        """Ajoute un champ label + widget.
+
+        Args:
+            label: Libellé du champ affiché au-dessus du widget.
+            widget_factory: Classe/factory de widget à instancier.
+            **kwargs: Paramètres transmis au widget.
+
+        Returns:
+            Le widget créé et ajouté dans ``frame_content``.
+        """
         ctk.CTkLabel(self.frame_content, text=label, anchor="w").pack(fill="x", pady=(8, 2))
         widget = widget_factory(self.frame_content, **kwargs)
         widget.pack(fill="x", pady=(0, 4))

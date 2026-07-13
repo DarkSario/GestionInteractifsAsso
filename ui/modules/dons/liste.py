@@ -339,12 +339,12 @@ class _DialogDon(FormDialog):
             return bloc
 
         champ(section_donateur, 'Exercice', ctk.CTkOptionMenu(section_donateur, values=list(self._map_exercices), variable=self._var_exercice, width=260))
-        type_menu = ctk.CTkSegmentedButton(section_donateur, values=['particulier', 'entreprise'], variable=self._var_type, command=lambda _value: self._toggle_type_fields())
+        type_menu = ctk.CTkSegmentedButton(section_donateur, values=['particulier', 'entreprise'], variable=self._var_type, command=self._toggle_type_fields)
         champ(section_donateur, 'Type donateur', type_menu)
         membre_values = ['— Aucun —'] + [f"{m['nom']} {m['prenom']}".strip() for m in self._membres]
         combo_membre = ctk.CTkOptionMenu(section_donateur, values=membre_values, variable=self._var_membre, width=260, command=lambda _value: self._prefill_membre())
         champ(section_donateur, 'Lier à un adhérent', combo_membre)
-        champ(section_donateur, 'Nom *', ctk.CTkEntry(section_donateur, textvariable=self._var_nom, width=260))
+        champ(section_donateur, 'Nom / raison sociale *', ctk.CTkEntry(section_donateur, textvariable=self._var_nom, width=260))
         champ(section_donateur, 'Prénom', ctk.CTkEntry(section_donateur, textvariable=self._var_prenom, width=260))
         champ(section_donateur, 'Adresse', ctk.CTkEntry(section_donateur, textvariable=self._var_adresse, width=260))
         champ(section_donateur, 'Code postal', ctk.CTkEntry(section_donateur, textvariable=self._var_cp, width=260))
@@ -353,7 +353,7 @@ class _DialogDon(FormDialog):
 
         section_don = section('Don')
         champ(section_don, 'Date du don *', ctk.CTkEntry(section_don, textvariable=self._var_date, width=260))
-        nature = ctk.CTkSegmentedButton(section_don, values=['argent', 'nature'], variable=self._var_nature, command=lambda _value: self._toggle_nature_fields())
+        nature = ctk.CTkSegmentedButton(section_don, values=['argent', 'nature'], variable=self._var_nature, command=self._toggle_nature_fields)
         champ(section_don, 'Nature', nature)
         champ(section_don, 'Montant (€)', ctk.CTkEntry(section_don, textvariable=self._var_montant, width=260))
         self._frame_description = champ(section_don, 'Description', ctk.CTkEntry(section_don, textvariable=self._var_description, width=260))
@@ -379,13 +379,13 @@ class _DialogDon(FormDialog):
         self._var_nom.set(detail.get('nom') or '')
         self._var_prenom.set(detail.get('prenom') or '')
 
-    def _toggle_type_fields(self) -> None:
+    def _toggle_type_fields(self, _value: str | None = None) -> None:
         if self._var_type.get() == 'entreprise':
             self._frame_siret.pack(fill='x', pady=4)
         else:
             self._frame_siret.pack_forget()
 
-    def _toggle_nature_fields(self) -> None:
+    def _toggle_nature_fields(self, _value: str | None = None) -> None:
         if self._var_nature.get() == 'nature':
             self._frame_description.pack(fill='x', pady=4)
             self._frame_valeur.pack(fill='x', pady=4)
