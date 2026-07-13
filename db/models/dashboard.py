@@ -876,6 +876,27 @@ def get_toutes_alertes() -> list[dict]:
             }
         )
 
+    # Cotisations en retard (table cotisations Phase 16)
+    try:
+        from datetime import date as _date
+        from db.models.cotisations import get_nb_cotisations_en_attente
+
+        annee_courante = _date.today().year
+        nb_en_attente = get_nb_cotisations_en_attente(annee_courante)
+        if nb_en_attente > 0:
+            alertes.append(
+                {
+                    "niveau": "orange",
+                    "message": (
+                        f"{nb_en_attente} cotisation(s) en attente pour {annee_courante}"
+                    ),
+                    "module": "membres",
+                    "lien_action": "membres",
+                }
+            )
+    except Exception:  # noqa: BLE001
+        pass
+
     nb_sans_apres = get_evenements_sans_inventaire_apres()
     if nb_sans_apres > 0:
         alertes.append(
