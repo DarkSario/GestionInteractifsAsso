@@ -182,12 +182,14 @@ def montant_signe_operation(operation: dict) -> float:
 
 def export_bilan_ag_pdf(exercice: str, chemin_sortie: str,
                         sections: dict | None = None,
-                        avec_graphiques: bool = False) -> bool:
+                        avec_graphiques: bool = False,
+                        type_periode: str = "scolaire") -> bool:
     """Génère le bilan AG au format PDF."""
     try:
         from core.pdf_bilan_ag import PdfBilanAG
 
-        gen = PdfBilanAG(exercice, sections=sections, avec_graphiques=avec_graphiques)
+        gen = PdfBilanAG(exercice, sections=sections, avec_graphiques=avec_graphiques,
+                         type_periode=type_periode)
         return gen.generer(chemin_sortie)
     except Exception as exc:
         logger.exception("export_bilan_ag_pdf: %s", exc)
