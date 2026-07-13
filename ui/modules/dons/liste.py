@@ -408,8 +408,8 @@ class _DialogDon(FormDialog):
         self._mettre_a_jour_visibilite_champs()
 
     def _mettre_a_jour_visibilite_champs(self) -> None:
-        type_code = self._code_depuis_label(self._TYPE_LABELS, self._var_type.get(), next(iter(self._TYPE_LABELS.values()), 'particulier'))
-        nature_code = self._code_depuis_label(self._NATURE_LABELS, self._var_nature.get(), next(iter(self._NATURE_LABELS.values()), 'argent'))
+        type_code = self._code_depuis_label(self._TYPE_LABELS, self._var_type.get(), 'particulier')
+        nature_code = self._code_depuis_label(self._NATURE_LABELS, self._var_nature.get(), 'argent')
         if type_code == 'entreprise':
             self._frame_siret.pack(fill='x', pady=4)
         else:

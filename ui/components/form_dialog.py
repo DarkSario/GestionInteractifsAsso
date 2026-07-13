@@ -51,7 +51,11 @@ except ModuleNotFoundError:  # pragma: no cover - environnement sans Tk
             return 0
 
     class _DummyCTk:
-        CTkToplevel = CTkFrame = CTkScrollableFrame = CTkButton = CTkLabel = _DummyWidget
+        CTkToplevel = _DummyWidget
+        CTkFrame = _DummyWidget
+        CTkScrollableFrame = _DummyWidget
+        CTkButton = _DummyWidget
+        CTkLabel = _DummyWidget
 
     ctk = _DummyCTk()
 
