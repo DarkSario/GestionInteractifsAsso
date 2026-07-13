@@ -886,13 +886,18 @@ class PdfDossierSubvention(PdfBasePro):
 
     def _envelopper_section(self, elements_section: list) -> list:
         """Garde titre + début de section ensemble sur la même page."""
+        # Seuil : sections de moins de 15 flowables sont gardées entièrement ensemble
+        _SEUIL_SECTION_COURTE = 15
+        # Nombre de flowables de "tête" à garder solidaires (titre + spacer + tableau header)
+        _NB_ELEMENTS_ENTETE = 4
         if not elements_section:
             return elements_section
         try:
-            if len(elements_section) <= 15:
+            if len(elements_section) <= _SEUIL_SECTION_COURTE:
                 return [KeepTogether(elements_section)]
-            tete = elements_section[:4]
-            suite = elements_section[4:]
+            # Pour les sections longues, garder au moins l'entête + début du contenu ensemble
+            tete = elements_section[:_NB_ELEMENTS_ENTETE]
+            suite = elements_section[_NB_ELEMENTS_ENTETE:]
             return [KeepTogether(tete)] + suite
         except Exception:
             return elements_section

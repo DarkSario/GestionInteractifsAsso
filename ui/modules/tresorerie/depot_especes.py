@@ -165,15 +165,17 @@ class _FormulaireDepotPopup(ctk.CTkToplevel):
             widget.pack(fill="x", pady=(2, 0))
 
         champ("Date du dépôt (AAAA-MM-JJ)", ctk.CTkEntry(form, textvariable=self._var_date))
-        champ("Compte de destination",
-              ctk.CTkOptionMenu(form, values=labels_comptes, variable=self._var_compte))
+        champ(
+            "Compte de destination",
+            ctk.CTkOptionMenu(form, values=labels_comptes, variable=self._var_compte),
+        )
         champ("Montant (EUR)", ctk.CTkEntry(form, textvariable=self._var_montant))
         champ("Origine", ctk.CTkEntry(form, textvariable=self._var_origine))
         champ("Référence (bordereau / ticket)", ctk.CTkEntry(form, textvariable=self._var_reference))
-        champ("Statut",
-              ctk.CTkOptionMenu(form,
-                                values=["En attente", "Déposé", "Vérifié"],
-                                variable=self._var_statut))
+        champ(
+            "Statut",
+            ctk.CTkOptionMenu(form, values=["En attente", "Déposé", "Vérifié"], variable=self._var_statut),
+        )
         champ("Commentaire", ctk.CTkEntry(form, textvariable=self._var_commentaire))
 
         actions = ctk.CTkFrame(self, fg_color="transparent")
