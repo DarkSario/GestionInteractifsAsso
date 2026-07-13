@@ -153,8 +153,12 @@ class PdfDossierSubvention(PdfBasePro):
                 variables["nb_evenements"] = str(row["nb"]) if row else "0"
 
                 row = conn.execute(
-                    """SELECT COUNT(DISTINCT membre_id) as nb FROM evenement_benevoles
-                       WHERE membre_id IS NOT NULL"""
+                    """SELECT COUNT(DISTINCT eb.membre_id) as nb
+                       FROM evenement_benevoles eb
+                       JOIN evenements e ON e.id = eb.evenement_id
+                       WHERE eb.membre_id IS NOT NULL
+                         AND e.date_debut >= ? AND e.date_debut <= ?""",
+                    (self._date_debut, self._date_fin),
                 ).fetchone()
                 variables["nb_benevoles"] = str(row["nb"]) if row else "0"
             finally:

@@ -195,9 +195,11 @@ def test_graphique_camembert_vide(db_conn):
     """graphique_camembert_rl() gère les données vides sans lever d'exception."""
     from core.graphiques import graphique_camembert_rl
 
-    result = graphique_camembert_rl([], titre="Vide")
-    # Ne doit pas lever d'exception; le résultat peut être None ou un élément vide
-    assert result is not None or result is None  # pas d'exception = succès
+    # Ne doit pas lever d'exception
+    try:
+        graphique_camembert_rl([], titre="Vide")
+    except Exception as exc:
+        pytest.fail(f"graphique_camembert_rl avec données vides a levé une exception : {exc}")
 
 
 # ── Excel Dossier Subvention ──────────────────────────────────────────────────

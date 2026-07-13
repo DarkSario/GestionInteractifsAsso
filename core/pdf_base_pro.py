@@ -253,7 +253,6 @@ class PdfBasePro(BasePDF):
             ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
             ("LEFTPADDING", (0, 0), (-1, -1), 6),
             ("RIGHTPADDING", (0, 0), (-1, -1), 6),
-            ("ROUNDEDCORNERS", [4, 4, 4, 4]),
         ]))
         return tableau
 
