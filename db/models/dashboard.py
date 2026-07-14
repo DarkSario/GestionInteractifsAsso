@@ -87,50 +87,16 @@ def get_solde_global() -> dict:
         Dictionnaire avec solde_total, solde_bancaire, solde_caisse,
         par_compte (liste [{nom, solde}]).
     """
-    comptes = _fetch_all(
-        """
-        SELECT id, nom, solde_initial, est_caisse
-        FROM comptes_bancaires
-        WHERE actif = 1
-        ORDER BY ordre ASC, id ASC
-        """
-    )
+    from db.models.tresorerie import get_all_comptes
+
+    comptes = get_all_comptes(actif_only=True)
     par_compte = []
     solde_total = 0.0
     solde_bancaire = 0.0
     solde_caisse = 0.0
 
     for compte in comptes:
-        compte_id = compte["id"]
-        solde_initial = float(compte.get("solde_initial") or 0)
-        # Calculer le solde en appliquant les opérations valides
-        ops = _fetch_all(
-            """
-            SELECT type_operation, montant, statut, source_module
-            FROM tresorerie_operations
-            WHERE compte_id = ?
-            """,
-            (compte_id,),
-        )
-        solde = solde_initial
-        for op in ops:
-            statut = op.get("statut", "")
-            if statut == "annule":
-                continue
-            montant = float(op.get("montant") or 0)
-            type_op = op.get("type_operation", "")
-            source = op.get("source_module", "")
-            if type_op == "recette":
-                solde += montant
-            elif type_op == "depense":
-                solde -= montant
-            elif type_op == "virement_sortant":
-                solde -= montant
-            elif type_op == "virement_entrant":
-                solde += montant
-            elif type_op == "remise_cheque" or source == "remise_cheque":
-                solde += montant
-        solde = round(solde, 2)
+        solde = float(compte.get("solde_actuel") or 0)
         par_compte.append({"nom": compte["nom"], "solde": solde})
         solde_total += solde
         if int(compte.get("est_caisse") or 0):
@@ -170,6 +136,7 @@ def get_recettes_depenses_mois(annee: int, mois: int) -> dict:
             FROM tresorerie_operations
             WHERE type_operation IN ('recette')
               AND statut = 'valide'
+              AND (source_module IS NULL OR source_module NOT IN ('remise_cheque', 'depot_especes'))
               AND date_operation >= ?
               AND date_operation < ?
             """,
@@ -184,6 +151,7 @@ def get_recettes_depenses_mois(annee: int, mois: int) -> dict:
             FROM tresorerie_operations
             WHERE type_operation IN ('depense')
               AND statut = 'valide'
+              AND (source_module IS NULL OR source_module NOT IN ('remise_cheque', 'depot_especes'))
               AND date_operation >= ?
               AND date_operation < ?
             """,
@@ -270,10 +238,11 @@ def get_evolution_tresorerie(nb_mois: int = 12) -> list[dict]:
     # Toutes les opérations valides classées chronologiquement
     ops = _fetch_all(
         """
-        SELECT date_operation, type_operation, montant, statut
+        SELECT date_operation, type_operation, montant, statut, source_module
         FROM tresorerie_operations
         WHERE statut = 'valide'
           AND type_operation NOT IN ('virement_sortant', 'virement_entrant')
+          AND (source_module IS NULL OR source_module NOT IN ('remise_cheque', 'depot_especes'))
         ORDER BY date_operation ASC
         """
     )
