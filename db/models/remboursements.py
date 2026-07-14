@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from db.connection import get_connection
+from db.models import _build_nom_complet
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -23,9 +24,8 @@ def _creer_operation_remboursement_tombola(lot_info: dict, mode: str, date_rembo
             return
 
         lot_id = lot_info.get('id')
-        beneficiaire_nom = (
-            f"{lot_info.get('membre_nom') or ''} {lot_info.get('membre_prenom') or ''}".strip()
-            or "Bénéficiaire inconnu"
+        beneficiaire_nom = _build_nom_complet(
+            lot_info.get('membre_prenom'), lot_info.get('membre_nom'), defaut="Bénéficiaire inconnu"
         )
         description = lot_info.get('description') or f"Lot #{lot_id}"
 

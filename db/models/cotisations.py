@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import date
 
 from db.connection import get_connection
+from db.models import _build_nom_complet
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -18,7 +19,7 @@ def _get_nom_membre(adherent_id: int) -> str:
             "SELECT nom, prenom FROM membres WHERE id = ?", (adherent_id,)
         ).fetchone()
         if row:
-            return f"{(row['prenom'] or '').strip()} {(row['nom'] or '').strip()}".strip()
+            return _build_nom_complet(row['prenom'], row['nom'], defaut=f"Adhérent #{adherent_id}")
         return f"Adhérent #{adherent_id}"
     except Exception:
         return f"Adhérent #{adherent_id}"

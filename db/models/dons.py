@@ -6,6 +6,7 @@ from datetime import date
 from typing import Any
 
 from db.connection import get_connection
+from db.models import _build_nom_complet
 from db.models.parametres_globaux import get_parametre
 from utils.logger import get_logger
 
@@ -55,9 +56,9 @@ def _sync_operation_tresorerie_don(don_id: int, don_data: dict) -> None:
         )
 
         # Libellé du donateur
-        prenom = don_data.get('donateur_prenom') or ''
-        nom = don_data.get('donateur_nom') or ''
-        donateur = f"{prenom} {nom}".strip() or "Donateur"
+        donateur = _build_nom_complet(
+            don_data.get('donateur_prenom'), don_data.get('donateur_nom'), defaut="Donateur"
+        )
         date_don = str(don_data.get('date_don') or date.today().isoformat())
         mode = don_data.get('mode_versement') or "autre"
         compte_id = comptes[0]["id"]
