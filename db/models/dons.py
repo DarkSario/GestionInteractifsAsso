@@ -55,10 +55,9 @@ def _sync_operation_tresorerie_don(don_id: int, don_data: dict) -> None:
         )
 
         # Libellé du donateur
-        donateur = (
-            f"{(don_data.get('donateur_prenom') or '').strip()} "
-            f"{(don_data.get('donateur_nom') or '').strip()}".strip()
-        ) or "Donateur"
+        prenom = don_data.get('donateur_prenom') or ''
+        nom = don_data.get('donateur_nom') or ''
+        donateur = f"{prenom} {nom}".strip() or "Donateur"
         date_don = str(don_data.get('date_don') or date.today().isoformat())
         mode = don_data.get('mode_versement') or "autre"
         compte_id = comptes[0]["id"]

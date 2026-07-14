@@ -24,7 +24,7 @@ def _creer_operation_remboursement_tombola(lot_info: dict, mode: str, date_rembo
 
         lot_id = lot_info.get('id')
         beneficiaire_nom = (
-            f"{lot_info.get('membre_nom', '') or ''} {lot_info.get('membre_prenom', '') or ''}".strip()
+            f"{lot_info.get('membre_nom') or ''} {lot_info.get('membre_prenom') or ''}".strip()
             or "Bénéficiaire inconnu"
         )
         description = lot_info.get('description') or f"Lot #{lot_id}"
