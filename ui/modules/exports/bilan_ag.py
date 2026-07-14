@@ -21,8 +21,8 @@ class BilanAGDialog(ctk.CTkToplevel):
     def __init__(self, parent) -> None:
         super().__init__(parent)
         self.title("📋 Bilan AG")
-        self.geometry("700x720")
-        self.minsize(700, 680)
+        self.geometry("700x860")
+        self.minsize(700, 760)
         self.resizable(True, True)
         self.transient(parent)
         self.grab_set()
@@ -53,6 +53,10 @@ class BilanAGDialog(ctk.CTkToplevel):
         annee_en_cours = datetime.now().year
         self._annee_scolaire_var = ctk.StringVar(value=f"{annee_en_cours - 1}-{annee_en_cours}")
         self._annee_civile_var = ctk.StringVar(value=str(annee_en_cours))
+
+        # Zones de texte introduction / conclusion
+        self._introduction_widget: ctk.CTkTextbox | None = None
+        self._conclusion_widget: ctk.CTkTextbox | None = None
 
         self._build_ui()
 
@@ -134,6 +138,31 @@ class BilanAGDialog(ctk.CTkToplevel):
             anchor="w", padx=34, pady=(0, 12)
         )
 
+        # ── Textes libres — Introduction / Conclusion ──────────────────────────
+        frame_textes = ctk.CTkFrame(scroll)
+        frame_textes.pack(fill="x", padx=20, pady=(0, 10))
+        ctk.CTkLabel(frame_textes, text="Textes du bilan", font=fonts.get("subtitle")).pack(
+            anchor="w", padx=12, pady=(10, 6)
+        )
+
+        ctk.CTkLabel(
+            frame_textes,
+            text="Introduction (affiché en début de bilan)",
+            anchor="w",
+            font=ctk.CTkFont(size=12),
+        ).pack(anchor="w", padx=12, pady=(4, 2))
+        self._introduction_widget = ctk.CTkTextbox(frame_textes, height=70)
+        self._introduction_widget.pack(fill="x", padx=12, pady=(0, 8))
+
+        ctk.CTkLabel(
+            frame_textes,
+            text="Conclusion (affichée en fin de bilan, avant la signature)",
+            anchor="w",
+            font=ctk.CTkFont(size=12),
+        ).pack(anchor="w", padx=12, pady=(0, 2))
+        self._conclusion_widget = ctk.CTkTextbox(frame_textes, height=70)
+        self._conclusion_widget.pack(fill="x", padx=12, pady=(0, 12))
+
         # ── Destination ───────────────────────────────────────────────────────
         frame_dest = ctk.CTkFrame(scroll)
         frame_dest.pack(fill="x", padx=20, pady=(0, 12))
@@ -185,6 +214,13 @@ class BilanAGDialog(ctk.CTkToplevel):
         else:
             periode = self._annee_scolaire_var.get() or self._exercice_var.get()
 
+        introduction = ""
+        conclusion = ""
+        if self._introduction_widget:
+            introduction = self._introduction_widget.get("1.0", "end").strip()
+        if self._conclusion_widget:
+            conclusion = self._conclusion_widget.get("1.0", "end").strip()
+
         sections = {cle: var.get() for cle, var in self._sections_vars.items()}
         chemin = os.path.join(dossier, nom_fichier)
         ok = export_bilan_ag_pdf(
@@ -193,6 +229,8 @@ class BilanAGDialog(ctk.CTkToplevel):
             sections=sections,
             avec_graphiques=self._graphiques_var.get(),
             type_periode=type_periode,
+            introduction=introduction,
+            conclusion=conclusion,
         )
         if ok:
             afficher_info(self, "Bilan généré", f"Le bilan AG a été généré :\n{chemin}")

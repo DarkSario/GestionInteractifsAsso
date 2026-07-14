@@ -86,6 +86,19 @@ class WelcomeScreen(ctk.CTk):
             self._after_center_id = None
         super().destroy()
 
+    @staticmethod
+    def report_callback_exception(exc_type, exc_val, exc_tb) -> None:  # type: ignore[override]
+        """Supprime les TclError sur widgets détruits lors de la transition WelcomeScreen → MainApp."""
+        import tkinter
+        if issubclass(exc_type, tkinter.TclError):
+            import logging
+            logging.getLogger(__name__).debug(
+                "TclError supprimé (widget détruit) : %s", exc_val
+            )
+            return
+        import traceback
+        traceback.print_exception(exc_type, exc_val, exc_tb)
+
     def run(self) -> str | None:
         self.mainloop()
         return self.result_path

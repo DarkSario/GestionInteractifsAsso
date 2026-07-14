@@ -22,6 +22,88 @@ _ALLOWED_FIELDS = {
 _COLUMN_SQL = {field: field for field in _ALLOWED_FIELDS}
 
 
+def _sync_operation_tresorerie_don(don_id: int, don_data: dict) -> None:
+    """Crée ou met à jour l'opération trésorerie liée à un don en argent."""
+    try:
+        nature_don = (don_data.get('nature_don') or 'argent').lower()
+        montant = float(don_data.get('montant') or 0)
+        if nature_don != 'argent' or montant <= 0:
+            return
+
+        from db.models.tresorerie import add_operation, get_all_comptes, get_all_categories
+        from db.connection import get_connection as _gc
+
+        # Vérifier si une opération existe déjà pour ce don
+        _conn = _gc()
+        try:
+            row = _conn.execute(
+                "SELECT id FROM tresorerie_operations WHERE source_module = 'don' AND source_id = ?",
+                (don_id,),
+            ).fetchone()
+            existing_id = row[0] if row else None
+        finally:
+            _conn.close()
+
+        comptes = get_all_comptes(actif_only=True)
+        if not comptes:
+            return
+
+        categories = get_all_categories("recette")
+        cat_don = next(
+            (c for c in categories if "don" in (c.get("nom") or "").lower()),
+            None,
+        )
+
+        # Libellé du donateur
+        donateur = (
+            f"{(don_data.get('donateur_prenom') or '').strip()} "
+            f"{(don_data.get('donateur_nom') or '').strip()}".strip()
+        ) or "Donateur"
+        date_don = str(don_data.get('date_don') or date.today().isoformat())
+        mode = don_data.get('mode_versement') or "autre"
+        compte_id = comptes[0]["id"]
+        cat_id = int(cat_don["id"]) if cat_don else None
+        libelle = f"Don — {donateur}"
+        commentaire = "Don automatique enregistré"
+
+        if existing_id:
+            _conn2 = _gc()
+            try:
+                _conn2.execute(
+                    """
+                    UPDATE tresorerie_operations
+                    SET montant = ?, date_operation = ?, mode_paiement = ?,
+                        categorie_id = ?, libelle = ?, statut = 'valide'
+                    WHERE source_module = 'don' AND source_id = ?
+                    """,
+                    (montant, date_don, mode, cat_id, libelle, don_id),
+                )
+                _conn2.commit()
+            finally:
+                _conn2.close()
+        else:
+            add_operation(
+                compte_id=compte_id,
+                type_operation="recette",
+                libelle=libelle,
+                montant=montant,
+                date_operation=date_don,
+                categorie_id=cat_id,
+                mode_paiement=mode,
+                numero_facture=None,
+                evenement_id=None,
+                fournisseur_id=None,
+                statut="valide",
+                est_automatique=1,
+                source_module="don",
+                source_id=don_id,
+                commentaire=commentaire,
+            )
+    except Exception as exc:  # noqa: BLE001
+        logger.error("_sync_operation_tresorerie_don (don %s): %s", don_id, exc)
+
+
+
 def _fetch_all(query: str, params: tuple[Any, ...] = ()) -> list[dict]:
     conn = get_connection()
     try:
@@ -80,9 +162,13 @@ def add_don(**kwargs) -> int:
             tuple(valeurs),
         )
         conn.commit()
-        return int(cur.lastrowid)
+        don_id = int(cur.lastrowid)
     finally:
         conn.close()
+
+    if don_id:
+        _sync_operation_tresorerie_don(don_id, champs)
+    return don_id
 
 
 def get_all_dons(filters: dict[str, Any] | None = None) -> list[dict]:
@@ -159,12 +245,18 @@ def update_don(don_id: int, **kwargs) -> bool:
             tuple(valeurs),
         )
         conn.commit()
-        return True
+        ok = True
     except Exception as exc:  # noqa: BLE001
         logger.error('update_don: %s', exc)
         return False
     finally:
         conn.close()
+
+    if ok:
+        don = get_don_by_id(don_id)
+        if don:
+            _sync_operation_tresorerie_don(don_id, don)
+    return ok
 
 
 def delete_don(don_id: int) -> bool:

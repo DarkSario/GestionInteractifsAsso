@@ -107,6 +107,8 @@ class MainApp(ctk.CTk):
         menu_exports = tk.Menu(menubar, tearoff=0)
         menu_exports.add_command(label="📋 Bilan AG", command=self._ouvrir_bilan_ag)
         menu_exports.add_command(label="📂 Dossier Subvention", command=self._ouvrir_dossier_subvention)
+        menu_exports.add_separator()
+        menu_exports.add_command(label="📊 Export CSV Trésorerie", command=self._ouvrir_export_csv_tresorerie)
         menubar.add_cascade(label="Exports", menu=menu_exports)
         menubar.add_command(label="🏠 Tableau de bord", command=self._ouvrir_dashboard)
 
@@ -330,6 +332,13 @@ class MainApp(ctk.CTk):
         fenetre = DossierSubventionDialog(self)
         fenetre.grab_set()
 
+    def _ouvrir_export_csv_tresorerie(self) -> None:
+        """Ouvre la fenêtre d'export CSV des opérations de trésorerie."""
+        from ui.modules.exports.export_csv_tresorerie import ExportCSVTresorerieDialog
+
+        fenetre = ExportCSVTresorerieDialog(self)
+        fenetre.grab_set()
+
     def _ouvrir_export_base(self) -> None:
         """Ouvre le dialogue d'export de la base."""
         from ui.modules.administration.import_export_dialog import ExportBaseDialog
@@ -411,3 +420,16 @@ class MainApp(ctk.CTk):
             except Exception:  # noqa: BLE001
                 pass
         super().destroy()
+
+    @staticmethod
+    def report_callback_exception(exc_type, exc_val, exc_tb) -> None:  # type: ignore[override]
+        """Supprime les TclError sur widgets détruits (callbacks after() résiduels)."""
+        import tkinter
+        if issubclass(exc_type, tkinter.TclError):
+            import logging
+            logging.getLogger(__name__).debug(
+                "TclError supprimé (widget détruit) : %s", exc_val
+            )
+            return
+        import traceback
+        traceback.print_exception(exc_type, exc_val, exc_tb)

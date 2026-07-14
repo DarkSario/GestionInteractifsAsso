@@ -531,15 +531,22 @@ def get_stats_adherents_dashboard() -> dict:
         )
     )
 
-    # Cotisations non réglées : membres actifs dont la cotisation est NULL ou vide
+    # Cotisations non à jour : membres actifs sans cotisation payee ou offerte
+    # pour l'année courante dans la table cotisations (Phase 16)
+    annee_courante = date.today().year
     nb_cotisation_non_reglee = int(
         _fetch_scalar(
             """
             SELECT COUNT(*)
-            FROM membres
-            WHERE statut_archive = 0
-              AND (cotisation IS NULL OR TRIM(cotisation) = '')
+            FROM membres m
+            LEFT JOIN cotisations c
+                ON c.adherent_id = m.id
+               AND c.annee = ?
+               AND c.statut IN ('payee', 'offerte')
+            WHERE m.statut_archive = 0
+              AND c.id IS NULL
             """,
+            (annee_courante,),
             default=0,
         )
     )
@@ -830,7 +837,7 @@ def get_toutes_alertes() -> list[dict]:
             }
         )
 
-    # Cotisations non réglées
+    # Cotisations non à jour
     stats_adh = get_stats_adherents_dashboard()
     if stats_adh["nb_cotisation_non_reglee"] > 0:
         alertes.append(
@@ -838,7 +845,7 @@ def get_toutes_alertes() -> list[dict]:
                 "niveau": "bleu",
                 "message": (
                     f"{stats_adh['nb_cotisation_non_reglee']} cotisation(s) "
-                    "non renseignée(s)"
+                    "non à jour"
                 ),
                 "module": "adherents",
                 "lien_action": "membres",

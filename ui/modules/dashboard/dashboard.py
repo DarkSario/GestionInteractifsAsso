@@ -80,6 +80,7 @@ class DashboardFrame(ctk.CTkFrame):
         self._section_graphique(d)
         self._section_evenements(d)
         self._section_adherents_stock(d)
+        self._section_remboursements(d)
         self._section_sauvegarde(d)
 
     # ── Sections ──────────────────────────────────────────────────────────────
@@ -385,7 +386,7 @@ class DashboardFrame(ctk.CTkFrame):
         adh_lignes = [
             ("Total", str(adh.get("nb_total", 0))),
             ("Actifs", str(adh.get("nb_actifs", 0))),
-            ("Cotisations non renseignées", str(adh.get("nb_cotisation_non_reglee", 0))),
+            ("Cotisations non à jour", str(adh.get("nb_cotisation_non_reglee", 0))),
             ("Nouveaux ce mois", str(adh.get("nb_nouveaux_ce_mois", 0))),
         ]
         for libelle, valeur in adh_lignes:
@@ -454,6 +455,36 @@ class DashboardFrame(ctk.CTkFrame):
             font=ctk.CTkFont(size=11),
             command=lambda: self._navigation_callback("stock") if self._navigation_callback else None,
         ).pack(anchor="w", padx=10, pady=(6, 10))
+
+    def _section_remboursements(self, d: dict) -> None:
+        remb = d.get("remboursements_en_attente", {})
+        nb = int(remb.get("nb_remboursements") or 0)
+        total = float(remb.get("total_en_attente") or 0)
+
+        if nb == 0:
+            return
+
+        frame = ctk.CTkFrame(self._scroll, corner_radius=8)
+        frame.pack(fill="x", padx=12, pady=(0, 8))
+
+        frame_row = ctk.CTkFrame(frame, fg_color="transparent")
+        frame_row.pack(fill="x", padx=10, pady=8)
+
+        ctk.CTkLabel(
+            frame_row,
+            text=f"💸  {nb} remboursement(s) en attente — {total:.2f} €",
+            font=ctk.CTkFont(size=13, weight="bold"),
+            text_color=("#e65100", "#ff8a65"),
+        ).pack(side="left")
+
+        ctk.CTkButton(
+            frame_row,
+            text="Voir les remboursements",
+            width=200,
+            height=28,
+            font=ctk.CTkFont(size=11),
+            command=lambda: self._navigation_callback("remboursements") if self._navigation_callback else None,
+        ).pack(side="right")
 
     def _section_sauvegarde(self, d: dict) -> None:
         sauvegarde = d.get("derniere_sauvegarde", {})

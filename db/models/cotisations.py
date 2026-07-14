@@ -10,6 +10,113 @@ from utils.logger import get_logger
 logger = get_logger(__name__)
 
 
+def _get_nom_membre(adherent_id: int) -> str:
+    """Retourne 'Prenom Nom' d'un adhérent."""
+    conn = get_connection()
+    try:
+        row = conn.execute(
+            "SELECT nom, prenom FROM membres WHERE id = ?", (adherent_id,)
+        ).fetchone()
+        if row:
+            return f"{(row['prenom'] or '').strip()} {(row['nom'] or '').strip()}".strip()
+        return f"Adhérent #{adherent_id}"
+    except Exception:
+        return f"Adhérent #{adherent_id}"
+    finally:
+        conn.close()
+
+
+def _sync_operation_tresorerie(cotisation_id: int, adherent_id: int, annee: int,
+                                montant: float, statut: str,
+                                date_paiement: str | None, mode_paiement: str | None) -> None:
+    """Crée, met à jour ou annule l'opération trésorerie liée à une cotisation.
+
+    - statut='payee' et montant>0 : crée ou met à jour l'opération en 'valide'
+    - statut='offerte' ou 'en_attente' : annule l'opération si elle existe
+    """
+    try:
+        from db.models.tresorerie import add_operation, get_all_comptes, get_all_categories
+        from db.connection import get_connection as _gc
+
+        # Chercher si une opération existe déjà pour cette cotisation
+        _conn = _gc()
+        try:
+            row = _conn.execute(
+                "SELECT id, statut FROM tresorerie_operations WHERE source_module = 'cotisation' AND source_id = ?",
+                (cotisation_id,),
+            ).fetchone()
+            existing = dict(row) if row else None
+        finally:
+            _conn.close()
+
+        if statut == "payee" and float(montant or 0) > 0:
+            comptes = get_all_comptes(actif_only=True)
+            if not comptes:
+                return
+
+            categories = get_all_categories("recette")
+            cat_cotisation = next(
+                (c for c in categories if "cotisation" in (c.get("nom") or "").lower()),
+                None,
+            )
+            nom_membre = _get_nom_membre(adherent_id)
+            date_op = date_paiement or date.today().isoformat()
+            compte_id = comptes[0]["id"]
+            cat_id = int(cat_cotisation["id"]) if cat_cotisation else None
+            libelle = f"Cotisation {annee} — {nom_membre}"
+            commentaire = f"Cotisation automatique exercice {annee}"
+            mode = mode_paiement or "autre"
+
+            if existing:
+                # Mettre à jour l'opération existante
+                _conn2 = _gc()
+                try:
+                    _conn2.execute(
+                        """
+                        UPDATE tresorerie_operations
+                        SET montant = ?, date_operation = ?, mode_paiement = ?,
+                            categorie_id = ?, libelle = ?, statut = 'valide'
+                        WHERE source_module = 'cotisation' AND source_id = ?
+                        """,
+                        (float(montant), date_op, mode, cat_id, libelle, cotisation_id),
+                    )
+                    _conn2.commit()
+                finally:
+                    _conn2.close()
+            else:
+                add_operation(
+                    compte_id=compte_id,
+                    type_operation="recette",
+                    libelle=libelle,
+                    montant=float(montant),
+                    date_operation=date_op,
+                    categorie_id=cat_id,
+                    mode_paiement=mode,
+                    numero_facture=None,
+                    evenement_id=None,
+                    fournisseur_id=None,
+                    statut="valide",
+                    est_automatique=1,
+                    source_module="cotisation",
+                    source_id=cotisation_id,
+                    commentaire=commentaire,
+                )
+        else:
+            # statut != payee → annuler l'opération si elle existe
+            if existing and existing.get("statut") != "annule":
+                _conn3 = _gc()
+                try:
+                    _conn3.execute(
+                        "UPDATE tresorerie_operations SET statut = 'annule' WHERE source_module = 'cotisation' AND source_id = ?",
+                        (cotisation_id,),
+                    )
+                    _conn3.commit()
+                finally:
+                    _conn3.close()
+    except Exception as exc:  # noqa: BLE001
+        logger.error("_sync_operation_tresorerie (cotisation %s): %s", cotisation_id, exc)
+
+
 # ── Lecture ───────────────────────────────────────────────────────────────────
 
 
@@ -117,13 +224,20 @@ def add_cotisation(
             ),
         )
         conn.commit()
-        return cursor.lastrowid or 0
+        cotisation_id = cursor.lastrowid or 0
     except Exception as exc:
         logger.exception("add_cotisation: %s", exc)
         conn.rollback()
         return 0
     finally:
         conn.close()
+
+    if cotisation_id:
+        _sync_operation_tresorerie(
+            cotisation_id, adherent_id, annee, montant, statut,
+            date_paiement, mode_paiement,
+        )
+    return cotisation_id
 
 
 def update_cotisation(cotisation_id: int, **kwargs) -> bool:
@@ -155,13 +269,28 @@ def update_cotisation(cotisation_id: int, **kwargs) -> bool:
             values,
         )
         conn.commit()
-        return True
+        ok = True
     except Exception as exc:
         logger.exception("update_cotisation(%s): %s", cotisation_id, exc)
         conn.rollback()
         return False
     finally:
         conn.close()
+
+    if ok:
+        # Récupérer la cotisation complète pour synchroniser l'opération trésorerie
+        cotisation = get_cotisation_by_id(cotisation_id)
+        if cotisation:
+            _sync_operation_tresorerie(
+                cotisation_id,
+                int(cotisation.get("adherent_id") or 0),
+                int(cotisation.get("annee") or date.today().year),
+                float(cotisation.get("montant") or 0),
+                cotisation.get("statut") or "en_attente",
+                cotisation.get("date_paiement"),
+                cotisation.get("mode_paiement"),
+            )
+    return ok
 
 
 def delete_cotisation(cotisation_id: int) -> bool:
