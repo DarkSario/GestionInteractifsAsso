@@ -117,6 +117,13 @@ def get_donnees_dashboard() -> dict:
         }
 
     try:
+        from db.models.remboursements import get_stats_remboursements
+        stats_remboursements = get_stats_remboursements()
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("get_stats_remboursements: %s", exc)
+        stats_remboursements = {"total_en_attente": 0.0, "nb_remboursements": 0, "par_adherent": []}
+
+    try:
         alertes_stock = get_alertes_stock()
     except Exception as exc:  # noqa: BLE001
         logger.warning("get_alertes_stock: %s", exc)
@@ -152,6 +159,7 @@ def get_donnees_dashboard() -> dict:
         "stock": alertes_stock,
         "alertes": toutes_alertes,
         "derniere_sauvegarde": derniere_sauvegarde,
+        "remboursements_en_attente": stats_remboursements,
     }
 
 

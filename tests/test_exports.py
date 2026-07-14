@@ -55,11 +55,12 @@ def _creer_evenement_complet() -> int:
 
 
 def test_get_config_asso_defaut():
-    """Si paramètres vides → ConfigAsso avec valeurs vides (pas d'erreur)."""
+    """Si paramètres vides → ConfigAsso avec ASSOCIATION_NAME comme nom par défaut (pas d'erreur)."""
     from core.exports import get_config_asso
+    from config.settings import ASSOCIATION_NAME
 
     config = get_config_asso()
-    assert config.nom == ""
+    assert config.nom == ASSOCIATION_NAME
     assert config.adresse == ""
     assert config.telephone == ""
     assert config.email == ""

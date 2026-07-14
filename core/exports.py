@@ -22,11 +22,12 @@ class ConfigAsso:
 
 
 def get_config_asso() -> ConfigAsso:
-    """Lit les paramètres association depuis la DB."""
+    """Lit les paramètres association depuis la DB, avec ASSOCIATION_NAME comme fallback."""
     from db.models.evenements import get_parametre
+    from config.settings import ASSOCIATION_NAME
 
     return ConfigAsso(
-        nom=get_parametre("asso_nom") or "",
+        nom=get_parametre("asso_nom") or ASSOCIATION_NAME,
         adresse=get_parametre("asso_adresse") or "",
         telephone=get_parametre("asso_telephone") or "",
         email=get_parametre("asso_email") or "",
@@ -183,13 +184,16 @@ def montant_signe_operation(operation: dict) -> float:
 def export_bilan_ag_pdf(exercice: str, chemin_sortie: str,
                         sections: dict | None = None,
                         avec_graphiques: bool = False,
-                        type_periode: str = "scolaire") -> bool:
+                        type_periode: str = "scolaire",
+                        introduction: str = "",
+                        conclusion: str = "") -> bool:
     """Génère le bilan AG au format PDF."""
     try:
         from core.pdf_bilan_ag import PdfBilanAG
 
         gen = PdfBilanAG(exercice, sections=sections, avec_graphiques=avec_graphiques,
-                         type_periode=type_periode)
+                         type_periode=type_periode,
+                         introduction=introduction, conclusion=conclusion)
         return gen.generer(chemin_sortie)
     except Exception as exc:
         logger.exception("export_bilan_ag_pdf: %s", exc)

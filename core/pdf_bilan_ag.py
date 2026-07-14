@@ -35,6 +35,8 @@ class PdfBilanAG(PdfBasePro):
         avec_graphiques: bool = False,
         orientation: str = "portrait",
         type_periode: str = "scolaire",
+        introduction: str = "",
+        conclusion: str = "",
     ):
         super().__init__("Bilan Assemblée Générale", orientation=orientation, avec_page_garde=True)
         self.exercice = exercice or self.exercice
@@ -44,6 +46,8 @@ class PdfBilanAG(PdfBasePro):
         self._avec_graphiques = bool(avec_graphiques)
         self._type_periode = type_periode or "scolaire"
         self._annee = self._extraire_annee(self.exercice)
+        self._introduction = introduction or ""
+        self._conclusion = conclusion or ""
 
     @staticmethod
     def _extraire_annee(exercice: str) -> int | None:
@@ -166,6 +170,13 @@ class PdfBilanAG(PdfBasePro):
             elements.append(Paragraph("Option graphiques activée.", self._style_small))
         elements.append(Spacer(1, 0.2 * cm))
 
+        # Introduction
+        if self._introduction:
+            elements.append(Spacer(1, 0.3 * cm))
+            import html as _html
+            elements.append(Paragraph(_html.escape(self._introduction).replace("\n", "<br/>"), self._style_normal))
+            elements.append(Spacer(1, 0.4 * cm))
+
         try:
             sections = [
                 ("resume_financier", self._section_resume_financier),
@@ -182,6 +193,14 @@ class PdfBilanAG(PdfBasePro):
                 if self._sections.get(section_key):
                     elements.append(CondPageBreak(6 * cm))
                     elements.extend(self._envelopper_section(section_fn()))
+
+            # Conclusion (avant la signature si pas de section signatures)
+            if self._conclusion:
+                import html as _html
+                elements.append(Spacer(1, 0.4 * cm))
+                elements.append(Paragraph(_html.escape(self._conclusion).replace("\n", "<br/>"), self._style_normal))
+                elements.append(Spacer(1, 0.3 * cm))
+
             return elements
         except Exception as exc:
             logger.exception("PdfBilanAG._construire_contenu: %s", exc)
