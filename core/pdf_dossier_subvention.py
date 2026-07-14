@@ -316,19 +316,11 @@ class PdfDossierSubvention(PdfBasePro):
             (self._variables["nb_evenements"], "Événements"),
         ]
         try:
-            from db.connection import get_connection
-            conn = get_connection()
-            try:
-                row = conn.execute(
-                    """SELECT COALESCE(SUM(montant), 0) as total FROM tresorerie_operations
-                       WHERE date_operation >= ? AND date_operation <= ?""",
-                    (self._date_debut, self._date_fin),
-                ).fetchone()
-                budget = float(row["total"]) if row else 0.0
-                budget_fmt = f"{budget:,.0f} €".replace(",", "\u202f")
-                kpis.append((budget_fmt, "Budget"))
-            finally:
-                conn.close()
+            from db.models.tresorerie import get_stats_tresorerie
+            stats = get_stats_tresorerie(date_debut=self._date_debut, date_fin=self._date_fin)
+            budget = stats["total_recettes"]
+            budget_fmt = f"{budget:,.0f} EUR".replace(",", "\u202f")
+            kpis.append((budget_fmt, "Budget"))
         except Exception:
             pass
 
@@ -452,25 +444,11 @@ class PdfDossierSubvention(PdfBasePro):
     def _section_resume_financier(self) -> list:
         elements = self._titre_section_pro("Bilan financier")
         try:
-            from db.connection import get_connection
-            conn = get_connection()
-            try:
-                rec = conn.execute(
-                    """SELECT COALESCE(SUM(montant), 0) as total FROM tresorerie_operations
-                       WHERE type_operation = 'recette' AND date_operation >= ? AND date_operation <= ?""",
-                    (self._date_debut, self._date_fin),
-                ).fetchone()
-                dep = conn.execute(
-                    """SELECT COALESCE(SUM(montant), 0) as total FROM tresorerie_operations
-                       WHERE type_operation = 'depense' AND date_operation >= ? AND date_operation <= ?""",
-                    (self._date_debut, self._date_fin),
-                ).fetchone()
-            finally:
-                conn.close()
-
-            recettes = float(rec["total"]) if rec else 0.0
-            depenses = float(dep["total"]) if dep else 0.0
-            solde = recettes - depenses
+            from db.models.tresorerie import get_stats_tresorerie
+            stats = get_stats_tresorerie(date_debut=self._date_debut, date_fin=self._date_fin)
+            recettes = stats["total_recettes"]
+            depenses = stats["total_depenses"]
+            solde = stats["solde"]
 
             donnees = [
                 ["Indicateur", "Montant"],
@@ -508,6 +486,8 @@ class PdfDossierSubvention(PdfBasePro):
                        FROM tresorerie_operations o
                        LEFT JOIN tresorerie_categories c ON o.categorie_id = c.id
                        WHERE o.date_operation >= ? AND o.date_operation <= ?
+                         AND o.statut = 'valide'
+                         AND (o.source_module IS NULL OR o.source_module NOT IN ('remise_cheque', 'depot_especes'))
                        GROUP BY c.nom, o.type_operation
                        ORDER BY c.nom, o.type_operation""",
                     (self._date_debut, self._date_fin),
@@ -546,10 +526,18 @@ class PdfDossierSubvention(PdfBasePro):
             try:
                 rows = conn.execute(
                     """SELECT c.nom,
-                              COALESCE(SUM(CASE WHEN o.type_operation='recette' THEN o.montant ELSE -o.montant END), 0) as solde
+                              COALESCE(SUM(
+                                  CASE
+                                    WHEN o.type_operation = 'recette' THEN o.montant
+                                    WHEN o.type_operation = 'depense' THEN -o.montant
+                                    ELSE 0
+                                  END
+                              ), 0) as solde
                        FROM comptes_bancaires c
                        LEFT JOIN tresorerie_operations o ON o.compte_id = c.id
-                       AND o.date_operation >= ? AND o.date_operation <= ?
+                           AND o.date_operation >= ? AND o.date_operation <= ?
+                           AND o.statut = 'valide'
+                           AND (o.source_module IS NULL OR o.source_module NOT IN ('remise_cheque', 'depot_especes'))
                        WHERE c.actif = 1
                        GROUP BY c.id, c.nom
                        ORDER BY c.nom""",

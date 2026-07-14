@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 from reportlab.lib import colors
+from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import cm
-from reportlab.platypus import CondPageBreak, KeepTogether, Paragraph, Spacer, Table, TableStyle
+from reportlab.platypus import CondPageBreak, HRFlowable, KeepTogether, PageBreak, Paragraph, Spacer, Table, TableStyle
 
-from core.pdf_base import BasePDF
+from core.pdf_base_pro import PdfBasePro, COULEUR_GRIS, COULEUR_NOIR, MARGE
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -24,7 +25,7 @@ _SECTIONS_PAR_DEFAUT = {
 }
 
 
-class PdfBilanAG(BasePDF):
+class PdfBilanAG(PdfBasePro):
     """Export PDF du bilan pour l'assemblée générale."""
 
     def __init__(
@@ -67,8 +68,98 @@ class PdfBilanAG(BasePDF):
                 pass
         return f"{self._annee}-01-01", f"{self._annee}-12-31"
 
+
+    def _page_garde(self) -> list:
+        """Page de garde professionnelle du Bilan AG."""
+        import os
+
+        elements: list = [Spacer(1, 3 * cm)]
+
+        # Logo centré (priorité : logo_pro_path, puis config_asso.logo_path)
+        logo_path = self._logo_pro_path or self.config_asso.logo_path or ""
+        if logo_path and os.path.isfile(logo_path):
+            try:
+                from reportlab.platypus import Image as RLImage
+                img = RLImage(logo_path, width=5 * cm, height=3 * cm, kind="proportional")
+                img.hAlign = "CENTER"
+                elements.append(img)
+                elements.append(Spacer(1, 0.8 * cm))
+            except Exception as exc:
+                logger.error("PdfBilanAG._page_garde logo: %s", exc)
+
+        # Ligne décorative
+        elements.append(HRFlowable(
+            width="80%",
+            thickness=2,
+            color=self._couleur_principale,
+            hAlign="CENTER",
+        ))
+        elements.append(Spacer(1, 0.5 * cm))
+
+        # Nom de l'association
+        nom_asso = self.config_asso.nom or ""
+        if not nom_asso:
+            try:
+                from db.models.parametres_globaux import get_parametre
+                nom_asso = get_parametre("nom_asso", "") or get_parametre("asso_nom", "Association")
+            except Exception:
+                nom_asso = "Association"
+
+        style_nom = ParagraphStyle(
+            "BilanGardeNom",
+            parent=self._style_nom_asso_couverture,
+            textColor=self._couleur_principale,
+            fontSize=20,
+            spaceAfter=4,
+        )
+        elements.append(Paragraph(nom_asso, style_nom))
+
+        elements.append(Spacer(1, 0.5 * cm))
+        elements.append(HRFlowable(
+            width="80%",
+            thickness=2,
+            color=self._couleur_principale,
+            hAlign="CENTER",
+        ))
+        elements.append(Spacer(1, 1.5 * cm))
+
+        # Titre principal
+        style_titre_garde = ParagraphStyle(
+            "BilanGardeTitre",
+            parent=self._style_titre_couverture,
+            fontSize=18,
+            textColor=self._couleur_secondaire,
+            spaceAfter=8,
+        )
+        elements.append(Paragraph("BILAN ASSEMBLÉE GÉNÉRALE", style_titre_garde))
+        elements.append(Spacer(1, 0.8 * cm))
+
+        # Exercice
+        style_info = ParagraphStyle(
+            "BilanGardeInfo",
+            parent=self._style_normal,
+            alignment=1,
+            fontSize=11,
+            spaceAfter=4,
+        )
+        style_label = ParagraphStyle(
+            "BilanGardeLabel",
+            parent=style_info,
+            textColor=COULEUR_GRIS,
+            fontSize=10,
+        )
+        if self.exercice:
+            elements.append(Paragraph(f"Exercice {self.exercice}", style_info))
+        elements.append(Spacer(1, 0.3 * cm))
+        elements.append(Paragraph(
+            self.date_export.strftime("Généré le %d/%m/%Y"),
+            style_label,
+        ))
+
+        return elements
+
     def _construire_contenu(self) -> list:
-        elements: list = [Paragraph(self.titre, self._style_titre)]
+        elements: list = []
         if self.exercice:
             elements.append(Paragraph(f"Exercice : {self.exercice}", self._style_normal))
         if self._avec_graphiques:
@@ -118,7 +209,7 @@ class PdfBilanAG(BasePDF):
         from db.models.tresorerie import get_all_comptes, get_stats_tresorerie
 
         date_debut, date_fin = self._periode()
-        elements = self._titre_section("Résumé financier")
+        elements = self._titre_section_pro("Résumé financier")
         comptes = get_all_comptes(actif_only=False)
         stats = get_stats_tresorerie(date_debut=date_debut or None, date_fin=date_fin or None)
 
@@ -155,7 +246,7 @@ class PdfBilanAG(BasePDF):
         from db.models.tresorerie import get_stats_tresorerie
 
         date_debut, date_fin = self._periode()
-        elements = self._titre_section("Trésorerie par catégorie")
+        elements = self._titre_section_pro("Trésorerie par catégorie")
         stats = get_stats_tresorerie(date_debut=date_debut or None, date_fin=date_fin or None)
         categories = stats.get("par_categorie") or {}
         if not categories:
@@ -171,7 +262,7 @@ class PdfBilanAG(BasePDF):
     def _section_subventions(self) -> list:
         from db.models.tresorerie import get_all_subventions
 
-        elements = self._titre_section("Subventions de l'exercice")
+        elements = self._titre_section_pro("Subventions de l'exercice")
         subventions = get_all_subventions(annee=self._annee)
         if not subventions:
             return elements + [self._message_aucune_donnee()]
@@ -206,7 +297,7 @@ class PdfBilanAG(BasePDF):
     def _section_evenements(self) -> list:
         from db.connection import get_connection
 
-        elements = self._titre_section("Événements")
+        elements = self._titre_section_pro("Événements")
         conn = get_connection()
         try:
             if self._annee:
@@ -256,7 +347,7 @@ class PdfBilanAG(BasePDF):
     def _section_buvette(self) -> list:
         from db.models.buvette import get_all_articles_buvette, get_recettes_buvette
 
-        elements = self._titre_section("Bilan buvette")
+        elements = self._titre_section_pro("Bilan buvette")
         articles = get_all_articles_buvette(include_archives=False)
         recettes = get_recettes_buvette(limit=1000)
         if self._annee:
@@ -277,7 +368,7 @@ class PdfBilanAG(BasePDF):
     def _section_adherents(self) -> list:
         from db.models.membres import get_all_membres
 
-        elements = self._titre_section("Statistiques adhérents")
+        elements = self._titre_section_pro("Statistiques adhérents")
         membres = get_all_membres(include_archives=True)
         # Ne pas filtrer par année d'adhésion — afficher tous les membres actifs
         if not membres:
@@ -300,7 +391,7 @@ class PdfBilanAG(BasePDF):
         return elements
 
     def _section_dons(self) -> list:
-        elements = self._titre_section("Dons reçus")
+        elements = self._titre_section_pro("Dons reçus")
         try:
             from db.models.dons import get_all_dons
 
@@ -344,7 +435,7 @@ class PdfBilanAG(BasePDF):
         return elements
 
     def _section_remboursements(self) -> list:
-        elements = self._titre_section("Remboursements en attente")
+        elements = self._titre_section_pro("Remboursements en attente")
         try:
             from db.models.remboursements import get_remboursements_en_attente
 
@@ -379,7 +470,7 @@ class PdfBilanAG(BasePDF):
         return elements
 
     def _section_signatures(self) -> list:
-        elements = self._titre_section("Signatures")
+        elements = self._titre_section_pro("Signatures")
         contenu = [
             [
                 Paragraph("........................................<br/><br/>Président", self._style_center),

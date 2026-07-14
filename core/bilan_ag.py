@@ -236,7 +236,8 @@ def collecter_donnees_bilan(
                     COALESCE(SUM(CASE WHEN type_operation = 'depense' THEN montant ELSE 0 END), 0) AS depenses
                 FROM tresorerie_operations
                 WHERE exercice_id = ?
-                  AND statut != 'annule'
+                  AND statut = 'valide'
+                  AND (source_module IS NULL OR source_module NOT IN ('remise_cheque', 'depot_especes'))
                 """,
                 (exercice_id,),
             ).fetchone()
@@ -264,7 +265,9 @@ def collecter_donnees_bilan(
                     COALESCE(SUM(CASE WHEN o.type_operation = 'recette' THEN o.montant ELSE 0 END), 0) AS total_recettes,
                     COALESCE(SUM(CASE WHEN o.type_operation = 'depense' THEN o.montant ELSE 0 END), 0) AS total_depenses
                 FROM evenements e
-                LEFT JOIN tresorerie_operations o ON o.evenement_id = e.id AND o.statut != 'annule'
+                LEFT JOIN tresorerie_operations o ON o.evenement_id = e.id
+                    AND o.statut = 'valide'
+                    AND (o.source_module IS NULL OR o.source_module NOT IN ('remise_cheque', 'depot_especes'))
                 WHERE e.exercice_id = ?
                 GROUP BY e.id, e.nom, e.date_debut
                 ORDER BY e.date_debut
