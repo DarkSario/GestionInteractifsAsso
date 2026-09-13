@@ -25,6 +25,13 @@ class _BaseWidget:
         self.kwargs = kwargs
         self.children: list[_BaseWidget] = []
         self.destroyed = False
+        self.call_order: list[str] = []
+        self.grab_called = False
+        self.focus_called = False
+        self.focus_set_called = False
+        self.update_idletasks_called = False
+        self.lift_called = False
+        self.transient_called = False
         if parent is not None and hasattr(parent, "children"):
             parent.children.append(self)
 
@@ -50,13 +57,26 @@ class _BaseWidget:
         return None
 
     def transient(self, *_args) -> None:
-        return None
+        self.transient_called = True
 
     def grab_set(self) -> None:
-        return None
+        self.grab_called = True
+        self.call_order.append("grab_set")
 
     def focus(self) -> None:
-        return None
+        self.focus_called = True
+
+    def focus_set(self) -> None:
+        self.focus_set_called = True
+        self.call_order.append("focus_set")
+
+    def update_idletasks(self) -> None:
+        self.update_idletasks_called = True
+        self.call_order.append("update_idletasks")
+
+    def lift(self) -> None:
+        self.lift_called = True
+        self.call_order.append("lift")
 
 
 class _Label(_BaseWidget):
@@ -148,6 +168,12 @@ def test_dialog_ligne_affiche_tous_les_champs_et_actions(monkeypatch) -> None:
     labels = [label.kwargs.get("text") for label in _Label.instances]
     boutons = {button.kwargs.get("text"): button for button in _Button.instances}
     assert dialog.geometry_value == "480x420"
+    assert dialog.update_idletasks_called is True
+    assert dialog.lift_called is True
+    assert dialog.grab_called is True
+    assert dialog.focus_set_called is True
+    assert dialog.transient_called is True
+    assert dialog.call_order == ["update_idletasks", "lift", "grab_set", "focus_set"]
     assert "Préset" in labels
     assert "Désignation *" in labels
     assert "Montant unitaire (€) *" in labels
