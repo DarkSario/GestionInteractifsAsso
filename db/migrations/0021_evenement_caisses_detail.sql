@@ -1,5 +1,16 @@
 -- Phase 21 : gestion détaillée des caisses par événement
 
+CREATE TABLE IF NOT EXISTS evenement_caisses (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    evenement_id INTEGER NOT NULL REFERENCES evenements(id),
+    nom_caisse TEXT NOT NULL,
+    nom TEXT,
+    commentaire TEXT,
+    statut TEXT DEFAULT 'ouvert',
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now'))
+);
+
 -- Harmonisation de la table historique evenement_caisses
 ALTER TABLE evenement_caisses ADD COLUMN nom TEXT;
 ALTER TABLE evenement_caisses ADD COLUMN statut TEXT DEFAULT 'ouvert';

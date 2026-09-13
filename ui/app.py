@@ -9,6 +9,7 @@ import customtkinter as ctk
 
 from config.settings import APP_NAME, APP_VERSION
 from db.connection import get_db_file, get_connection, set_db_file
+from db.migrations.runner import run_migrations
 from ui import theme as app_theme
 from utils.backup import verifier_sauvegarde_auto
 from utils.logger import get_logger
@@ -23,6 +24,11 @@ class MainApp(ctk.CTk):
         super().__init__()
         if db_path:
             set_db_file(db_path)
+            try:
+                run_migrations()
+            except Exception as exc:  # noqa: BLE001
+                logger.exception("Échec des migrations au démarrage : %s", exc)
+                raise
 
         self._config = self._load_config()
         self._dashboard_frame = None

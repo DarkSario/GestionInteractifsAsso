@@ -3,8 +3,18 @@
 from __future__ import annotations
 
 from db.connection import get_connection
+from utils.logger import get_logger
 
 _TYPES_OUVERTURE = {"debut", "fin"}
+logger = get_logger(__name__)
+
+
+def _open_connection(operation: str):
+    try:
+        return get_connection()
+    except Exception:
+        logger.exception("Impossible d'ouvrir la connexion DB (%s)", operation)
+        raise
 
 
 def _normaliser_type_ouverture(type_ouverture: str) -> str:
@@ -24,7 +34,7 @@ def creer_caisse(evenement_id: int, nom: str, statut: str = "ouvert") -> int:
     if not nom_val:
         raise ValueError("Le nom de la caisse est obligatoire.")
 
-    conn = get_connection()
+    conn = _open_connection("creer_caisse")
     try:
         cur = conn.execute(
             """
@@ -35,13 +45,20 @@ def creer_caisse(evenement_id: int, nom: str, statut: str = "ouvert") -> int:
         )
         conn.commit()
         return int(cur.lastrowid)
+    except Exception:
+        logger.exception(
+            "Erreur DB lors de la création d'une caisse (evenement_id=%s, nom=%s)",
+            evenement_id,
+            nom_val,
+        )
+        raise
     finally:
         conn.close()
 
 
 def lister_caisses_evenement(evenement_id: int) -> list[dict]:
     """Retourne les caisses d'un événement avec leurs totaux."""
-    conn = get_connection()
+    conn = _open_connection("lister_caisses_evenement")
     try:
         rows = conn.execute(
             """
@@ -65,13 +82,18 @@ def lister_caisses_evenement(evenement_id: int) -> list[dict]:
             data["recette"] = round(data["total_fin"] - data["total_debut"], 2)
             caisses.append(data)
         return caisses
+    except Exception:
+        logger.exception(
+            "Erreur DB lors du chargement des caisses (evenement_id=%s)", evenement_id
+        )
+        raise
     finally:
         conn.close()
 
 
 def get_caisse(caisse_id: int) -> dict | None:
     """Retourne une caisse avec ses lignes début/fin."""
-    conn = get_connection()
+    conn = _open_connection("get_caisse")
     try:
         row = conn.execute(
             """
@@ -95,6 +117,9 @@ def get_caisse(caisse_id: int) -> dict | None:
         caisse["total_fin"] = total_fin
         caisse["recette"] = round(total_fin - total_debut, 2)
         return caisse
+    except Exception:
+        logger.exception("Erreur DB lors du chargement de la caisse (caisse_id=%s)", caisse_id)
+        raise
     finally:
         conn.close()
 
@@ -120,7 +145,7 @@ def mettre_a_jour_caisse(
     updates.append("updated_at = datetime('now')")
     params.append(int(caisse_id))
 
-    conn = get_connection()
+    conn = _open_connection("mettre_a_jour_caisse")
     try:
         cur = conn.execute(
             f"UPDATE evenement_caisses SET {', '.join(updates)} WHERE id = ?",
@@ -128,13 +153,18 @@ def mettre_a_jour_caisse(
         )
         conn.commit()
         return cur.rowcount > 0
+    except Exception:
+        logger.exception(
+            "Erreur DB lors de la mise à jour de la caisse (caisse_id=%s)", caisse_id
+        )
+        raise
     finally:
         conn.close()
 
 
 def supprimer_caisse(caisse_id: int) -> bool:
     """Supprime une caisse et ses lignes."""
-    conn = get_connection()
+    conn = _open_connection("supprimer_caisse")
     try:
         conn.execute(
             "DELETE FROM evenement_caisse_lignes WHERE caisse_id = ?",
@@ -145,6 +175,9 @@ def supprimer_caisse(caisse_id: int) -> bool:
         )
         conn.commit()
         return cur.rowcount > 0
+    except Exception:
+        logger.exception("Erreur DB lors de la suppression de la caisse (caisse_id=%s)", caisse_id)
+        raise
     finally:
         conn.close()
 
@@ -152,7 +185,7 @@ def supprimer_caisse(caisse_id: int) -> bool:
 def get_lignes_caisse(caisse_id: int, type_ouverture: str) -> list[dict]:
     """Retourne les lignes d'une caisse pour un type d'ouverture."""
     type_val = _normaliser_type_ouverture(type_ouverture)
-    conn = get_connection()
+    conn = _open_connection("get_lignes_caisse")
     try:
         rows = conn.execute(
             """
@@ -166,6 +199,13 @@ def get_lignes_caisse(caisse_id: int, type_ouverture: str) -> list[dict]:
             (int(caisse_id), type_val),
         ).fetchall()
         return [dict(r) for r in rows]
+    except Exception:
+        logger.exception(
+            "Erreur DB lors du chargement des lignes de caisse (caisse_id=%s, type=%s)",
+            caisse_id,
+            type_val,
+        )
+        raise
     finally:
         conn.close()
 
@@ -191,7 +231,7 @@ def ajouter_ligne_caisse(
         raise ValueError("Le montant unitaire doit être positif ou nul.")
     total = _calculer_total(montant_val, quantite_val)
 
-    conn = get_connection()
+    conn = _open_connection("ajouter_ligne_caisse")
     try:
         cur = conn.execute(
             """
@@ -217,6 +257,13 @@ def ajouter_ligne_caisse(
         )
         conn.commit()
         return int(cur.lastrowid)
+    except Exception:
+        logger.exception(
+            "Erreur DB lors de l'ajout d'une ligne de caisse (caisse_id=%s, type=%s)",
+            caisse_id,
+            type_val,
+        )
+        raise
     finally:
         conn.close()
 
@@ -240,7 +287,7 @@ def modifier_ligne_caisse(
         raise ValueError("Le montant unitaire doit être positif ou nul.")
     total = _calculer_total(montant_val, quantite_val)
 
-    conn = get_connection()
+    conn = _open_connection("modifier_ligne_caisse")
     try:
         caisse = conn.execute(
             "SELECT caisse_id FROM evenement_caisse_lignes WHERE id = ?",
@@ -271,13 +318,16 @@ def modifier_ligne_caisse(
         )
         conn.commit()
         return cur.rowcount > 0
+    except Exception:
+        logger.exception("Erreur DB lors de la modification de ligne (ligne_id=%s)", ligne_id)
+        raise
     finally:
         conn.close()
 
 
 def supprimer_ligne_caisse(ligne_id: int) -> bool:
     """Supprime une ligne de caisse."""
-    conn = get_connection()
+    conn = _open_connection("supprimer_ligne_caisse")
     try:
         caisse = conn.execute(
             "SELECT caisse_id FROM evenement_caisse_lignes WHERE id = ?",
@@ -293,6 +343,9 @@ def supprimer_ligne_caisse(ligne_id: int) -> bool:
             )
         conn.commit()
         return cur.rowcount > 0
+    except Exception:
+        logger.exception("Erreur DB lors de la suppression de ligne (ligne_id=%s)", ligne_id)
+        raise
     finally:
         conn.close()
 
@@ -300,7 +353,7 @@ def supprimer_ligne_caisse(ligne_id: int) -> bool:
 def get_total_caisse(caisse_id: int, type_ouverture: str) -> float:
     """Retourne le total d'une caisse pour 'debut' ou 'fin'."""
     type_val = _normaliser_type_ouverture(type_ouverture)
-    conn = get_connection()
+    conn = _open_connection("get_total_caisse")
     try:
         row = conn.execute(
             """
@@ -311,6 +364,13 @@ def get_total_caisse(caisse_id: int, type_ouverture: str) -> float:
             (int(caisse_id), type_val),
         ).fetchone()
         return round(float(row["total"] if row else 0), 2)
+    except Exception:
+        logger.exception(
+            "Erreur DB lors du calcul du total caisse (caisse_id=%s, type=%s)",
+            caisse_id,
+            type_val,
+        )
+        raise
     finally:
         conn.close()
 
@@ -324,7 +384,7 @@ def get_recette_caisse(caisse_id: int) -> float:
 
 def get_total_recettes_caisses_evenement(evenement_id: int) -> float:
     """Retourne la somme des recettes de toutes les caisses d'un événement."""
-    conn = get_connection()
+    conn = _open_connection("get_total_recettes_caisses_evenement")
     try:
         row = conn.execute(
             """
@@ -340,5 +400,11 @@ def get_total_recettes_caisses_evenement(evenement_id: int) -> float:
             (int(evenement_id),),
         ).fetchone()
         return round(float(row["recette"] if row else 0), 2)
+    except Exception:
+        logger.exception(
+            "Erreur DB lors du calcul des recettes des caisses (evenement_id=%s)",
+            evenement_id,
+        )
+        raise
     finally:
         conn.close()

@@ -188,6 +188,7 @@ TABLES = {
     "evenement_caisses": (
         "id INTEGER PRIMARY KEY AUTOINCREMENT",
         "evenement_id INTEGER NOT NULL REFERENCES evenements(id)",
+        "nom TEXT",
         "nom_caisse TEXT NOT NULL",
         "commentaire TEXT",
         "statut TEXT DEFAULT 'ouvert'",
