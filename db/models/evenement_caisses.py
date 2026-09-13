@@ -99,7 +99,9 @@ def get_caisse(caisse_id: int) -> dict | None:
         conn.close()
 
 
-def mettre_a_jour_caisse(caisse_id: int, nom: str | None = None, statut: str | None = None) -> bool:
+def mettre_a_jour_caisse(
+    caisse_id: int, nom: str | None = None, statut: str | None = None
+) -> bool:
     """Met à jour le nom et/ou le statut d'une caisse."""
     updates: list[str] = []
     params: list[object] = []
@@ -138,7 +140,9 @@ def supprimer_caisse(caisse_id: int) -> bool:
             "DELETE FROM evenement_caisse_lignes WHERE caisse_id = ?",
             (int(caisse_id),),
         )
-        cur = conn.execute("DELETE FROM evenement_caisses WHERE id = ?", (int(caisse_id),))
+        cur = conn.execute(
+            "DELETE FROM evenement_caisses WHERE id = ?", (int(caisse_id),)
+        )
         conn.commit()
         return cur.rowcount > 0
     finally:
@@ -152,8 +156,9 @@ def get_lignes_caisse(caisse_id: int, type_ouverture: str) -> list[dict]:
     try:
         rows = conn.execute(
             """
-            SELECT id, caisse_id, type_ouverture, designation, montant_unitaire, quantite,
-                   total, created_at, updated_at
+            SELECT id, caisse_id, type_ouverture, designation_id,
+                   COALESCE(NULLIF(designation_text, ''), designation) AS designation,
+                   designation_text, montant_unitaire, quantite, total, created_at, updated_at
             FROM evenement_caisse_lignes
             WHERE caisse_id = ? AND type_ouverture = ?
             ORDER BY id ASC
@@ -171,6 +176,7 @@ def ajouter_ligne_caisse(
     designation: str,
     montant_unitaire: float,
     quantite: int,
+    designation_id: int | None = None,
 ) -> int:
     """Ajoute une ligne de détail à une caisse."""
     type_val = _normaliser_type_ouverture(type_ouverture)
@@ -190,10 +196,20 @@ def ajouter_ligne_caisse(
         cur = conn.execute(
             """
             INSERT INTO evenement_caisse_lignes (
-                caisse_id, type_ouverture, designation, montant_unitaire, quantite, total, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+                caisse_id, type_ouverture, designation_id, designation_text, designation,
+                montant_unitaire, quantite, total, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
             """,
-            (int(caisse_id), type_val, designation_val, montant_val, quantite_val, total),
+            (
+                int(caisse_id),
+                type_val,
+                int(designation_id) if designation_id else None,
+                designation_val,
+                designation_val,
+                montant_val,
+                quantite_val,
+                total,
+            ),
         )
         conn.execute(
             "UPDATE evenement_caisses SET updated_at = datetime('now') WHERE id = ?",
@@ -210,6 +226,7 @@ def modifier_ligne_caisse(
     designation: str,
     montant_unitaire: float,
     quantite: int,
+    designation_id: int | None = None,
 ) -> bool:
     """Modifie une ligne de caisse."""
     designation_val = str(designation or "").strip()
@@ -234,10 +251,19 @@ def modifier_ligne_caisse(
         cur = conn.execute(
             """
             UPDATE evenement_caisse_lignes
-            SET designation = ?, montant_unitaire = ?, quantite = ?, total = ?, updated_at = datetime('now')
+            SET designation_id = ?, designation_text = ?, designation = ?, montant_unitaire = ?,
+                quantite = ?, total = ?, updated_at = datetime('now')
             WHERE id = ?
             """,
-            (designation_val, montant_val, quantite_val, total, int(ligne_id)),
+            (
+                int(designation_id) if designation_id else None,
+                designation_val,
+                designation_val,
+                montant_val,
+                quantite_val,
+                total,
+                int(ligne_id),
+            ),
         )
         conn.execute(
             "UPDATE evenement_caisses SET updated_at = datetime('now') WHERE id = ?",
@@ -257,7 +283,9 @@ def supprimer_ligne_caisse(ligne_id: int) -> bool:
             "SELECT caisse_id FROM evenement_caisse_lignes WHERE id = ?",
             (int(ligne_id),),
         ).fetchone()
-        cur = conn.execute("DELETE FROM evenement_caisse_lignes WHERE id = ?", (int(ligne_id),))
+        cur = conn.execute(
+            "DELETE FROM evenement_caisse_lignes WHERE id = ?", (int(ligne_id),)
+        )
         if caisse:
             conn.execute(
                 "UPDATE evenement_caisses SET updated_at = datetime('now') WHERE id = ?",

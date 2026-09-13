@@ -116,6 +116,7 @@ class MainApp(ctk.CTk):
         menu_admin.add_command(label="⚙️ Paramètres", command=self._ouvrir_parametres)
         menu_admin.add_separator()
         menu_admin.add_command(label="Référentiels Stock", command=self._ouvrir_referentiels_stock)
+        menu_admin.add_command(label="Désignations de caisses", command=self._ouvrir_designations_caisses)
         menu_admin.add_separator()
         menu_admin.add_command(label="🖋️ Polices PDF", command=self._ouvrir_polices_pdf)
         menu_admin.add_command(label="Apparence", command=self._ouvrir_theme_editor)
@@ -307,6 +308,13 @@ class MainApp(ctk.CTk):
         from ui.modules.stock.referentiels import Referentiels
 
         fenetre = Referentiels(self)
+        fenetre.grab_set()
+
+    def _ouvrir_designations_caisses(self) -> None:
+        """Ouvre la fenêtre de gestion des désignations de caisses."""
+        from ui.modules.administration.caisse_designations import GestionDesignationsCaisses
+
+        fenetre = GestionDesignationsCaisses(self)
         fenetre.grab_set()
 
     def _ouvrir_gestion_exercices(self) -> None:
