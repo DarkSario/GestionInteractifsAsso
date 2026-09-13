@@ -285,6 +285,7 @@ def test_mini_formulaire_cotisation_rapide_retourne_none_si_statut_vide(monkeypa
 
     payload, erreur = mini.lire_saisie()
 
+    assert mini.cotisation_active() is False
     assert payload is None
     assert erreur is None
 
@@ -299,5 +300,6 @@ def test_mini_formulaire_cotisation_rapide_convertit_montant_et_force_offerte(mo
 
     payload, erreur = mini.lire_saisie()
 
+    assert mini.cotisation_active() is True
     assert erreur is None
     assert payload == {"annee": 2026, "montant": 0.0, "statut": "offerte"}

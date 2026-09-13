@@ -336,10 +336,12 @@ class FormulaireMembreModal(ctk.CTkToplevel):
                 if champ in self._error_labels:
                     self._error_labels[champ].configure(text=message)
             return
-        cotisation_rapide, erreur_cotisation = self._cotisation_rapide.lire_saisie()
-        if erreur_cotisation:
-            self._error_labels["cotisation_rapide"].configure(text=erreur_cotisation)
-            return
+        cotisation_rapide = None
+        if self._cotisation_rapide.cotisation_active():
+            cotisation_rapide, erreur_cotisation = self._cotisation_rapide.lire_saisie()
+            if erreur_cotisation:
+                self._error_labels["cotisation_rapide"].configure(text=erreur_cotisation)
+                return
 
         adherent_id: int | None = None
         try:

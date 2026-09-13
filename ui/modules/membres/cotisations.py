@@ -104,6 +104,9 @@ class MiniFormulaireCotisationRapide(ctk.CTkFrame):
             statut = "offerte"
         return {"annee": annee, "montant": montant, "statut": statut}, None
 
+    def cotisation_active(self) -> bool:
+        return bool(_STATUTS_RAPIDES_VALEURS.get(self._statut_var.get(), ""))
+
 
 class OngletCotisationsAdherent(ctk.CTkFrame):
     """Onglet Cotisations pour la fiche d'un adhérent."""

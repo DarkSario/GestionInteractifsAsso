@@ -72,6 +72,7 @@ def test_soumettre_sauve_la_cotisation_rapide(monkeypatch) -> None:
         "commentaire": "",
     }[champ]
     form._cotisation_rapide = types.SimpleNamespace(
+        cotisation_active=lambda: True,
         lire_saisie=lambda: (
             {"annee": 2026, "montant": 20.0, "statut": "payee"},
             None,
@@ -118,6 +119,7 @@ def test_soumettre_bloque_si_cotisation_rapide_invalide(monkeypatch) -> None:
         "commentaire": "",
     }[champ]
     form._cotisation_rapide = types.SimpleNamespace(
+        cotisation_active=lambda: True,
         lire_saisie=lambda: (None, "L'année de cotisation doit être un entier.")
     )
     form._sauver_cotisation_rapide = lambda *_args: True
