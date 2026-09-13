@@ -191,7 +191,7 @@ def test_dialog_ligne_signale_erreur_chargement_presets(monkeypatch) -> None:
     module = _load_module_with_ui_stubs(monkeypatch)
     avertissements: list[str] = []
 
-    def _boom(*, actif_only=True):
+    def _boom(actif_only=True):
         raise RuntimeError("db indisponible")
 
     monkeypatch.setattr(module, "lister_designations_caisse", _boom)
