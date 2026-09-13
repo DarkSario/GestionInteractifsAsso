@@ -539,7 +539,6 @@ class _DialogLigneCaisse(ctk.CTkToplevel):
     def _sync_designation_state(self) -> None:
         designation = self._designation_selectionnee()
         self._designation_entry.configure(state="disabled" if designation else "normal")
-        self._montant_entry.configure(state="disabled" if designation else "normal")
 
     def _on_designation_change(self, _event: object = None) -> None:
         self._designation_index = max(self._preset_menu.current(), 0)

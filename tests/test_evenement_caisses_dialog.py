@@ -173,7 +173,6 @@ def test_dialog_ligne_selection_preset_remplit_champs(monkeypatch) -> None:
     assert dialog._designation_var.get() == "Billets 10€"
     assert dialog._montant_var.get() == "10.00"
     assert dialog._designation_entry.kwargs.get("state") == "disabled"
-    assert dialog._montant_entry.kwargs.get("state") == "disabled"
 
 
 def test_dialog_ligne_signale_absence_de_presets_actifs(monkeypatch) -> None:
