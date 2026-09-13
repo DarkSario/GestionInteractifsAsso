@@ -24,6 +24,8 @@ class MainApp(ctk.CTk):
         super().__init__()
         if db_path:
             set_db_file(db_path)
+        active_db = get_db_file()
+        if active_db:
             try:
                 run_migrations()
             except Exception as exc:  # noqa: BLE001
