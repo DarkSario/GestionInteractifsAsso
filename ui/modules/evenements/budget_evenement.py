@@ -91,9 +91,16 @@ class BudgetEvenementView(ctk.CTkFrame):
             if seuil["atteint"]
             else f"❌ Non atteint (manque {seuil['manque']})"
         )
+        detail_recettes = bilan.get("detail_recettes") or {}
         texte = (
             "PRÉVISIONNEL vs RÉEL\n\n"
             f"Recettes réelles : {bilan['recettes_reelles']:.2f} €\n"
+            f"  • Billetterie : {float(detail_recettes.get('billetterie') or 0):.2f} €\n"
+            f"  • Stands : {float(detail_recettes.get('stands') or 0):.2f} €\n"
+            f"  • Tableaux : {float(detail_recettes.get('tableaux') or 0):.2f} €\n"
+            f"  • Tombola : {float(detail_recettes.get('tombola') or 0):.2f} €\n"
+            f"  • Buvette : {float(detail_recettes.get('buvette') or 0):.2f} €\n"
+            f"  • Caisses : {float(detail_recettes.get('caisses') or 0):.2f} €\n"
             f"Dépenses réelles : {bilan['depenses_reelles']:.2f} €\n"
             f"Coût buvette réel : {bilan['cout_buvette_reel']:.2f} €\n"
             f"Bénéfice net réel : {bilan['benefice_reel']:.2f} €\n\n"

@@ -165,30 +165,39 @@ def _cout_buvette_reel(conn, evenement_id: int) -> float:
 
 
 def get_bilan_reel(evenement_id: int) -> dict:
-    conn = get_connection()
-    try:
-        budget = get_or_create_budget(evenement_id)
-        recettes_reelles = _recettes_reelles(conn, evenement_id)
-        depenses_reelles = _depenses_reelles(conn, evenement_id)
-        cout_buvette_reel = _cout_buvette_reel(conn, evenement_id)
+    from core.caisses_evenement import calculer_bilan_complet_evenement
 
-        benefice_reel = recettes_reelles - depenses_reelles - cout_buvette_reel
-        recettes_prevues = float(budget.get("recettes_prevues") or 0)
-        depenses_prevues = float(budget.get("depenses_prevues") or 0)
-        cout_buvette_prevu = float(budget.get("cout_buvette_prevu") or 0)
-        benefice_prevu = recettes_prevues - depenses_prevues - cout_buvette_prevu
+    budget = get_or_create_budget(evenement_id)
+    bilan = calculer_bilan_complet_evenement(evenement_id)
+    recettes_reelles = float(bilan.get("total_recettes") or 0)
+    depenses_reelles = float(bilan.get("depenses_evenement") or 0) + float(
+        bilan.get("depenses_stands") or 0
+    )
+    cout_buvette_reel = float(bilan.get("cout_buvette") or 0)
+    benefice_reel = float(bilan.get("benefice_global") or 0)
 
-        return {
-            "recettes_reelles": round(recettes_reelles, 2),
-            "depenses_reelles": round(depenses_reelles, 2),
-            "cout_buvette_reel": round(cout_buvette_reel, 2),
-            "benefice_reel": round(benefice_reel, 2),
-            "ecart_recettes": round(recettes_reelles - recettes_prevues, 2),
-            "ecart_depenses": round(depenses_prevues - depenses_reelles, 2),
-            "ecart_benefice": round(benefice_reel - benefice_prevu, 2),
-        }
-    finally:
-        conn.close()
+    recettes_prevues = float(budget.get("recettes_prevues") or 0)
+    depenses_prevues = float(budget.get("depenses_prevues") or 0)
+    cout_buvette_prevu = float(budget.get("cout_buvette_prevu") or 0)
+    benefice_prevu = recettes_prevues - depenses_prevues - cout_buvette_prevu
+
+    return {
+        "recettes_reelles": round(recettes_reelles, 2),
+        "depenses_reelles": round(depenses_reelles, 2),
+        "cout_buvette_reel": round(cout_buvette_reel, 2),
+        "benefice_reel": round(benefice_reel, 2),
+        "ecart_recettes": round(recettes_reelles - recettes_prevues, 2),
+        "ecart_depenses": round(depenses_prevues - depenses_reelles, 2),
+        "ecart_benefice": round(benefice_reel - benefice_prevu, 2),
+        "detail_recettes": {
+            "billetterie": round(float(bilan.get("recettes_billetterie") or 0), 2),
+            "stands": round(float(bilan.get("recettes_stands") or 0), 2),
+            "tableaux": round(float(bilan.get("recettes_tableaux") or 0), 2),
+            "tombola": round(float(bilan.get("recettes_tombola") or 0), 2),
+            "buvette": round(float(bilan.get("recettes_buvette") or 0), 2),
+            "caisses": round(float(bilan.get("recettes_caisses") or 0), 2),
+        },
+    }
 
 
 def get_seuil_rentabilite(evenement_id: int) -> dict:

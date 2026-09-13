@@ -461,6 +461,69 @@ def get_bilan_dernier_evenement() -> dict | None:
             0,
         )
     )
+    recettes_tableaux = float(
+        _fetch_scalar(
+            """
+            SELECT COALESCE(SUM(c.valeur_montant), 0)
+            FROM tableaux_perso t
+            JOIN tableaux_colonnes col ON col.tableau_id = t.id
+            JOIN tableaux_lignes l ON l.tableau_id = t.id
+            JOIN tableaux_cellules c ON c.ligne_id = l.id AND c.colonne_id = col.id
+            WHERE t.evenement_id = ?
+              AND col.type_colonne = 'montant'
+            """,
+            (ev_id,),
+            0,
+        )
+    )
+    recettes_tombola = float(
+        _fetch_scalar(
+            """
+            SELECT COALESCE(SUM(montant_encaisse), 0)
+            FROM tombola_carnets
+            WHERE evenement_id = ?
+            """,
+            (ev_id,),
+            0,
+        )
+    ) + float(
+        _fetch_scalar(
+            """
+            SELECT COALESCE(SUM(montant_don), 0)
+            FROM tombola_solidaire_participations
+            WHERE evenement_id = ?
+            """,
+            (ev_id,),
+            0,
+        )
+    )
+    recettes_buvette = float(
+        _fetch_scalar(
+            """
+            SELECT COALESCE(recette_nette, 0)
+            FROM recettes_buvette
+            WHERE evenement_id = ?
+            ORDER BY id DESC
+            LIMIT 1
+            """,
+            (ev_id,),
+            0,
+        )
+    )
+    recettes_caisses = float(
+        _fetch_scalar(
+            """
+            SELECT COALESCE(SUM(CASE WHEN l.type_ouverture = 'fin' THEN l.total
+                                     WHEN l.type_ouverture = 'debut' THEN -l.total
+                                     ELSE 0 END), 0)
+            FROM evenement_caisses c
+            LEFT JOIN evenement_caisse_lignes l ON l.caisse_id = c.id
+            WHERE c.evenement_id = ?
+            """,
+            (ev_id,),
+            0,
+        )
+    )
     depenses = float(
         _fetch_scalar(
             """
@@ -486,7 +549,7 @@ def get_bilan_dernier_evenement() -> dict | None:
             0,
         )
     )
-    recettes += recettes_stands
+    recettes += recettes_stands + recettes_tableaux + recettes_tombola + recettes_buvette + recettes_caisses
     depenses += depenses_stands
     return {
         "nom": ev["nom"],

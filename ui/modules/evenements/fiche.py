@@ -51,6 +51,7 @@ from db.models.membres import get_all_membres
 from ui import theme as app_theme
 from ui.components.dialogs import afficher_erreur, afficher_info, demander_confirmation
 from ui.modules.evenements.budget_evenement import BudgetEvenementView
+from ui.modules.evenements.caisses import CaissesEvenementView
 from ui.modules.evenements.stands import StandsView
 from ui.modules.evenements.tableaux import TableauxView
 from ui.modules.evenements.tombola import TombolaView
@@ -92,6 +93,7 @@ ONGLETS_MODULES = {
     "🎰 Tombola": {"tombola_classique", "tombola_solidaire"},
     "🏪 Stands": {"stands"},
     "📊 Tableaux": {"tableaux"},
+    "🧾 Caisses": {"caisses"},
 }
 
 LIBELLES_MODULES = {
@@ -102,10 +104,11 @@ LIBELLES_MODULES = {
     "tombola_solidaire": "Tombola solidaire",
     "stands": "Stands",
     "tableaux": "Tableaux",
+    "caisses": "Caisses",
     "budget_previsionnel": "Budget",
 }
 # Valeurs initiales choisies pour coller au flux de création le plus fréquent.
-MODULES_CREATION_INITIAUX = ("billetterie", "depenses")
+MODULES_CREATION_INITIAUX = ("billetterie", "depenses", "caisses")
 
 STATUTS_BENEVOLE = {
     "confirme": "Confirmé",
@@ -186,6 +189,7 @@ class FicheEvenement(ctk.CTkToplevel):
         self._tabs.add("🎰 Tombola")
         self._tabs.add("🏪 Stands")
         self._tabs.add("📊 Tableaux")
+        self._tabs.add("🧾 Caisses")
 
         self._build_onglet_general(self._tabs.tab("📋 Général"))
         self._build_onglet_billetterie(self._tabs.tab("🎫 Billetterie"))
@@ -195,6 +199,7 @@ class FicheEvenement(ctk.CTkToplevel):
         self._build_onglet_tombola(self._tabs.tab("🎰 Tombola"))
         self._build_onglet_stands(self._tabs.tab("🏪 Stands"))
         self._build_onglet_tableaux(self._tabs.tab("📊 Tableaux"))
+        self._build_onglet_caisses(self._tabs.tab("🧾 Caisses"))
 
     def _ouvrir_export(self) -> None:
         """Ouvre le dialogue d'export de l'événement."""
@@ -337,7 +342,7 @@ class FicheEvenement(ctk.CTkToplevel):
             anchor="w", pady=(0, 4)
         )
 
-        self._lbl_recettes = ctk.CTkLabel(frame, text="Recettes billetterie : —")
+        self._lbl_recettes = ctk.CTkLabel(frame, text="Recettes globales : —")
         self._lbl_recettes.pack(anchor="w", padx=16)
         self._lbl_depenses = ctk.CTkLabel(frame, text="Dépenses : —")
         self._lbl_depenses.pack(anchor="w", padx=16)
@@ -389,6 +394,7 @@ class FicheEvenement(ctk.CTkToplevel):
         self._tombola_view.set_evenement_id(self._evenement_id)
         self._stands_view.set_evenement_id(self._evenement_id)
         self._tableaux_view.set_evenement_id(self._evenement_id)
+        self._caisses_view.set_evenement_id(self._evenement_id)
         self._appliquer_modules_actifs()
 
     def _sauvegarder_general(self) -> None:
@@ -456,6 +462,7 @@ class FicheEvenement(ctk.CTkToplevel):
         self._tombola_view.set_evenement_id(self._evenement_id)
         self._stands_view.set_evenement_id(self._evenement_id)
         self._tableaux_view.set_evenement_id(self._evenement_id)
+        self._caisses_view.set_evenement_id(self._evenement_id)
         self._appliquer_modules_actifs()
 
     def _appliquer_modules_actifs(self) -> None:
@@ -488,7 +495,7 @@ class FicheEvenement(ctk.CTkToplevel):
         try:
             bilan = calculer_bilan_evenement(self._evenement_id)
             self._lbl_recettes.configure(
-                text=f"Recettes billetterie : {self._fmt(bilan['recettes_total'])}"
+                text=f"Recettes globales : {self._fmt(bilan['recettes_total'])}"
             )
             self._lbl_depenses.configure(
                 text=f"Dépenses : {self._fmt(bilan['depenses_total'])}"
@@ -1191,6 +1198,14 @@ class FicheEvenement(ctk.CTkToplevel):
     def _build_onglet_tableaux(self, parent: Any) -> None:
         self._tableaux_view = TableauxView(parent, self._evenement_id)
         self._tableaux_view.pack(fill="both", expand=True)
+
+    def _build_onglet_caisses(self, parent: Any) -> None:
+        self._caisses_view = CaissesEvenementView(
+            parent,
+            self._evenement_id,
+            callback_refresh=self._actualiser_resume_financier,
+        )
+        self._caisses_view.pack(fill="both", expand=True)
 
     # ── Helpers ───────────────────────────────────────────────────────────────
 
