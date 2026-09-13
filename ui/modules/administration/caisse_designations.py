@@ -212,15 +212,16 @@ class _DialogDesignationCaisse(ctk.CTkToplevel):
     def __init__(self, parent: Any, titre: str, designation: dict | None) -> None:
         super().__init__(parent)
         self.title(titre)
-        self.geometry("420x320")
+        self.geometry("460x380")
         self.resizable(False, False)
         self.transient(parent)
         self.grab_set()
         self.result: dict | None = None
 
         self._nom_var = tk.StringVar(value=(designation or {}).get("nom") or "")
+        montant_initial = (designation or {}).get("montant_unitaire")
         self._montant_var = tk.StringVar(
-            value=str((designation or {}).get("montant_unitaire") or 0)
+            value="" if montant_initial is None else str(montant_initial)
         )
         self._description_var = tk.StringVar(
             value=(designation or {}).get("description") or ""
@@ -232,29 +233,45 @@ class _DialogDesignationCaisse(ctk.CTkToplevel):
         self.focus()
 
     def _build_ui(self) -> None:
-        ctk.CTkLabel(self, text="Désignation *").pack(anchor="w", padx=20, pady=(18, 2))
-        ctk.CTkEntry(self, textvariable=self._nom_var, width=360).pack(padx=20)
+        form = ctk.CTkFrame(self, fg_color="transparent")
+        form.pack(fill="both", expand=True, padx=20, pady=(18, 0))
 
-        ctk.CTkLabel(self, text="Montant unitaire (€) *").pack(
-            anchor="w", padx=20, pady=(10, 2)
+        ctk.CTkLabel(form, text="Désignation *").pack(anchor="w", pady=(0, 2))
+        self._nom_entry = ctk.CTkEntry(form, textvariable=self._nom_var, width=380)
+        self._nom_entry.pack(fill="x")
+
+        ctk.CTkLabel(form, text="Montant unitaire (€) *").pack(
+            anchor="w", pady=(10, 2)
         )
-        ctk.CTkEntry(self, textvariable=self._montant_var, width=360).pack(padx=20)
+        ctk.CTkEntry(form, textvariable=self._montant_var, width=380).pack(fill="x")
 
-        ctk.CTkLabel(self, text="Description").pack(anchor="w", padx=20, pady=(10, 2))
-        ctk.CTkEntry(self, textvariable=self._description_var, width=360).pack(padx=20)
+        ctk.CTkLabel(form, text="Description").pack(anchor="w", pady=(10, 2))
+        ctk.CTkEntry(form, textvariable=self._description_var, width=380).pack(fill="x")
 
-        ctk.CTkLabel(self, text="Ordre").pack(anchor="w", padx=20, pady=(10, 2))
-        ctk.CTkEntry(self, textvariable=self._ordre_var, width=360).pack(padx=20)
+        ctk.CTkLabel(form, text="Ordre").pack(anchor="w", pady=(10, 2))
+        ctk.CTkEntry(form, textvariable=self._ordre_var, width=380).pack(fill="x")
 
         ctk.CTkCheckBox(
-            self, text="Actif", variable=self._actif_var, onvalue=True, offvalue=False
-        ).pack(anchor="w", padx=20, pady=(12, 0))
+            form, text="Actif", variable=self._actif_var, onvalue=True, offvalue=False
+        ).pack(anchor="w", pady=(12, 0))
 
         actions = ctk.CTkFrame(self, fg_color="transparent")
-        actions.pack(fill="x", padx=20, pady=16)
-        ctk.CTkButton(actions, text="Annuler", command=self.destroy).pack(side="right")
-        ctk.CTkButton(actions, text="Valider", command=self._valider).pack(
-            side="right", padx=(0, 8)
+        actions.pack(fill="x", padx=20, pady=(16, 20))
+        ctk.CTkButton(
+            actions,
+            text="Annuler",
+            width=120,
+            fg_color="#6c757d",
+            hover_color="#5a6268",
+            command=self.destroy,
+        ).pack(side="right")
+        ctk.CTkButton(
+            actions,
+            text="Enregistrer",
+            width=140,
+            command=self._valider,
+        ).pack(
+            side="right", padx=(0, 10)
         )
 
     def _valider(self) -> None:
@@ -262,8 +279,16 @@ class _DialogDesignationCaisse(ctk.CTkToplevel):
         if not nom:
             afficher_erreur(self, "Désignations de caisses", "Le nom est obligatoire.")
             return
+        montant_brut = self._montant_var.get().strip()
+        if not montant_brut:
+            afficher_erreur(
+                self,
+                "Désignations de caisses",
+                "Le montant unitaire est obligatoire.",
+            )
+            return
         try:
-            montant = float(self._montant_var.get().strip().replace(",", "."))
+            montant = float(montant_brut.replace(",", "."))
             ordre = int(self._ordre_var.get().strip() or "0")
         except ValueError:
             afficher_erreur(
