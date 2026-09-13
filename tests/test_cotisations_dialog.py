@@ -185,6 +185,35 @@ def test_formulaire_global_affiche_erreur_si_ajout_echoue(monkeypatch) -> None:
     ]
 
 
+def test_formulaire_global_affiche_erreur_si_ajout_retourne_none(monkeypatch) -> None:
+    module = _load_module_with_ui_stubs(monkeypatch)
+    monkeypatch.setattr(
+        module,
+        "get_all_membres",
+        lambda include_archives=False: [{"id": 3, "nom": "Dupont", "prenom": "Bob"}],
+    )
+    monkeypatch.setattr(module, "get_montant_cotisation_defaut", lambda: 0.0)
+    monkeypatch.setattr(module, "add_cotisation", lambda adherent_id, **kwargs: None)
+    erreurs: list[tuple[str, str]] = []
+    monkeypatch.setattr(
+        module,
+        "afficher_erreur",
+        lambda _parent, titre, message: erreurs.append((titre, message)),
+    )
+
+    dialog = module._FormulaireCotisation(_BaseWidget())
+    dialog._membre_var.set("3 — Bob Dupont")
+    dialog._enregistrer()
+
+    assert dialog.destroyed is False
+    assert erreurs == [
+        (
+            "Erreur",
+            "Impossible d'ajouter la cotisation. Vérifiez la base de données et réessayez.",
+        )
+    ]
+
+
 def test_formulaire_global_affiche_erreur_si_les_adherents_ne_chargent_pas(monkeypatch) -> None:
     module = _load_module_with_ui_stubs(monkeypatch)
     erreurs: list[tuple[str, str]] = []

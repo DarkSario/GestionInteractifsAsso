@@ -621,7 +621,7 @@ class _FormulaireCotisation(ctk.CTkToplevel):
                     return
             else:
                 cotisation_id = add_cotisation(adherent_id=adherent_id, **kwargs)
-                if cotisation_id == 0:
+                if not isinstance(cotisation_id, int) or cotisation_id <= 0:
                     afficher_erreur(
                         self,
                         "Erreur",
