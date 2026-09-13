@@ -134,7 +134,7 @@ def test_soumettre_bloque_si_cotisation_rapide_invalide(monkeypatch) -> None:
     )
 
 
-def test_soumettre_ferme_la_fenetre_si_cotisation_rapide_echoue_apres_save(monkeypatch) -> None:
+def test_soumettre_garde_la_fenetre_ouverte_si_cotisation_rapide_echoue(monkeypatch) -> None:
     module = _load_module(monkeypatch)
 
     monkeypatch.setattr(module, "valider_membre", lambda *_args: [])
@@ -167,7 +167,7 @@ def test_soumettre_ferme_la_fenetre_si_cotisation_rapide_echoue_apres_save(monke
 
     form._soumettre()
 
-    assert form.destroyed is True
+    assert form.destroyed is False
 
 
 def test_sauver_cotisation_rapide_met_a_jour_la_cotisation_existante(monkeypatch) -> None:

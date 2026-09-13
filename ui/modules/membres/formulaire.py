@@ -395,7 +395,6 @@ class FormulaireMembreModal(ctk.CTkToplevel):
             logger.warning(
                 "Membre enregistré sans cotisation rapide (adherent_id=%s)", adherent_id
             )
-            self.destroy()
             return
 
         self.destroy()
