@@ -474,7 +474,19 @@ class _FormulaireCotisation(ctk.CTkToplevel):
         self._cotisation = cotisation
         self._adherent_id = adherent_id or (cotisation["adherent_id"] if cotisation else None)
         self._on_save = on_save
-        self._membres = self._charger_membres_actifs() if self._adherent_id is None else []
+        self._membres: list[dict] = []
+        if self._adherent_id is None:
+            try:
+                self._membres = self._charger_membres_actifs()
+            except Exception:
+                logger.exception("Impossible de charger les adhérents pour les cotisations.")
+                afficher_erreur(
+                    self,
+                    "Erreur",
+                    "Impossible de charger la liste des adhérents pour créer une cotisation.",
+                )
+                self.destroy()
+                return
         self._membre_options = self._build_membre_options()
 
         frame = ctk.CTkScrollableFrame(self, fg_color="transparent")
@@ -555,11 +567,7 @@ class _FormulaireCotisation(ctk.CTkToplevel):
 
     @staticmethod
     def _charger_membres_actifs() -> list[dict]:
-        try:
-            return get_all_membres(include_archives=False)
-        except Exception:
-            logger.exception("Impossible de charger les adhérents pour les cotisations.")
-            return []
+        return get_all_membres(include_archives=False)
 
     def _resolve_adherent_id(self) -> int | None:
         if self._adherent_id is not None:
