@@ -104,22 +104,18 @@ def lister_designations_caisse(actif_only: bool = False) -> list[dict]:
     conn = get_connection()
     try:
         if actif_only:
-            rows = conn.execute(
-                """
+            rows = conn.execute("""
                 SELECT id, nom, montant_unitaire, description, ordre, actif, created_at, updated_at
                 FROM caisse_designations
                 WHERE actif = 1
                 ORDER BY ordre ASC, nom COLLATE NOCASE ASC, id ASC
-                """
-            ).fetchall()
+                """).fetchall()
         else:
-            rows = conn.execute(
-                """
+            rows = conn.execute("""
                 SELECT id, nom, montant_unitaire, description, ordre, actif, created_at, updated_at
                 FROM caisse_designations
                 ORDER BY ordre ASC, nom COLLATE NOCASE ASC, id ASC
-                """
-            ).fetchall()
+                """).fetchall()
         return [dict(row) for row in rows]
     finally:
         conn.close()

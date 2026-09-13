@@ -403,16 +403,18 @@ class _DialogLigneCaisse(ctk.CTkToplevel):
         self.result: dict | None = None
 
         self._designations = lister_designations_caisse(actif_only=True)
-        self._designations_by_label = {
-            self._format_designation_label(designation): designation
-            for designation in self._designations
-        }
-        initial_label = self._find_initial_designation_label(ligne)
-        self._syncing_preset = False
+        self._preset_options = [
+            "Saisie libre",
+            *[self._format_designation_label(d) for d in self._designations],
+        ]
+        self._designation_by_index: list[dict | None] = [None, *self._designations]
+        self._designation_index = self._find_initial_designation_index(ligne)
         self._designation_var = tk.StringVar(
             value=(ligne or {}).get("designation") or ""
         )
-        self._designation_preset_var = tk.StringVar(value=initial_label)
+        self._designation_preset_var = tk.StringVar(
+            value=self._preset_options[self._designation_index]
+        )
         self._montant_var = tk.StringVar(
             value=str((ligne or {}).get("montant_unitaire") or "0")
         )
@@ -421,8 +423,7 @@ class _DialogLigneCaisse(ctk.CTkToplevel):
         )
 
         self._build()
-        self._designation_var.trace_add("write", self._on_manual_field_change)
-        self._montant_var.trace_add("write", self._on_manual_field_change)
+        self._sync_designation_state()
         self.grab_set()
         self.focus()
 
@@ -430,7 +431,7 @@ class _DialogLigneCaisse(ctk.CTkToplevel):
     def _format_designation_label(designation: dict) -> str:
         return f"{designation.get('nom') or ''} — {float(designation.get('montant_unitaire') or 0):.2f} €"
 
-    def _find_initial_designation_label(self, ligne: dict | None) -> str:
+    def _find_initial_designation_index(self, ligne: dict | None) -> int:
         designation_id = (ligne or {}).get("designation_id")
         designation_nom = str((ligne or {}).get("designation") or "").strip()
         try:
@@ -440,32 +441,37 @@ class _DialogLigneCaisse(ctk.CTkToplevel):
         except (TypeError, ValueError):
             designation_montant = 0.0
         if designation_id:
-            for label, designation in self._designations_by_label.items():
+            for idx, designation in enumerate(self._designation_by_index[1:], start=1):
                 if int(designation.get("id") or 0) == int(designation_id):
-                    return label
+                    return idx
         if designation_nom:
-            for label, designation in self._designations_by_label.items():
+            for idx, designation in enumerate(self._designation_by_index[1:], start=1):
                 if (
                     str(designation.get("nom") or "").strip() == designation_nom
                     and round(float(designation.get("montant_unitaire") or 0), 2)
                     == designation_montant
                 ):
-                    return label
-        return "Saisie libre"
+                    return idx
+        return 0
 
     def _build(self) -> None:
         ctk.CTkLabel(self, text="Préset").pack(anchor="w", padx=20, pady=(16, 2))
-        self._preset_menu = ctk.CTkOptionMenu(
+        self._preset_menu = ttk.Combobox(
             self,
-            values=["Saisie libre", *self._designations_by_label.keys()],
+            values=self._preset_options,
             variable=self._designation_preset_var,
-            command=self._on_designation_change,
-            width=360,
+            state="readonly",
+            width=42,
         )
         self._preset_menu.pack(padx=20)
+        self._preset_menu.current(self._designation_index)
+        self._preset_menu.bind("<<ComboboxSelected>>", self._on_designation_change)
 
         ctk.CTkLabel(self, text="Désignation *").pack(anchor="w", padx=20, pady=(16, 2))
-        ctk.CTkEntry(self, textvariable=self._designation_var, width=360).pack(padx=20)
+        self._designation_entry = ctk.CTkEntry(
+            self, textvariable=self._designation_var, width=360
+        )
+        self._designation_entry.pack(padx=20)
 
         ctk.CTkLabel(self, text="Montant unitaire (€) *").pack(
             anchor="w", padx=20, pady=(10, 2)
@@ -482,32 +488,21 @@ class _DialogLigneCaisse(ctk.CTkToplevel):
             side="right", padx=(0, 8)
         )
 
-    def _on_designation_change(self, selected: str) -> None:
-        designation = self._designations_by_label.get(selected)
+    def _designation_selectionnee(self) -> dict | None:
+        return self._designation_by_index[self._designation_index]
+
+    def _sync_designation_state(self) -> None:
+        designation = self._designation_selectionnee()
+        self._designation_entry.configure(state="disabled" if designation else "normal")
+
+    def _on_designation_change(self, _event: object = None) -> None:
+        self._designation_index = max(self._preset_menu.current(), 0)
+        designation = self._designation_selectionnee()
+        self._sync_designation_state()
         if not designation:
             return
-        self._syncing_preset = True
         self._designation_var.set(str(designation.get("nom") or ""))
         self._montant_var.set(f"{float(designation.get('montant_unitaire') or 0):.2f}")
-        self._syncing_preset = False
-
-    def _on_manual_field_change(self, *_args: object) -> None:
-        if self._syncing_preset:
-            return
-        designation = self._designations_by_label.get(
-            self._designation_preset_var.get()
-        )
-        if not designation:
-            return
-        nom = self._designation_var.get().strip()
-        try:
-            montant = round(float(self._montant_var.get().strip().replace(",", ".")), 2)
-        except ValueError:
-            montant = None
-        if nom != str(designation.get("nom") or "").strip() or montant != round(
-            float(designation.get("montant_unitaire") or 0), 2
-        ):
-            self._designation_preset_var.set("Saisie libre")
 
     def _valider(self) -> None:
         designation = self._designation_var.get().strip()
@@ -534,9 +529,7 @@ class _DialogLigneCaisse(ctk.CTkToplevel):
                 self, "Ligne caisse", "La quantité doit être positive ou nulle."
             )
             return
-        designation_preset = self._designations_by_label.get(
-            self._designation_preset_var.get()
-        )
+        designation_preset = self._designation_selectionnee()
         designation_id = int(designation_preset["id"]) if designation_preset else None
         self.result = {
             "designation": designation,
