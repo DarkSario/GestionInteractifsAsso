@@ -60,6 +60,7 @@ def test_soumettre_sauve_la_cotisation_rapide(monkeypatch) -> None:
     form = module.FormulaireMembreModal.__new__(module.FormulaireMembreModal)
     form._est_edition = False
     form._membre = None
+    form._cotisation_rapide_initiale = None
     form._error_labels = {"nom": _ErrorLabel(), "cotisation_rapide": _ErrorLabel()}
     form._lire_valeur = lambda champ: {
         "nom": "Durand",
@@ -105,6 +106,7 @@ def test_soumettre_bloque_si_cotisation_rapide_invalide(monkeypatch) -> None:
     form = module.FormulaireMembreModal.__new__(module.FormulaireMembreModal)
     form._est_edition = False
     form._membre = None
+    form._cotisation_rapide_initiale = None
     form._error_labels = {"nom": _ErrorLabel(), "cotisation_rapide": _ErrorLabel()}
     form._lire_valeur = lambda champ: {
         "nom": "Durand",
@@ -146,6 +148,7 @@ def test_sauver_cotisation_rapide_met_a_jour_la_cotisation_existante(monkeypatch
     )
 
     form = module.FormulaireMembreModal.__new__(module.FormulaireMembreModal)
+    form._cotisation_rapide_initiale = None
     form._error_labels = {"cotisation_rapide": _ErrorLabel()}
 
     ok = form._sauver_cotisation_rapide(
