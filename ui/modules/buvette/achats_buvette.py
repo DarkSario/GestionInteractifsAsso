@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import tkinter as tk
 from tkinter import ttk
 from typing import Any
 
@@ -20,6 +19,16 @@ class OngletAchatsBuvette(ctk.CTkFrame):
         self._charger()
 
     def _build_ui(self) -> None:
+        top = ctk.CTkFrame(self, fg_color="transparent")
+        top.pack(fill="x", padx=10, pady=(10, 0))
+        ctk.CTkLabel(
+            top,
+            text="Les achats affichés ici proviennent des entrées stock taggées « Buvette ».",
+            anchor="w",
+            justify="left",
+        ).pack(side="left")
+        ctk.CTkButton(top, text="🔄 Actualiser", command=self.refresh).pack(side="right")
+
         frame = ctk.CTkFrame(self)
         frame.pack(fill="both", expand=True, padx=10, pady=10)
 
@@ -81,3 +90,6 @@ class OngletAchatsBuvette(ctk.CTkFrame):
                     f"{float(row['total_ttc'] or 0):.2f} €",
                 ),
             )
+
+    def refresh(self) -> None:
+        self._charger()

@@ -207,17 +207,17 @@ Suivez vos demandes de subventions dans **Trésorerie → Subventions** :
 ### Entrées en stock (achats fournisseur)
 
 Quand vous achetez de la marchandise :
-1. Allez dans **Stock → Entrées**
-2. Cliquez **"+ Nouvelle entrée"**
-3. Sélectionnez l'article et saisissez la quantité et le prix d'achat
+1. Allez dans **Stock → Entrées** ou dans **Buvette → ➕ Ajouter un achat buvette**
+2. Sélectionnez l'article et saisissez la quantité et le prix d'achat
+3. Vérifiez que le tag **Buvette** est bien coché pour les achats destinés à la buvette
 4. Le stock est mis à jour automatiquement
 
 ### La Buvette
 
-L'onglet **Buvette** suit les ventes lors des événements :
-1. Sélectionnez l'événement concerné
-2. Saisissez les ventes par article
-3. Le stock est automatiquement décrémenté
+Depuis la fenêtre **Buvette** :
+1. Cliquez sur **➕ Ajouter un achat buvette** pour ouvrir le formulaire d'entrée stock préconfiguré
+2. Consultez l'onglet **📋 Achats buvette** pour retrouver le récapitulatif des lots taggés **Buvette**
+3. Utilisez les onglets **Inventaires** et **Coûts par événement** pour suivre la consommation par événement
 
 ### Inventaires
 

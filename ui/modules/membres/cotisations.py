@@ -4,12 +4,16 @@ from __future__ import annotations
 
 import tkinter as tk
 from collections.abc import Callable
-from datetime import date
 from tkinter import ttk
 from typing import Any
 
 import customtkinter as ctk
 
+from core.cotisations import (
+    get_annee_courante,
+    get_montant_cotisation_defaut,
+    renouveler_annee_courante,
+)
 from db.models.cotisations import (
     add_cotisation,
     delete_cotisation,
@@ -18,11 +22,7 @@ from db.models.cotisations import (
     get_stats_cotisations,
     update_cotisation,
 )
-from core.cotisations import (
-    get_annee_courante,
-    get_montant_cotisation_defaut,
-    renouveler_annee_courante,
-)
+from db.models.membres import get_all_membres
 from ui import theme as app_theme
 from ui.components.dialogs import afficher_erreur, afficher_info, demander_confirmation
 from utils.logger import get_logger
@@ -39,6 +39,7 @@ _STATUTS_LIBELLES = {
     "payee": "Payée",
     "en_attente": "En attente",
 }
+_AUCUN_ADHERENT_LABEL = "— Sélectionner un adhérent —"
 
 
 class OngletCotisationsAdherent(ctk.CTkFrame):
@@ -259,13 +260,22 @@ class GestionCotisations(ctk.CTkToplevel):
         frame_actions_top.pack(fill="x", padx=15, pady=(0, 4))
         ctk.CTkButton(
             frame_actions_top,
+            text="+ Ajouter cotisation",
+            width=180,
+            font=fonts.get("normal"),
+            fg_color=colors.get("primary", "#1f6aa5"),
+            hover_color=colors.get("secondary", "#144870"),
+            command=self._ajouter,
+        ).pack(side="left")
+        ctk.CTkButton(
+            frame_actions_top,
             text="🔄 Renouveler en masse",
             width=200,
             font=fonts.get("normal"),
             fg_color=colors.get("primary", "#1f6aa5"),
             hover_color=colors.get("secondary", "#144870"),
             command=self._renouveler_masse,
-        ).pack(side="left")
+        ).pack(side="left", padx=(8, 0))
 
         # Tableau
         frame_table = ctk.CTkFrame(self)
@@ -409,6 +419,9 @@ class GestionCotisations(ctk.CTkToplevel):
             return
         _FormulaireCotisation(self, cotisation=c, on_save=self._charger)
 
+    def _ajouter(self) -> None:
+        _FormulaireCotisation(self, on_save=self._charger)
+
     def _supprimer(self) -> None:
         c = self._get_selection()
         if not c:
@@ -461,8 +474,20 @@ class _FormulaireCotisation(ctk.CTkToplevel):
         self._cotisation = cotisation
         self._adherent_id = adherent_id or (cotisation["adherent_id"] if cotisation else None)
         self._on_save = on_save
-
-        fonts = app_theme.FONTS
+        self._membres: list[dict] = []
+        if self._adherent_id is None:
+            try:
+                self._membres = self._charger_membres_actifs()
+            except Exception:
+                logger.exception("Impossible de charger les adhérents pour les cotisations.")
+                afficher_erreur(
+                    self,
+                    "Erreur",
+                    "Impossible de charger la liste des adhérents pour créer une cotisation.",
+                )
+                self.destroy()
+                return
+        self._membre_options = self._build_membre_options()
 
         frame = ctk.CTkScrollableFrame(self, fg_color="transparent")
         frame.pack(fill="both", expand=True, padx=16, pady=8)
@@ -475,11 +500,27 @@ class _FormulaireCotisation(ctk.CTkToplevel):
             entry.pack(side="left", fill="x", expand=True)
             return entry
 
+        self._membre_var = ctk.StringVar(
+            value=self._membre_options[0] if self._membre_options else _AUCUN_ADHERENT_LABEL
+        )
         self._annee_var = ctk.StringVar(value=str(cotisation["annee"] if cotisation else get_annee_courante()))
         self._montant_var = ctk.StringVar(value=str(cotisation["montant"] if cotisation else f"{get_montant_cotisation_defaut():.2f}"))
         self._date_var = ctk.StringVar(value=cotisation.get("date_paiement") or "" if cotisation else "")
         self._mode_var = ctk.StringVar(value=cotisation.get("mode_paiement") or "" if cotisation else "")
         self._commentaire_var = ctk.StringVar(value=cotisation.get("commentaire") or "" if cotisation else "")
+
+        if self._adherent_id is None:
+            f_membre = ctk.CTkFrame(frame, fg_color="transparent")
+            f_membre.pack(fill="x", pady=3)
+            ctk.CTkLabel(f_membre, text="Adhérent *", width=130, anchor="ne").pack(
+                side="left", padx=(0, 8)
+            )
+            ctk.CTkOptionMenu(
+                f_membre,
+                variable=self._membre_var,
+                values=self._membre_options or [_AUCUN_ADHERENT_LABEL],
+                width=240,
+            ).pack(side="left", fill="x", expand=True)
 
         champ("Année *", self._annee_var, "2026")
         champ("Montant (€) *", self._montant_var, "0.00")
@@ -511,6 +552,35 @@ class _FormulaireCotisation(ctk.CTkToplevel):
             f_btn, text="💾 Enregistrer", width=140, command=self._enregistrer
         ).pack(side="right")
 
+    @staticmethod
+    def _label_membre(membre: dict) -> str:
+        nom = f"{membre.get('prenom', '')} {membre.get('nom', '')}".strip()
+        fallback = f"Adhérent #{membre['id']}"
+        return f"{membre['id']} — {nom or fallback}"
+
+    def _build_membre_options(self) -> list[str]:
+        if self._adherent_id is not None:
+            return []
+        if not self._membres:
+            return [_AUCUN_ADHERENT_LABEL]
+        return [_AUCUN_ADHERENT_LABEL, *[self._label_membre(m) for m in self._membres]]
+
+    @staticmethod
+    def _charger_membres_actifs() -> list[dict]:
+        return get_all_membres(include_archives=False)
+
+    def _resolve_adherent_id(self) -> int | None:
+        if self._adherent_id is not None:
+            return self._adherent_id
+        selected = self._membre_var.get()
+        if selected == _AUCUN_ADHERENT_LABEL:
+            return None
+        membre = next(
+            (m for m in self._membres if self._label_membre(m) == selected),
+            None,
+        )
+        return int(membre["id"]) if membre else None
+
     def _enregistrer(self) -> None:
         try:
             annee = int(self._annee_var.get().strip())
@@ -525,20 +595,43 @@ class _FormulaireCotisation(ctk.CTkToplevel):
         statut = self._statut_var.get()
         if montant == 0.0:
             statut = "offerte"
+        adherent_id = self._resolve_adherent_id()
+        if adherent_id is None:
+            afficher_erreur(self, "Erreur", "Veuillez sélectionner un adhérent.")
+            return
 
-        kwargs = dict(
-            annee=annee,
-            montant=montant,
-            statut=statut,
-            date_paiement=self._date_var.get().strip() or None,
-            mode_paiement=self._mode_var.get().strip() or None,
-            commentaire=self._commentaire_var.get().strip() or None,
-        )
+        kwargs = {
+            "annee": annee,
+            "montant": montant,
+            "statut": statut,
+            "date_paiement": self._date_var.get().strip() or None,
+            "mode_paiement": self._mode_var.get().strip() or None,
+            "commentaire": self._commentaire_var.get().strip() or None,
+        }
 
-        if self._cotisation:
-            update_cotisation(self._cotisation["id"], **kwargs)
-        else:
-            add_cotisation(adherent_id=self._adherent_id, **kwargs)
+        try:
+            if self._cotisation:
+                ok = update_cotisation(self._cotisation["id"], **kwargs)
+                if not ok:
+                    afficher_erreur(
+                        self,
+                        "Erreur",
+                        "Impossible d'enregistrer les modifications de la cotisation.",
+                    )
+                    return
+            else:
+                cotisation_id = add_cotisation(adherent_id=adherent_id, **kwargs)
+                if not isinstance(cotisation_id, int) or cotisation_id <= 0:
+                    afficher_erreur(
+                        self,
+                        "Erreur",
+                        "Impossible d'ajouter la cotisation. Vérifiez la base de données et réessayez.",
+                    )
+                    return
+        except Exception as exc:
+            logger.exception("Erreur lors de l'enregistrement de la cotisation.")
+            afficher_erreur(self, "Erreur", f"Impossible d'enregistrer la cotisation : {exc}")
+            return
 
         if self._on_save:
             self._on_save()
