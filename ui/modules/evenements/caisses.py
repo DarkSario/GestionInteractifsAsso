@@ -456,7 +456,6 @@ class _DialogLigneCaisse(ctk.CTkToplevel):
         self.title(title)
         self.geometry("480x420")
         self.resizable(False, False)
-        self.transient(parent)
         self.result: dict | None = None
 
         self._preset_warning = ""
@@ -482,8 +481,11 @@ class _DialogLigneCaisse(ctk.CTkToplevel):
 
         self._build()
         self._sync_designation_state()
+        self.update_idletasks()
+        self.lift()
         self.grab_set()
-        self.focus()
+        self.focus_set()
+        logger.debug("DialogLigneCaisse affiché (titre=%s)", title)
 
     @staticmethod
     def _format_designation_label(designation: dict) -> str:

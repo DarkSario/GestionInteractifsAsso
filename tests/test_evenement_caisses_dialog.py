@@ -53,10 +53,19 @@ class _BaseWidget:
         return None
 
     def grab_set(self) -> None:
-        return None
+        self.grab_called = True
 
     def focus(self) -> None:
-        return None
+        self.focus_called = True
+
+    def focus_set(self) -> None:
+        self.focus_set_called = True
+
+    def update_idletasks(self) -> None:
+        self.update_idletasks_called = True
+
+    def lift(self) -> None:
+        self.lift_called = True
 
 
 class _Label(_BaseWidget):
@@ -148,6 +157,10 @@ def test_dialog_ligne_affiche_tous_les_champs_et_actions(monkeypatch) -> None:
     labels = [label.kwargs.get("text") for label in _Label.instances]
     boutons = {button.kwargs.get("text"): button for button in _Button.instances}
     assert dialog.geometry_value == "480x420"
+    assert dialog.update_idletasks_called is True
+    assert dialog.lift_called is True
+    assert dialog.grab_called is True
+    assert dialog.focus_set_called is True
     assert "Préset" in labels
     assert "Désignation *" in labels
     assert "Montant unitaire (€) *" in labels
