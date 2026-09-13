@@ -175,30 +175,37 @@ def test_dialog_ligne_selection_preset_remplit_champs(monkeypatch) -> None:
     assert dialog._montant_entry.kwargs.get("state") == "disabled"
 
 
-def test_dialog_ligne_recree_presets_standards_si_absents(monkeypatch) -> None:
+def test_dialog_ligne_signale_absence_de_presets_actifs(monkeypatch) -> None:
     module = _load_module_with_ui_stubs(monkeypatch)
-    appels: list[str] = []
-    reponses = [
-        [],
-        [{"id": 3, "nom": "Pièces 1€", "montant_unitaire": 1.0}],
-    ]
+    monkeypatch.setattr(module, "lister_designations_caisse", lambda actif_only=True: [])
 
-    def _fake_list(*, actif_only=True):
-        appels.append("list")
-        return reponses.pop(0)
+    dialog = module._DialogLigneCaisse(_BaseWidget(), "Ajouter ligne", None)
 
-    monkeypatch.setattr(module, "lister_designations_caisse", _fake_list)
+    assert dialog._preset_options == ["Saisie libre"]
+    assert dialog._preset_warning == (
+        "Aucun préset actif disponible. Utilisez la saisie libre."
+    )
+
+
+def test_dialog_ligne_signale_erreur_chargement_presets(monkeypatch) -> None:
+    module = _load_module_with_ui_stubs(monkeypatch)
+    avertissements: list[str] = []
+
+    def _boom(*, actif_only=True):
+        raise RuntimeError("db indisponible")
+
+    monkeypatch.setattr(module, "lister_designations_caisse", _boom)
     monkeypatch.setattr(
-        module,
-        "reinitialiser_designations_caisses",
-        lambda: appels.append("reset"),
+        module.logger, "warning", lambda message, exc: avertissements.append(message % exc)
     )
 
     dialog = module._DialogLigneCaisse(_BaseWidget(), "Ajouter ligne", None)
 
-    assert appels == ["list", "reset", "list"]
-    assert "recréés automatiquement" in dialog._preset_warning
-    assert dialog._preset_options[1].startswith("Pièces 1€")
+    assert dialog._preset_options == ["Saisie libre"]
+    assert dialog._preset_warning == (
+        "Impossible de charger les présets. Utilisez la saisie libre."
+    )
+    assert avertissements == ["Impossible de charger les présets de caisse : db indisponible"]
 
 
 def test_dialog_ligne_valide_avec_liaison_designation(monkeypatch) -> None:

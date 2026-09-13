@@ -8,10 +8,7 @@ from typing import Any
 
 import customtkinter as ctk
 
-from db.models.caisse_designations import (
-    lister_designations_caisse,
-    reinitialiser_designations_caisses,
-)
+from db.models.caisse_designations import lister_designations_caisse
 from db.models.evenement_caisses import (
     ajouter_ligne_caisse,
     creer_caisse,
@@ -462,13 +459,6 @@ class _DialogLigneCaisse(ctk.CTkToplevel):
         try:
             designations = lister_designations_caisse(actif_only=True)
             if designations:
-                return designations
-            reinitialiser_designations_caisses()
-            designations = lister_designations_caisse(actif_only=True)
-            if designations:
-                self._preset_warning = (
-                    "Les présets standards ont été recréés automatiquement."
-                )
                 return designations
             self._preset_warning = (
                 "Aucun préset actif disponible. Utilisez la saisie libre."
