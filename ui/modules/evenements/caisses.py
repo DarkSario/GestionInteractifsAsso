@@ -408,6 +408,7 @@ class _DialogLigneCaisse(ctk.CTkToplevel):
             for designation in self._designations
         }
         initial_label = self._find_initial_designation_label(ligne)
+        self._syncing_preset = False
         self._designation_var = tk.StringVar(
             value=(ligne or {}).get("designation") or ""
         )
@@ -420,6 +421,8 @@ class _DialogLigneCaisse(ctk.CTkToplevel):
         )
 
         self._build()
+        self._designation_var.trace_add("write", self._on_manual_field_change)
+        self._montant_var.trace_add("write", self._on_manual_field_change)
         self.grab_set()
         self.focus()
 
@@ -430,13 +433,23 @@ class _DialogLigneCaisse(ctk.CTkToplevel):
     def _find_initial_designation_label(self, ligne: dict | None) -> str:
         designation_id = (ligne or {}).get("designation_id")
         designation_nom = str((ligne or {}).get("designation") or "").strip()
+        try:
+            designation_montant = round(
+                float((ligne or {}).get("montant_unitaire") or 0), 2
+            )
+        except (TypeError, ValueError):
+            designation_montant = 0.0
         if designation_id:
             for label, designation in self._designations_by_label.items():
                 if int(designation.get("id") or 0) == int(designation_id):
                     return label
         if designation_nom:
             for label, designation in self._designations_by_label.items():
-                if str(designation.get("nom") or "").strip() == designation_nom:
+                if (
+                    str(designation.get("nom") or "").strip() == designation_nom
+                    and round(float(designation.get("montant_unitaire") or 0), 2)
+                    == designation_montant
+                ):
                     return label
         return "Saisie libre"
 
@@ -473,8 +486,28 @@ class _DialogLigneCaisse(ctk.CTkToplevel):
         designation = self._designations_by_label.get(selected)
         if not designation:
             return
+        self._syncing_preset = True
         self._designation_var.set(str(designation.get("nom") or ""))
         self._montant_var.set(f"{float(designation.get('montant_unitaire') or 0):.2f}")
+        self._syncing_preset = False
+
+    def _on_manual_field_change(self, *_args: object) -> None:
+        if self._syncing_preset:
+            return
+        designation = self._designations_by_label.get(
+            self._designation_preset_var.get()
+        )
+        if not designation:
+            return
+        nom = self._designation_var.get().strip()
+        try:
+            montant = round(float(self._montant_var.get().strip().replace(",", ".")), 2)
+        except ValueError:
+            montant = None
+        if nom != str(designation.get("nom") or "").strip() or montant != round(
+            float(designation.get("montant_unitaire") or 0), 2
+        ):
+            self._designation_preset_var.set("Saisie libre")
 
     def _valider(self) -> None:
         designation = self._designation_var.get().strip()

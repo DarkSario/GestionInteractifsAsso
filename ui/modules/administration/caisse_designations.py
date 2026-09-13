@@ -272,6 +272,13 @@ class _DialogDesignationCaisse(ctk.CTkToplevel):
                 "Montant et ordre doivent être numériques.",
             )
             return
+        if montant < 0:
+            afficher_erreur(
+                self,
+                "Désignations de caisses",
+                "Le montant unitaire doit être positif ou nul.",
+            )
+            return
         self.result = {
             "nom": nom,
             "montant_unitaire": montant,

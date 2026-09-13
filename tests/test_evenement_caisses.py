@@ -209,7 +209,9 @@ def test_modifier_ligne_caisse_conserve_lien_designation_et_texte() -> None:
         "Braderie", None, None, "2026-11-15", None, "planifie", None
     )
     designation = next(
-        item for item in lister_designations_caisse(actif_only=True) if item["nom"] == "SumUp/CB"
+        item
+        for item in lister_designations_caisse(actif_only=True)
+        if item["nom"] == "SumUp/CB"
     )
     designation_id = int(designation["id"])
     caisse_id = creer_caisse(evenement_id, "Point CB")
@@ -232,3 +234,35 @@ def test_modifier_ligne_caisse_conserve_lien_designation_et_texte() -> None:
     assert ligne["designation"] == "SumUp/CB"
     assert ligne["montant_unitaire"] == 180.5
     assert ligne["total"] == 180.5
+
+
+def test_modifier_ligne_caisse_en_saisie_libre_supprime_le_lien_designation() -> None:
+    evenement_id = add_evenement(
+        "Salon", None, None, "2026-11-20", None, "planifie", None
+    )
+    designation = next(
+        item
+        for item in lister_designations_caisse(actif_only=True)
+        if item["nom"] == "Pièces 1€"
+    )
+    designation_id = int(designation["id"])
+    caisse_id = creer_caisse(evenement_id, "Entrée")
+
+    ligne_id = ajouter_ligne_caisse(
+        caisse_id, "debut", "Pièces 1€", 1.0, 10, designation_id=designation_id
+    )
+    assert modifier_ligne_caisse(
+        ligne_id,
+        designation="Fonds spéciaux",
+        montant_unitaire=3.5,
+        quantite=2,
+        designation_id=None,
+    )
+
+    caisse = get_caisse(caisse_id)
+    assert caisse is not None
+    ligne = caisse["lignes_debut"][0]
+    assert ligne["designation_id"] is None
+    assert ligne["designation"] == "Fonds spéciaux"
+    assert ligne["designation_text"] == "Fonds spéciaux"
+    assert ligne["total"] == 7.0
