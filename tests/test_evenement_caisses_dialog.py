@@ -25,6 +25,11 @@ class _BaseWidget:
         self.kwargs = kwargs
         self.children: list[_BaseWidget] = []
         self.destroyed = False
+        self.grab_called = False
+        self.focus_called = False
+        self.focus_set_called = False
+        self.update_idletasks_called = False
+        self.lift_called = False
         if parent is not None and hasattr(parent, "children"):
             parent.children.append(self)
 
