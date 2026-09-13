@@ -92,7 +92,7 @@ def test_soumettre_sauve_la_cotisation_rapide(monkeypatch) -> None:
     assert form.destroyed is True
 
 
-def test_soumettre_bloque_si_cotisation_rapide_invalide(monkeypatch) -> None:
+def test_soumettre_enregistre_membre_meme_si_cotisation_rapide_invalide(monkeypatch) -> None:
     module = _load_module(monkeypatch)
     appels_add: list[bool] = []
 
@@ -125,7 +125,7 @@ def test_soumettre_bloque_si_cotisation_rapide_invalide(monkeypatch) -> None:
 
     form._soumettre()
 
-    assert appels_add == []
+    assert appels_add == [True]
     assert (
         form._error_labels["cotisation_rapide"].text
         == "L'année de cotisation doit être un entier."

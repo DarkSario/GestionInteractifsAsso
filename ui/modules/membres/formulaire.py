@@ -336,10 +336,6 @@ class FormulaireMembreModal(ctk.CTkToplevel):
                 if champ in self._error_labels:
                     self._error_labels[champ].configure(text=message)
             return
-        cotisation_rapide, erreur_cotisation = self._cotisation_rapide.lire_saisie()
-        if erreur_cotisation:
-            self._error_labels["cotisation_rapide"].configure(text=erreur_cotisation)
-            return
 
         adherent_id: int | None = None
         try:
@@ -385,6 +381,11 @@ class FormulaireMembreModal(ctk.CTkToplevel):
         except Exception as exc:
             logger.exception("Erreur lors de la sauvegarde du membre : %s", exc)
             self._error_labels["nom"].configure(text=f"Erreur : {exc}")
+            return
+
+        cotisation_rapide, erreur_cotisation = self._cotisation_rapide.lire_saisie()
+        if erreur_cotisation:
+            self._error_labels["cotisation_rapide"].configure(text=erreur_cotisation)
             return
 
         if cotisation_rapide and adherent_id and not self._sauver_cotisation_rapide(
