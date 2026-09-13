@@ -19,6 +19,9 @@ from db.models.evenement_caisses import (
     modifier_ligne_caisse,
 )
 from ui.components.dialogs import afficher_erreur, afficher_info, demander_confirmation
+from utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class CaissesEvenementView(ctk.CTkFrame):
@@ -339,8 +342,8 @@ class CaissesEvenementView(ctk.CTkFrame):
         if callable(self._callback_refresh):
             try:
                 self._callback_refresh()
-            except Exception:
-                pass
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("CaissesEvenementView: refresh parent callback failed: %s", exc)
 
 
 class _DialogLigneCaisse(ctk.CTkToplevel):

@@ -160,11 +160,17 @@ def calculer_bilan_evenement(evenement_id: int) -> dict:
     stats = get_stats_billetterie(evenement_id)
     depenses = get_depenses_evenement(evenement_id)
     stands = get_stands_evenement(evenement_id)
+    recettes_total = float(bilan.get("total_recettes") or 0)
+    depenses_hors_buvette = float(bilan.get("depenses_evenement") or 0) + float(
+        bilan.get("depenses_stands") or 0
+    )
+    cout_buvette = float(bilan.get("cout_buvette") or 0)
+    benefice = recettes_total - depenses_hors_buvette - cout_buvette
 
     return {
-        "recettes_total": round(float(bilan.get("total_recettes") or 0), 2),
-        "depenses_total": round(float(bilan.get("total_depenses") or 0), 2),
-        "benefice": round(float(bilan.get("benefice_global") or 0), 2),
+        "recettes_total": round(recettes_total, 2),
+        "depenses_total": round(depenses_hors_buvette, 2),
+        "benefice": round(benefice, 2),
         "detail": {
             "billetterie": stats,
             "depenses": depenses,
