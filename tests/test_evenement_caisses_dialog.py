@@ -31,6 +31,7 @@ class _BaseWidget:
         self.focus_set_called = False
         self.update_idletasks_called = False
         self.lift_called = False
+        self.transient_called = False
         if parent is not None and hasattr(parent, "children"):
             parent.children.append(self)
 
@@ -56,7 +57,7 @@ class _BaseWidget:
         return None
 
     def transient(self, *_args) -> None:
-        return None
+        self.transient_called = True
 
     def grab_set(self) -> None:
         self.grab_called = True
@@ -171,6 +172,7 @@ def test_dialog_ligne_affiche_tous_les_champs_et_actions(monkeypatch) -> None:
     assert dialog.lift_called is True
     assert dialog.grab_called is True
     assert dialog.focus_set_called is True
+    assert dialog.transient_called is True
     assert dialog.call_order == ["update_idletasks", "lift", "grab_set", "focus_set"]
     assert "Préset" in labels
     assert "Désignation *" in labels
