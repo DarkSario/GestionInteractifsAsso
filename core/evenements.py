@@ -152,57 +152,33 @@ def calculer_bilan_evenement(evenement_id: int) -> dict:
     Returns:
         Dict avec recettes_total, depenses_total, benefice et detail.
     """
+    from core.caisses_evenement import calculer_bilan_complet_evenement
     from db.models.evenements import get_depenses_evenement, get_stats_billetterie
     from db.models.stands import get_stands_evenement
-    from db.models.tableaux import calculer_totaux, get_colonnes_tableau, get_tableaux_evenement
 
+    bilan = calculer_bilan_complet_evenement(evenement_id)
     stats = get_stats_billetterie(evenement_id)
-    recettes_total = stats.get("total_net", 0.0)
-
     depenses = get_depenses_evenement(evenement_id)
-    depenses_total = sum(float(d.get("montant", 0)) for d in depenses)
     stands = get_stands_evenement(evenement_id)
-    recettes_stands = sum(
-        float(s.get("montant_location") or 0)
-        for s in stands
-        if s.get("type_stand") == "location"
-        and (s.get("type_location") or "recette") == "recette"
-        and s.get("statut") != "annule"
+    recettes_total = float(bilan.get("total_recettes") or 0)
+    depenses_hors_buvette = float(bilan.get("depenses_evenement") or 0) + float(
+        bilan.get("depenses_stands") or 0
     )
-    depenses_stands = sum(
-        float(s.get("montant_location") or 0)
-        for s in stands
-        if s.get("type_stand") == "location"
-        and (s.get("type_location") or "recette") == "depense"
-        and s.get("statut") != "annule"
-    )
-    recettes_total += recettes_stands
-    depenses_total += depenses_stands
-
-    # Inclure les totaux des colonnes de type 'montant' marquées afficher_total dans les tableaux
-    tableaux = get_tableaux_evenement(evenement_id)
-    recettes_tableaux = 0.0
-    for tableau in tableaux:
-        t_id = int(tableau["id"])
-        totaux = calculer_totaux(t_id)
-        if totaux:
-            colonnes_by_id = {int(c["id"]): c for c in get_colonnes_tableau(t_id)}
-            for col_id, total in totaux.items():
-                col = colonnes_by_id.get(col_id, {})
-                if col.get("type_colonne") == "montant":
-                    recettes_tableaux += total
-    recettes_total += recettes_tableaux
-
-    benefice = recettes_total - depenses_total
+    cout_buvette = float(bilan.get("cout_buvette") or 0)
+    benefice = recettes_total - depenses_hors_buvette - cout_buvette
 
     return {
         "recettes_total": round(recettes_total, 2),
-        "depenses_total": round(depenses_total, 2),
+        "depenses_total": round(depenses_hors_buvette, 2),
         "benefice": round(benefice, 2),
         "detail": {
             "billetterie": stats,
             "depenses": depenses,
             "stands": stands,
-            "recettes_tableaux": round(recettes_tableaux, 2),
+            "recettes_tableaux": round(float(bilan.get("recettes_tableaux") or 0), 2),
+            "recettes_tombola": round(float(bilan.get("recettes_tombola") or 0), 2),
+            "recettes_buvette": round(float(bilan.get("recettes_buvette") or 0), 2),
+            "recettes_caisses": round(float(bilan.get("recettes_caisses") or 0), 2),
+            "cout_buvette": round(float(bilan.get("cout_buvette") or 0), 2),
         },
     }

@@ -18,12 +18,14 @@ MODULES_EVENEMENT_DISPONIBLES = (
     "tombola_solidaire",
     "stands",
     "tableaux",
+    "caisses",
     "budget_previsionnel",
 )
 MODULES_EVENEMENT_PAR_DEFAUT = (
     "billetterie",
     "depenses",
     "benevoles",
+    "caisses",
 )
 
 
@@ -53,6 +55,14 @@ def get_all_evenements(statut: str | None = None) -> list[dict]:
                                    AND s.type_stand = 'location'
                                    AND COALESCE(s.type_location, 'recette') = 'recette'
                                    AND s.statut != 'annule'), 0)
+                     + COALESCE((
+                         SELECT SUM(CASE WHEN l.type_ouverture = 'fin' THEN l.total
+                                        WHEN l.type_ouverture = 'debut' THEN -l.total
+                                        ELSE 0 END)
+                         FROM evenement_caisses c
+                         LEFT JOIN evenement_caisse_lignes l ON l.caisse_id = c.id
+                         WHERE c.evenement_id = e.id
+                     ), 0)
                    ) AS total_recettes,
                    (
                        COALESCE((SELECT SUM(d.montant) FROM evenement_depenses d
@@ -110,7 +120,7 @@ def add_evenement(
             """
             INSERT INTO evenements
                 (nom, type, description, date_debut, date_fin, statut, budget_previsionnel, modules_actifs_json)
-            VALUES (?, ?, ?, ?, ?, ?, ?, COALESCE(?, '["billetterie","depenses","benevoles"]'))
+            VALUES (?, ?, ?, ?, ?, ?, ?, COALESCE(?, '["billetterie","depenses","benevoles","caisses"]'))
             """,
             (
                 nom,
