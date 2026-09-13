@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib
+import sqlite3
 import sys
 import types
 
@@ -192,7 +193,7 @@ def test_dialog_ligne_signale_erreur_chargement_presets(monkeypatch) -> None:
     avertissements: list[str] = []
 
     def _boom(actif_only=True):
-        raise RuntimeError("db indisponible")
+        raise sqlite3.OperationalError("db indisponible")
 
     monkeypatch.setattr(module, "lister_designations_caisse", _boom)
     monkeypatch.setattr(

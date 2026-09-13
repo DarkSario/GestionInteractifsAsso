@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sqlite3
 import tkinter as tk
 from tkinter import simpledialog, ttk
 from typing import Any
@@ -464,7 +465,7 @@ class _DialogLigneCaisse(ctk.CTkToplevel):
                 "Aucun préset actif disponible. Utilisez la saisie libre."
             )
             return []
-        except Exception as exc:  # noqa: BLE001
+        except sqlite3.Error as exc:
             logger.warning("Impossible de charger les présets de caisse : %s", exc)
             self._preset_warning = (
                 "Impossible de charger les présets. Utilisez la saisie libre."
