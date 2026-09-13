@@ -55,6 +55,9 @@ from ui.modules.evenements.caisses import CaissesEvenementView
 from ui.modules.evenements.stands import StandsView
 from ui.modules.evenements.tableaux import TableauxView
 from ui.modules.evenements.tombola import TombolaView
+from utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 STATUTS_EVENEMENT = ["planifie", "en_cours", "termine", "annule"]
 LABELS_STATUT = {
@@ -1200,11 +1203,15 @@ class FicheEvenement(ctk.CTkToplevel):
         self._tableaux_view.pack(fill="both", expand=True)
 
     def _build_onglet_caisses(self, parent: Any) -> None:
-        self._caisses_view = CaissesEvenementView(
-            parent,
-            self._evenement_id,
-            callback_refresh=self._actualiser_resume_financier,
-        )
+        try:
+            self._caisses_view = CaissesEvenementView(
+                parent,
+                self._evenement_id,
+                callback_refresh=self._actualiser_resume_financier,
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("Impossible d'initialiser l'onglet Caisses : %s", exc)
+            self._caisses_view = _CaissesUnavailableView(parent, str(exc))
         self._caisses_view.pack(fill="both", expand=True)
 
     # ── Helpers ───────────────────────────────────────────────────────────────
@@ -1224,6 +1231,28 @@ class FicheEvenement(ctk.CTkToplevel):
 # ══════════════════════════════════════════════════════════════════════════════
 # Dialogues auxiliaires
 # ══════════════════════════════════════════════════════════════════════════════
+
+
+class _CaissesUnavailableView(ctk.CTkFrame):
+    """Fallback affiché quand le module Caisses ne peut pas s'initialiser."""
+
+    def __init__(self, parent: Any, detail: str) -> None:
+        super().__init__(parent)
+        ctk.CTkLabel(
+            self,
+            text=(
+                "Le module Caisses est indisponible.\n"
+                "Vérifiez les migrations de base de données (0021/0022) puis relancez."
+            ),
+            justify="left",
+            text_color="#dc3545",
+        ).pack(anchor="w", padx=12, pady=(12, 6))
+        ctk.CTkLabel(self, text=f"Détail : {detail}", justify="left").pack(
+            anchor="w", padx=12, pady=(0, 12)
+        )
+
+    def set_evenement_id(self, _evenement_id: int | None) -> None:
+        return
 
 
 class _DialogTarif(ctk.CTkToplevel):

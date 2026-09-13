@@ -38,6 +38,7 @@ class CaissesEvenementView(ctk.CTkFrame):
         self._caisse_id: int | None = None
         self._caisse_options: dict[str, int] = {}
         self._lignes_by_id: dict[int, dict] = {}
+        self._db_error_shown = False
 
         self._build_ui()
         self.refresh()
@@ -171,6 +172,29 @@ class CaissesEvenementView(ctk.CTkFrame):
         afficher_info(self, "Caisses", "Veuillez d'abord sélectionner une caisse.")
         return False
 
+    @staticmethod
+    def _db_error_message(action: str, exc: Exception) -> str:
+        base = (
+            "Le module Caisses n'est pas disponible car la base n'est pas initialisée "
+            "correctement. Vérifiez l'ouverture de la base et relancez les migrations."
+        )
+        if isinstance(exc, RuntimeError):
+            return f"{base}\n\nDétail : {exc}"
+        if isinstance(exc, sqlite3.OperationalError) and "no such table" in str(exc).lower():
+            return (
+                f"{base}\n\nTable manquante détectée ({exc}). "
+                "Les migrations 0021/0022 doivent être appliquées."
+            )
+        return f"Impossible de {action}.\n\nDétail : {exc}"
+
+    def _gerer_erreur_db(self, action: str, exc: Exception, unique: bool = False) -> None:
+        logger.exception("CaissesEvenementView: échec '%s': %s", action, exc)
+        if unique and self._db_error_shown:
+            return
+        if unique:
+            self._db_error_shown = True
+        afficher_erreur(self, "Caisses", self._db_error_message(action, exc))
+
     def refresh(self) -> None:
         self._tree_debut.delete(*self._tree_debut.get_children())
         self._tree_fin.delete(*self._tree_fin.get_children())
@@ -188,7 +212,20 @@ class CaissesEvenementView(ctk.CTkFrame):
             self._caisse_options = {}
             return
 
-        caisses = lister_caisses_evenement(self._evenement_id)
+        try:
+            logger.info(
+                "CaissesEvenementView: refresh des caisses (evenement_id=%s)",
+                self._evenement_id,
+            )
+            caisses = lister_caisses_evenement(self._evenement_id)
+        except Exception as exc:  # noqa: BLE001
+            self._menu_caisses.configure(values=["—"])
+            self._var_caisse.set("—")
+            self._caisse_options = {}
+            self._caisse_id = None
+            self._gerer_erreur_db("charger les caisses", exc, unique=True)
+            return
+        self._db_error_shown = False
         labels = [f"{c['id']} — {c['nom']}" for c in caisses]
         self._caisse_options = {
             f"{c['id']} — {c['nom']}": int(c["id"]) for c in caisses
@@ -217,7 +254,12 @@ class CaissesEvenementView(ctk.CTkFrame):
             self._charger_caisse(self._caisse_id)
 
     def _charger_caisse(self, caisse_id: int) -> None:
-        caisse = get_caisse(caisse_id)
+        logger.info("CaissesEvenementView: chargement caisse_id=%s", caisse_id)
+        try:
+            caisse = get_caisse(caisse_id)
+        except Exception as exc:  # noqa: BLE001
+            self._gerer_erreur_db("charger la caisse sélectionnée", exc)
+            return
         if not caisse:
             return
         self._tree_debut.delete(*self._tree_debut.get_children())
@@ -285,7 +327,11 @@ class CaissesEvenementView(ctk.CTkFrame):
     def _renommer_caisse(self) -> None:
         if not self._check_caisse():
             return
-        caisse = get_caisse(self._caisse_id)
+        try:
+            caisse = get_caisse(self._caisse_id)
+        except Exception as exc:  # noqa: BLE001
+            self._gerer_erreur_db("charger la caisse à renommer", exc)
+            return
         current = (caisse or {}).get("nom") or ""
         nouveau_nom = simpledialog.askstring(
             "Renommer la caisse", "Nouveau nom :", initialvalue=current, parent=self
@@ -312,7 +358,12 @@ class CaissesEvenementView(ctk.CTkFrame):
             self, "Supprimer", "Supprimer cette caisse et toutes ses lignes ?"
         ):
             return
-        if supprimer_caisse(self._caisse_id):
+        try:
+            deleted = supprimer_caisse(self._caisse_id)
+        except Exception as exc:  # noqa: BLE001
+            self._gerer_erreur_db("supprimer la caisse", exc)
+            return
+        if deleted:
             self._caisse_id = None
             self.refresh()
             self._notifier_refresh_parent()
@@ -378,7 +429,12 @@ class CaissesEvenementView(ctk.CTkFrame):
             return
         if not demander_confirmation(self, "Supprimer", "Supprimer cette ligne ?"):
             return
-        if supprimer_ligne_caisse(int(sel[0])):
+        try:
+            deleted = supprimer_ligne_caisse(int(sel[0]))
+        except Exception as exc:  # noqa: BLE001
+            self._gerer_erreur_db("supprimer la ligne", exc)
+            return
+        if deleted:
             self._charger_caisse(self._caisse_id)
             self._notifier_refresh_parent()
 

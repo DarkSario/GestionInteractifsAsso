@@ -20,12 +20,22 @@ _ALTER_ADD_COLUMN_RE = re.compile(
 
 def run_migrations() -> None:
     """Applique toutes les migrations SQL non encore exécutées."""
-    conn = get_connection()
+    logger.info("Démarrage de run_migrations()")
+    try:
+        conn = get_connection()
+    except Exception:
+        logger.exception("Impossible d'ouvrir la connexion DB pour les migrations")
+        raise
     try:
         _create_migrations_table(conn)
 
         already_applied = _get_applied_migrations(conn)
         sql_files = sorted(MIGRATIONS_DIR.glob("*.sql"))
+        logger.info(
+            "Migrations détectées: %s fichier(s), %s déjà appliquée(s)",
+            len(sql_files),
+            len(already_applied),
+        )
 
         for sql_file in sql_files:
             migration_name = sql_file.name
@@ -49,6 +59,7 @@ def run_migrations() -> None:
                 conn.rollback()
                 logger.exception("Échec de la migration : %s", migration_name)
                 raise
+        logger.info("Fin de run_migrations() sans erreur")
     finally:
         conn.close()
 
