@@ -227,8 +227,11 @@ class CaissesEvenementView(ctk.CTkFrame):
         nom = simpledialog.askstring("Nouvelle caisse", "Nom de la caisse :", parent=self)
         if not nom:
             return
+        nom = nom.strip()
+        if not nom:
+            return
         try:
-            self._caisse_id = creer_caisse(self._evenement_id, nom.strip())
+            self._caisse_id = creer_caisse(self._evenement_id, nom)
         except Exception as exc:  # noqa: BLE001
             afficher_erreur(self, "Caisses", f"Impossible de créer la caisse : {exc}")
             return
@@ -243,8 +246,11 @@ class CaissesEvenementView(ctk.CTkFrame):
         nouveau_nom = simpledialog.askstring("Renommer la caisse", "Nouveau nom :", initialvalue=current, parent=self)
         if not nouveau_nom:
             return
+        nouveau_nom = nouveau_nom.strip()
+        if not nouveau_nom:
+            return
         try:
-            mettre_a_jour_caisse(self._caisse_id, nom=nouveau_nom.strip())
+            mettre_a_jour_caisse(self._caisse_id, nom=nouveau_nom)
         except Exception as exc:  # noqa: BLE001
             afficher_erreur(self, "Caisses", f"Impossible de renommer la caisse : {exc}")
             return

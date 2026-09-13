@@ -191,6 +191,64 @@ def test_get_bilan_dernier_evenement_integre_caisses():
     assert result["benefice_net"] == 21.0
 
 
+def test_get_bilan_dernier_evenement_filtre_tableaux_afficher_total():
+    from db.connection import get_connection
+
+    conn = get_connection()
+    try:
+        ev_id = conn.execute(
+            """
+            INSERT INTO evenements (nom, date_debut, statut)
+            VALUES ('Événement tableaux', '2026-07-01', 'termine')
+            """
+        ).lastrowid
+        tableau_id = conn.execute(
+            """
+            INSERT INTO tableaux_perso (evenement_id, nom, description, ordre)
+            VALUES (?, 'Tableau recettes', '', 0)
+            """,
+            (ev_id,),
+        ).lastrowid
+        col_ok = conn.execute(
+            """
+            INSERT INTO tableaux_colonnes (tableau_id, nom, type_colonne, afficher_total, ordre)
+            VALUES (?, 'Montant compté', 'montant', 1, 0)
+            """,
+            (tableau_id,),
+        ).lastrowid
+        col_ko = conn.execute(
+            """
+            INSERT INTO tableaux_colonnes (tableau_id, nom, type_colonne, afficher_total, ordre)
+            VALUES (?, 'Montant ignoré', 'montant', 0, 1)
+            """,
+            (tableau_id,),
+        ).lastrowid
+        ligne_id = conn.execute(
+            """
+            INSERT INTO tableaux_lignes (tableau_id, membre_id, statut_ligne, ordre)
+            VALUES (?, NULL, 'normal', 0)
+            """,
+            (tableau_id,),
+        ).lastrowid
+        conn.execute(
+            """
+            INSERT INTO tableaux_cellules (ligne_id, colonne_id, valeur)
+            VALUES
+              (?, ?, '10'),
+              (?, ?, '999')
+            """,
+            (ligne_id, col_ok, ligne_id, col_ko),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    result = get_bilan_dernier_evenement()
+    assert result is not None
+    assert result["recettes_nettes"] == 10.0
+    assert result["benefice_net"] == 10.0
+
+
 def test_get_stats_adherents_dashboard():
     result = get_stats_adherents_dashboard()
     assert "nb_total" in result

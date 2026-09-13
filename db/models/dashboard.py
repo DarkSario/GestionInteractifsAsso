@@ -464,13 +464,14 @@ def get_bilan_dernier_evenement() -> dict | None:
     recettes_tableaux = float(
         _fetch_scalar(
             """
-            SELECT COALESCE(SUM(c.valeur_montant), 0)
+            SELECT COALESCE(SUM(CAST(c.valeur AS REAL)), 0)
             FROM tableaux_perso t
             JOIN tableaux_colonnes col ON col.tableau_id = t.id
             JOIN tableaux_lignes l ON l.tableau_id = t.id
             JOIN tableaux_cellules c ON c.ligne_id = l.id AND c.colonne_id = col.id
             WHERE t.evenement_id = ?
               AND col.type_colonne = 'montant'
+              AND COALESCE(col.afficher_total, 0) = 1
             """,
             (ev_id,),
             0,
