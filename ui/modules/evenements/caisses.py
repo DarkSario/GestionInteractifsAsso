@@ -249,6 +249,7 @@ class CaissesEvenementView(ctk.CTkFrame):
             afficher_erreur(self, "Caisses", f"Impossible de renommer la caisse : {exc}")
             return
         self.refresh()
+        self._notifier_refresh_parent()
 
     def _supprimer_caisse_active(self) -> None:
         if not self._check_caisse():

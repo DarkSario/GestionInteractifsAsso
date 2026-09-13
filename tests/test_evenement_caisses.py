@@ -49,6 +49,8 @@ def test_caisse_lignes_debut_fin_et_recette() -> None:
 
 
 def test_bilan_evenement_integre_recette_caisses() -> None:
+    from db.connection import get_connection
+
     evenement_id = add_evenement("Kermesse", None, None, "2026-07-01", None, "planifie", None)
 
     tarif_id = add_tarif(evenement_id, "Entrée", 5.0, 0, 0)
@@ -70,14 +72,38 @@ def test_bilan_evenement_integre_recette_caisses() -> None:
     ajouter_ligne_caisse(caisse_id, "debut", "Fond", 1.0, 10)
     ajouter_ligne_caisse(caisse_id, "fin", "Fond", 1.0, 18)
 
+    conn = get_connection()
+    try:
+        conn.execute(
+            """
+            INSERT INTO tombola_carnets
+                (evenement_id, numero_debut, numero_fin, prix_carnet, vendeur_nom_externe, statut, montant_encaisse)
+            VALUES (?, 1, 1, 2, 'Élève A', 'vendu', 12)
+            """,
+            (evenement_id,),
+        )
+        conn.execute(
+            """
+            INSERT INTO caisses_buvette
+                (evenement_id, nom, fond_de_caisse, total_brut, date, commentaire)
+            VALUES (?, 'Bar', 3, 10, '2026-07-01', '')
+            """,
+            (evenement_id,),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
     bilan_complet = calculer_bilan_complet_evenement(evenement_id)
     assert bilan_complet["recettes_billetterie"] == 10.0
     assert bilan_complet["recettes_caisses"] == 8.0
-    assert bilan_complet["total_recettes"] == 18.0
+    assert bilan_complet["recettes_tombola"] == 12.0
+    assert bilan_complet["recettes_buvette"] == 7.0
+    assert bilan_complet["total_recettes"] == 37.0
     assert bilan_complet["total_depenses"] == 4.0
-    assert bilan_complet["benefice_global"] == 14.0
+    assert bilan_complet["benefice_global"] == 33.0
 
     bilan_fiche = calculer_bilan_evenement(evenement_id)
-    assert bilan_fiche["recettes_total"] == 18.0
+    assert bilan_fiche["recettes_total"] == 37.0
     assert bilan_fiche["depenses_total"] == 4.0
-    assert bilan_fiche["benefice"] == 14.0
+    assert bilan_fiche["benefice"] == 33.0
