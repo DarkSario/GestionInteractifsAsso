@@ -501,11 +501,9 @@ def get_bilan_dernier_evenement() -> dict | None:
     recettes_buvette = float(
         _fetch_scalar(
             """
-            SELECT COALESCE(recette_nette, 0)
+            SELECT COALESCE(SUM(recette_nette), 0)
             FROM recettes_buvette
             WHERE evenement_id = ?
-            ORDER BY id DESC
-            LIMIT 1
             """,
             (ev_id,),
             0,
