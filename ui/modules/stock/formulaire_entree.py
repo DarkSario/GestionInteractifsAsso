@@ -40,6 +40,7 @@ class FormulaireEntreeMarchandise(ctk.CTkToplevel):
         self._tags = get_tags()
         self._tag_vars: dict[int, tk.BooleanVar] = {}
         self._preselected_tag_names = set(preselected_tag_names or set())
+        self.saved = False
 
         self._build_ui()
 
@@ -173,6 +174,7 @@ class FormulaireEntreeMarchandise(ctk.CTkToplevel):
             return
 
         afficher_info(self, "Stock", f"Lot créé avec succès (ID {lot_id}).")
+        self.saved = True
         self.destroy()
 
     @staticmethod

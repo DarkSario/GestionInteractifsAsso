@@ -66,6 +66,8 @@ class ListeBuvette(ctk.CTkToplevel):
         )
         form.grab_set()
         self.wait_window(form)
+        if not getattr(form, "saved", False):
+            return
         self._tabs.set("📋 Achats buvette")
         self._onglet_achats.refresh()
         self._onglet_bilan.refresh()

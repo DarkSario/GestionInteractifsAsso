@@ -195,6 +195,7 @@ def test_liste_buvette_expose_le_flux_d_ajout_achat(monkeypatch) -> None:
         def __init__(self, parent=None, preselected_tag_names=None) -> None:
             super().__init__(parent)
             created_forms.append((parent, preselected_tag_names))
+            self.saved = True
 
     fake_stock_module = types.ModuleType("ui.modules.stock.formulaire_entree")
     fake_stock_module.FormulaireEntreeMarchandise = _FakeForm
@@ -220,3 +221,41 @@ def test_liste_buvette_expose_le_flux_d_ajout_achat(monkeypatch) -> None:
     assert window._tabs.selected == "📋 Achats buvette"
     assert window._onglet_achats.refresh_calls == 1
     assert window._onglet_bilan.refresh_calls == 1
+
+
+def test_liste_buvette_n_actualise_pas_si_le_formulaire_est_annule(monkeypatch) -> None:
+    _install_ui_stubs(monkeypatch)
+
+    fake_achats_module = types.ModuleType("ui.modules.buvette.achats_buvette")
+    fake_achats_module.OngletAchatsBuvette = _FakeAchats
+    fake_inv_module = types.ModuleType("ui.modules.buvette.inventaires")
+    fake_inv_module.OngletInventaires = _BaseWidget
+    fake_couts_module = types.ModuleType("ui.modules.buvette.couts_evenement")
+    fake_couts_module.OngletCoutsEvenement = _BaseWidget
+    fake_bilan_module = types.ModuleType("ui.modules.buvette.bilan_annuel")
+    fake_bilan_module.OngletBilanAnnuel = _RefreshableWidget
+
+    class _FakeForm(_BaseWidget):
+        def __init__(self, parent=None, preselected_tag_names=None) -> None:
+            super().__init__(parent)
+            self.saved = False
+
+    fake_stock_module = types.ModuleType("ui.modules.stock.formulaire_entree")
+    fake_stock_module.FormulaireEntreeMarchandise = _FakeForm
+
+    monkeypatch.setitem(sys.modules, "ui.modules.buvette.achats_buvette", fake_achats_module)
+    monkeypatch.setitem(sys.modules, "ui.modules.buvette.inventaires", fake_inv_module)
+    monkeypatch.setitem(sys.modules, "ui.modules.buvette.couts_evenement", fake_couts_module)
+    monkeypatch.setitem(sys.modules, "ui.modules.buvette.bilan_annuel", fake_bilan_module)
+    monkeypatch.setitem(sys.modules, "ui.modules.stock.formulaire_entree", fake_stock_module)
+
+    sys.modules.pop("ui.theme", None)
+    sys.modules.pop("ui.modules.buvette.liste", None)
+    module = importlib.import_module("ui.modules.buvette.liste")
+
+    window = module.ListeBuvette(_BaseWidget())
+    window._ouvrir_ajout_achat_buvette()
+
+    assert window._tabs.selected is None
+    assert window._onglet_achats.refresh_calls == 0
+    assert window._onglet_bilan.refresh_calls == 0
