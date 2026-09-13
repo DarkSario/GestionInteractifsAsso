@@ -181,6 +181,8 @@ def ajouter_ligne_caisse(
     if quantite_val < 0:
         raise ValueError("La quantité doit être positive ou nulle.")
     montant_val = float(montant_unitaire or 0)
+    if montant_val < 0:
+        raise ValueError("Le montant unitaire doit être positif ou nul.")
     total = _calculer_total(montant_val, quantite_val)
 
     conn = get_connection()
@@ -217,6 +219,8 @@ def modifier_ligne_caisse(
     if quantite_val < 0:
         raise ValueError("La quantité doit être positive ou nulle.")
     montant_val = float(montant_unitaire or 0)
+    if montant_val < 0:
+        raise ValueError("Le montant unitaire doit être positif ou nul.")
     total = _calculer_total(montant_val, quantite_val)
 
     conn = get_connection()

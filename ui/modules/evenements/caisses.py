@@ -382,6 +382,9 @@ class _DialogLigneCaisse(ctk.CTkToplevel):
         except ValueError:
             afficher_erreur(self, "Ligne caisse", "Montant unitaire et quantité doivent être numériques.")
             return
+        if montant < 0:
+            afficher_erreur(self, "Ligne caisse", "Le montant unitaire doit être positif ou nul.")
+            return
         if quantite < 0:
             afficher_erreur(self, "Ligne caisse", "La quantité doit être positive ou nulle.")
             return

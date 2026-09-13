@@ -77,7 +77,7 @@ def calculer_bilan_complet_evenement(evenement_id: int) -> dict:
         colonnes_by_id = {int(c["id"]): c for c in get_colonnes_tableau(t_id)}
         for col_id, total in totaux.items():
             col = colonnes_by_id.get(col_id, {})
-            if col.get("type_colonne") == "montant":
+            if col.get("afficher_total") and col.get("type_colonne") == "montant":
                 recettes_tableaux += float(total or 0)
 
     stats_tombola = get_stats_tombola(evenement_id)

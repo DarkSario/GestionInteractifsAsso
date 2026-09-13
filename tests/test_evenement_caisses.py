@@ -16,6 +16,7 @@ from db.models.evenement_caisses import (
     lister_caisses_evenement,
 )
 from db.models.evenements import add_depense, add_evenement, add_tarif, add_vente, add_vente_ligne
+from db.models.tableaux import add_colonne, add_ligne, add_tableau, set_cellule
 
 
 @pytest.fixture(autouse=True)
@@ -107,3 +108,17 @@ def test_bilan_evenement_integre_recette_caisses() -> None:
     assert bilan_fiche["recettes_total"] == 37.0
     assert bilan_fiche["depenses_total"] == 4.0
     assert bilan_fiche["benefice"] == 33.0
+
+
+def test_bilan_tableaux_compte_uniquement_colonnes_afficher_total() -> None:
+    evenement_id = add_evenement("Expo", None, None, "2026-09-01", None, "planifie", None)
+    tableau_id = add_tableau(evenement_id, "Recettes stand", None, 0)
+    col_comptee = add_colonne(tableau_id, "Ventes", "montant", None, True, 0, 120)
+    col_non_comptee = add_colonne(tableau_id, "Acompte", "montant", None, False, 1, 120)
+    ligne_id = add_ligne(tableau_id, None, "normal", 0)
+    assert set_cellule(ligne_id, col_comptee, "10")
+    assert set_cellule(ligne_id, col_non_comptee, "999")
+
+    bilan = calculer_bilan_complet_evenement(evenement_id)
+    assert bilan["recettes_tableaux"] == 10.0
+    assert bilan["total_recettes"] == 10.0
