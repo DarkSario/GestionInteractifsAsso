@@ -504,12 +504,7 @@ class _DialogLigneCaisse(ctk.CTkToplevel):
         designation_preset = self._designations_by_label.get(
             self._designation_preset_var.get()
         )
-        designation_id = (
-            int(designation_preset["id"])
-            if designation_preset
-            and designation == str(designation_preset.get("nom") or "").strip()
-            else None
-        )
+        designation_id = int(designation_preset["id"]) if designation_preset else None
         self.result = {
             "designation": designation,
             "montant_unitaire": montant,

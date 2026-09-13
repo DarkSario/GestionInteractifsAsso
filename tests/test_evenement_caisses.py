@@ -21,6 +21,7 @@ from db.models.evenement_caisses import (
     get_caisse,
     get_total_recettes_caisses_evenement,
     lister_caisses_evenement,
+    modifier_ligne_caisse,
 )
 from db.models.evenements import (
     add_depense,
@@ -201,3 +202,33 @@ def test_ligne_caisse_conserve_texte_si_designation_supprimee() -> None:
     assert caisse_apres is not None
     assert caisse_apres["lignes_fin"][0]["designation_id"] is None
     assert caisse_apres["lignes_fin"][0]["designation"] == "Jetons"
+
+
+def test_modifier_ligne_caisse_conserve_lien_designation_et_texte() -> None:
+    evenement_id = add_evenement(
+        "Braderie", None, None, "2026-11-15", None, "planifie", None
+    )
+    designation = next(
+        item for item in lister_designations_caisse(actif_only=True) if item["nom"] == "SumUp/CB"
+    )
+    designation_id = int(designation["id"])
+    caisse_id = creer_caisse(evenement_id, "Point CB")
+
+    ligne_id = ajouter_ligne_caisse(
+        caisse_id, "fin", "SumUp/CB", 120.0, 1, designation_id=designation_id
+    )
+    assert modifier_ligne_caisse(
+        ligne_id,
+        designation="SumUp/CB",
+        montant_unitaire=180.5,
+        quantite=1,
+        designation_id=designation_id,
+    )
+
+    caisse = get_caisse(caisse_id)
+    assert caisse is not None
+    ligne = caisse["lignes_fin"][0]
+    assert ligne["designation_id"] == designation_id
+    assert ligne["designation"] == "SumUp/CB"
+    assert ligne["montant_unitaire"] == 180.5
+    assert ligne["total"] == 180.5
