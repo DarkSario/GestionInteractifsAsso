@@ -25,6 +25,7 @@ class _BaseWidget:
         self.kwargs = kwargs
         self.children: list[_BaseWidget] = []
         self.destroyed = False
+        self.call_order: list[str] = []
         self.grab_called = False
         self.focus_called = False
         self.focus_set_called = False
@@ -59,18 +60,22 @@ class _BaseWidget:
 
     def grab_set(self) -> None:
         self.grab_called = True
+        self.call_order.append("grab_set")
 
     def focus(self) -> None:
         self.focus_called = True
 
     def focus_set(self) -> None:
         self.focus_set_called = True
+        self.call_order.append("focus_set")
 
     def update_idletasks(self) -> None:
         self.update_idletasks_called = True
+        self.call_order.append("update_idletasks")
 
     def lift(self) -> None:
         self.lift_called = True
+        self.call_order.append("lift")
 
 
 class _Label(_BaseWidget):
@@ -166,6 +171,7 @@ def test_dialog_ligne_affiche_tous_les_champs_et_actions(monkeypatch) -> None:
     assert dialog.lift_called is True
     assert dialog.grab_called is True
     assert dialog.focus_set_called is True
+    assert dialog.call_order == ["update_idletasks", "lift", "grab_set", "focus_set"]
     assert "Préset" in labels
     assert "Désignation *" in labels
     assert "Montant unitaire (€) *" in labels
