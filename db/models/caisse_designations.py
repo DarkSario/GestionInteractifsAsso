@@ -103,13 +103,23 @@ def lister_designations_caisse(actif_only: bool = False) -> list[dict]:
     """Liste les désignations triées par ordre puis nom."""
     conn = get_connection()
     try:
-        where = "WHERE actif = 1" if actif_only else ""
-        rows = conn.execute(f"""
-            SELECT id, nom, montant_unitaire, description, ordre, actif, created_at, updated_at
-            FROM caisse_designations
-            {where}
-            ORDER BY ordre ASC, nom COLLATE NOCASE ASC, id ASC
-            """).fetchall()
+        if actif_only:
+            rows = conn.execute(
+                """
+                SELECT id, nom, montant_unitaire, description, ordre, actif, created_at, updated_at
+                FROM caisse_designations
+                WHERE actif = 1
+                ORDER BY ordre ASC, nom COLLATE NOCASE ASC, id ASC
+                """
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                """
+                SELECT id, nom, montant_unitaire, description, ordre, actif, created_at, updated_at
+                FROM caisse_designations
+                ORDER BY ordre ASC, nom COLLATE NOCASE ASC, id ASC
+                """
+            ).fetchall()
         return [dict(row) for row in rows]
     finally:
         conn.close()

@@ -16,6 +16,8 @@ CREATE TABLE IF NOT EXISTS evenement_caisse_lignes (
     caisse_id INTEGER NOT NULL REFERENCES evenement_caisses(id) ON DELETE CASCADE,
     type_ouverture TEXT NOT NULL CHECK(type_ouverture IN ('debut', 'fin')),
     designation TEXT NOT NULL,
+    designation_id INTEGER REFERENCES caisse_designations(id) ON DELETE SET NULL,
+    designation_text TEXT,
     montant_unitaire REAL NOT NULL DEFAULT 0,
     quantite INTEGER NOT NULL DEFAULT 1,
     total REAL NOT NULL DEFAULT 0,
