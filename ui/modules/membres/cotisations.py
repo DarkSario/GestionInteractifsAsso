@@ -100,8 +100,6 @@ class MiniFormulaireCotisationRapide(ctk.CTkFrame):
             montant = float(self._montant_var.get().strip().replace(",", "."))
         except ValueError:
             return None, "Le montant de cotisation doit être un nombre."
-        if montant == 0.0:
-            statut = "offerte"
         return {"annee": annee, "montant": montant, "statut": statut}, None
 
     def cotisation_active(self) -> bool:

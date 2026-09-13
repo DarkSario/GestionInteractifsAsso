@@ -290,7 +290,7 @@ def test_mini_formulaire_cotisation_rapide_retourne_none_si_statut_vide(monkeypa
     assert erreur is None
 
 
-def test_mini_formulaire_cotisation_rapide_convertit_montant_et_force_offerte(monkeypatch) -> None:
+def test_mini_formulaire_cotisation_rapide_convertit_montant_et_garde_statut(monkeypatch) -> None:
     module = _load_module_with_ui_stubs(monkeypatch)
     monkeypatch.setattr(module, "get_montant_cotisation_defaut", lambda: 0.0)
     mini = module.MiniFormulaireCotisationRapide(_BaseWidget())
@@ -302,4 +302,4 @@ def test_mini_formulaire_cotisation_rapide_convertit_montant_et_force_offerte(mo
 
     assert mini.cotisation_active() is True
     assert erreur is None
-    assert payload == {"annee": 2026, "montant": 0.0, "statut": "offerte"}
+    assert payload == {"annee": 2026, "montant": 0.0, "statut": "payee"}

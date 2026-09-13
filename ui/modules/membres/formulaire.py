@@ -392,6 +392,10 @@ class FormulaireMembreModal(ctk.CTkToplevel):
         if cotisation_rapide and adherent_id and not self._sauver_cotisation_rapide(
             adherent_id, cotisation_rapide
         ):
+            logger.warning(
+                "Membre enregistré sans cotisation rapide (adherent_id=%s)", adherent_id
+            )
+            self.destroy()
             return
 
         self.destroy()

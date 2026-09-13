@@ -134,6 +134,42 @@ def test_soumettre_bloque_si_cotisation_rapide_invalide(monkeypatch) -> None:
     )
 
 
+def test_soumettre_ferme_la_fenetre_si_cotisation_rapide_echoue_apres_save(monkeypatch) -> None:
+    module = _load_module(monkeypatch)
+
+    monkeypatch.setattr(module, "valider_membre", lambda *_args: [])
+    monkeypatch.setattr(module, "add_membre", lambda *_args: 12)
+
+    form = module.FormulaireMembreModal.__new__(module.FormulaireMembreModal)
+    form._est_edition = False
+    form._membre = None
+    form._cotisation_rapide_initiale = None
+    form._error_labels = {"nom": _ErrorLabel(), "cotisation_rapide": _ErrorLabel()}
+    form._lire_valeur = lambda champ: {
+        "nom": "Durand",
+        "prenom": "Alice",
+        "email": "",
+        "telephone": "",
+        "statut": "Membre",
+        "date_adhesion": "2026-01-01",
+        "commentaire": "",
+    }[champ]
+    form._cotisation_rapide = types.SimpleNamespace(
+        cotisation_active=lambda: True,
+        lire_saisie=lambda: (
+            {"annee": 2026, "montant": 20.0, "statut": "payee"},
+            None,
+        ),
+    )
+    form._sauver_cotisation_rapide = lambda *_args: False
+    form.destroyed = False
+    form.destroy = lambda: setattr(form, "destroyed", True)
+
+    form._soumettre()
+
+    assert form.destroyed is True
+
+
 def test_sauver_cotisation_rapide_met_a_jour_la_cotisation_existante(monkeypatch) -> None:
     module = _load_module(monkeypatch)
     maj_calls: list[tuple[int, dict]] = []
