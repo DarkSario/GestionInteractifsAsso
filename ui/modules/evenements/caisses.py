@@ -8,7 +8,10 @@ from typing import Any
 
 import customtkinter as ctk
 
-from db.models.caisse_designations import lister_designations_caisse
+from db.models.caisse_designations import (
+    lister_designations_caisse,
+    reinitialiser_designations_caisses,
+)
 from db.models.evenement_caisses import (
     ajouter_ligne_caisse,
     creer_caisse,
@@ -397,12 +400,13 @@ class _DialogLigneCaisse(ctk.CTkToplevel):
     def __init__(self, parent: Any, title: str, ligne: dict | None) -> None:
         super().__init__(parent)
         self.title(title)
-        self.geometry("460x340")
+        self.geometry("480x420")
         self.resizable(False, False)
         self.transient(parent)
         self.result: dict | None = None
 
-        self._designations = lister_designations_caisse(actif_only=True)
+        self._preset_warning = ""
+        self._designations = self._charger_designations()
         self._preset_options = [
             "Saisie libre",
             *[self._format_designation_label(d) for d in self._designations],
@@ -454,38 +458,88 @@ class _DialogLigneCaisse(ctk.CTkToplevel):
                     return idx
         return 0
 
+    def _charger_designations(self) -> list[dict]:
+        try:
+            designations = lister_designations_caisse(actif_only=True)
+            if designations:
+                return designations
+            reinitialiser_designations_caisses()
+            designations = lister_designations_caisse(actif_only=True)
+            if designations:
+                self._preset_warning = (
+                    "Les présets standards ont été recréés automatiquement."
+                )
+                return designations
+            self._preset_warning = (
+                "Aucun préset actif disponible. Utilisez la saisie libre."
+            )
+            return []
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Impossible de charger les présets de caisse : %s", exc)
+            self._preset_warning = (
+                "Impossible de charger les présets. Utilisez la saisie libre."
+            )
+            return []
+
     def _build(self) -> None:
-        ctk.CTkLabel(self, text="Préset").pack(anchor="w", padx=20, pady=(16, 2))
+        form = ctk.CTkFrame(self, fg_color="transparent")
+        form.pack(fill="both", expand=True, padx=20, pady=(18, 0))
+
+        ctk.CTkLabel(form, text="Préset").pack(anchor="w", pady=(0, 2))
         self._preset_menu = ttk.Combobox(
-            self,
+            form,
             values=self._preset_options,
             variable=self._designation_preset_var,
             state="readonly",
             width=42,
         )
-        self._preset_menu.pack(padx=20)
+        self._preset_menu.pack(fill="x")
         self._preset_menu.current(self._designation_index)
         self._preset_menu.bind("<<ComboboxSelected>>", self._on_designation_change)
 
-        ctk.CTkLabel(self, text="Désignation *").pack(anchor="w", padx=20, pady=(16, 2))
+        if self._preset_warning:
+            ctk.CTkLabel(
+                form,
+                text=self._preset_warning,
+                text_color="#d97706",
+                wraplength=420,
+                justify="left",
+            ).pack(anchor="w", pady=(8, 0))
+
+        ctk.CTkLabel(form, text="Désignation *").pack(anchor="w", pady=(16, 2))
         self._designation_entry = ctk.CTkEntry(
-            self, textvariable=self._designation_var, width=360
+            form, textvariable=self._designation_var, width=360
         )
-        self._designation_entry.pack(padx=20)
+        self._designation_entry.pack(fill="x")
 
-        ctk.CTkLabel(self, text="Montant unitaire (€) *").pack(
-            anchor="w", padx=20, pady=(10, 2)
+        ctk.CTkLabel(form, text="Montant unitaire (€) *").pack(
+            anchor="w", pady=(10, 2)
         )
-        ctk.CTkEntry(self, textvariable=self._montant_var, width=360).pack(padx=20)
+        self._montant_entry = ctk.CTkEntry(
+            form, textvariable=self._montant_var, width=360
+        )
+        self._montant_entry.pack(fill="x")
 
-        ctk.CTkLabel(self, text="Quantité *").pack(anchor="w", padx=20, pady=(10, 2))
-        ctk.CTkEntry(self, textvariable=self._quantite_var, width=360).pack(padx=20)
+        ctk.CTkLabel(form, text="Quantité *").pack(anchor="w", pady=(10, 2))
+        self._quantite_entry = ctk.CTkEntry(
+            form, textvariable=self._quantite_var, width=360
+        )
+        self._quantite_entry.pack(fill="x")
 
         actions = ctk.CTkFrame(self, fg_color="transparent")
-        actions.pack(fill="x", padx=20, pady=16)
-        ctk.CTkButton(actions, text="Annuler", command=self.destroy).pack(side="right")
-        ctk.CTkButton(actions, text="Valider", command=self._valider).pack(
-            side="right", padx=(0, 8)
+        actions.pack(fill="x", padx=20, pady=(16, 20))
+        ctk.CTkButton(
+            actions,
+            text="Annuler",
+            width=120,
+            fg_color="#6c757d",
+            hover_color="#5a6268",
+            command=self.destroy,
+        ).pack(side="right")
+        ctk.CTkButton(
+            actions, text="Enregistrer", width=140, command=self._valider
+        ).pack(
+            side="right", padx=(0, 10)
         )
 
     def _designation_selectionnee(self) -> dict | None:
@@ -494,6 +548,7 @@ class _DialogLigneCaisse(ctk.CTkToplevel):
     def _sync_designation_state(self) -> None:
         designation = self._designation_selectionnee()
         self._designation_entry.configure(state="disabled" if designation else "normal")
+        self._montant_entry.configure(state="disabled" if designation else "normal")
 
     def _on_designation_change(self, _event: object = None) -> None:
         self._designation_index = max(self._preset_menu.current(), 0)
