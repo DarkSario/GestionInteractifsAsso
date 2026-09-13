@@ -208,3 +208,40 @@ def test_formulaire_global_affiche_erreur_si_les_adherents_ne_chargent_pas(monke
             "Impossible de charger la liste des adhérents pour créer une cotisation.",
         )
     ]
+
+
+def test_formulaire_edition_affiche_erreur_si_modification_echoue(monkeypatch) -> None:
+    module = _load_module_with_ui_stubs(monkeypatch)
+    monkeypatch.setattr(module, "update_cotisation", lambda _cotisation_id, **_kwargs: False)
+    erreurs: list[tuple[str, str]] = []
+    rappels: list[bool] = []
+    monkeypatch.setattr(
+        module,
+        "afficher_erreur",
+        lambda _parent, titre, message: erreurs.append((titre, message)),
+    )
+
+    dialog = module._FormulaireCotisation(
+        _BaseWidget(),
+        cotisation={
+            "id": 42,
+            "adherent_id": 7,
+            "annee": 2026,
+            "montant": 12.5,
+            "statut": "payee",
+            "date_paiement": "",
+            "mode_paiement": "",
+            "commentaire": "",
+        },
+        on_save=lambda: rappels.append(True),
+    )
+    dialog._enregistrer()
+
+    assert dialog.destroyed is False
+    assert rappels == []
+    assert erreurs == [
+        (
+            "Erreur",
+            "Impossible d'enregistrer les modifications de la cotisation.",
+        )
+    ]

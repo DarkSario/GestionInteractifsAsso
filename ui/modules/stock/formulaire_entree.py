@@ -169,7 +169,10 @@ class FormulaireEntreeMarchandise(ctk.CTkToplevel):
             )
             return
         except Exception as exc:
-            logger.exception("Erreur entrée de marchandise.")
+            logger.exception(
+                "Erreur entrée de marchandise lors de l'enregistrement de l'article %s.",
+                self._article_var.get(),
+            )
             afficher_erreur(self, "Erreur", f"Impossible d'enregistrer l'entrée : {exc}")
             return
 
