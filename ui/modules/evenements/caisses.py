@@ -481,6 +481,7 @@ class _DialogLigneCaisse(ctk.CTkToplevel):
 
         self._build()
         self._sync_designation_state()
+        self.transient(parent)
         self.update_idletasks()
         self.lift()
         self.grab_set()
