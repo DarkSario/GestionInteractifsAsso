@@ -268,7 +268,7 @@ class _DialogDesignationCaisse(ctk.CTkToplevel):
         ).pack(side="right")
         ctk.CTkButton(
             actions,
-            text="💾 Enregistrer",
+            text="Enregistrer",
             width=140,
             command=self._valider,
         ).pack(

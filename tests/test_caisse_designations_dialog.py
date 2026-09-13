@@ -103,8 +103,8 @@ def test_dialog_affiche_boutons_actions_stylises(monkeypatch) -> None:
 
     boutons = {button.kwargs.get("text"): button for button in _Button.instances}
     assert dialog.geometry_value == "460x380"
-    assert "💾 Enregistrer" in boutons
-    assert boutons["💾 Enregistrer"].kwargs.get("width") == 140
+    assert "Enregistrer" in boutons
+    assert boutons["Enregistrer"].kwargs.get("width") == 140
     assert "Annuler" in boutons
     assert boutons["Annuler"].kwargs.get("width") == 120
     assert boutons["Annuler"].kwargs.get("fg_color") == "#6c757d"
