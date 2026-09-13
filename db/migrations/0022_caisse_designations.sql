@@ -1,5 +1,16 @@
 -- Phase 22 : désignations globales réutilisables pour les caisses événement
 
+CREATE TABLE IF NOT EXISTS caisse_designations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    nom TEXT NOT NULL UNIQUE,
+    montant_unitaire REAL NOT NULL DEFAULT 0,
+    description TEXT,
+    ordre INTEGER NOT NULL DEFAULT 0,
+    actif INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE TABLE IF NOT EXISTS evenement_caisse_lignes (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     caisse_id INTEGER NOT NULL REFERENCES evenement_caisses(id) ON DELETE CASCADE,
@@ -12,17 +23,6 @@ CREATE TABLE IF NOT EXISTS evenement_caisse_lignes (
     total REAL NOT NULL DEFAULT 0,
     created_at TEXT DEFAULT (datetime('now')),
     updated_at TEXT DEFAULT (datetime('now'))
-);
-
-CREATE TABLE IF NOT EXISTS caisse_designations (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    nom TEXT NOT NULL UNIQUE,
-    montant_unitaire REAL NOT NULL DEFAULT 0,
-    description TEXT,
-    ordre INTEGER NOT NULL DEFAULT 0,
-    actif INTEGER NOT NULL DEFAULT 1,
-    created_at TEXT NOT NULL DEFAULT (datetime('now')),
-    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
 ALTER TABLE evenement_caisse_lignes ADD COLUMN designation_id INTEGER REFERENCES caisse_designations(id) ON DELETE SET NULL;

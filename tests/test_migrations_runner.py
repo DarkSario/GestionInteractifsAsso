@@ -196,3 +196,76 @@ def test_run_migrations_reconstruit_tables_caisses_si_absentes(tmp_db) -> None:
         "0021_evenement_caisses_detail.sql",
         "0022_caisse_designations.sql",
     }.issubset(migrations)
+
+
+def test_run_migrations_met_a_jour_evenement_caisses_historique(tmp_db) -> None:
+    set_db_file(str(tmp_db))
+    conn = get_connection()
+    try:
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS _migrations (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                nom TEXT NOT NULL UNIQUE,
+                appliquee_le TEXT NOT NULL DEFAULT (datetime('now'))
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS evenements (
+                id INTEGER PRIMARY KEY AUTOINCREMENT
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS evenement_caisses (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                evenement_id INTEGER NOT NULL,
+                nom_caisse TEXT NOT NULL,
+                commentaire TEXT,
+                FOREIGN KEY (evenement_id) REFERENCES evenements(id)
+            )
+            """
+        )
+        conn.execute("INSERT INTO evenements DEFAULT VALUES")
+        conn.execute(
+            """
+            INSERT INTO evenement_caisses (evenement_id, nom_caisse, commentaire)
+            VALUES (1, 'Caisse historique', 'legacy')
+            """
+        )
+        legacy_migrations = sorted(
+            migration.name
+            for migration in MIGRATIONS_DIR.glob("*.sql")
+            if migration.name < "0021_evenement_caisses_detail.sql"
+        )
+        conn.executemany(
+            "INSERT INTO _migrations (nom) VALUES (?)",
+            [(name,) for name in legacy_migrations],
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    run_migrations()
+
+    conn = get_connection()
+    try:
+        cols_caisses = {
+            row["name"]
+            for row in conn.execute("PRAGMA table_info(evenement_caisses)").fetchall()
+        }
+        row = conn.execute(
+            "SELECT nom, nom_caisse, statut FROM evenement_caisses WHERE id = 1"
+        ).fetchone()
+    finally:
+        conn.close()
+        set_db_file("")
+
+    assert {"nom", "nom_caisse", "statut", "created_at", "updated_at"}.issubset(cols_caisses)
+    assert row is not None
+    assert row["nom"] == "Caisse historique"
+    assert row["nom_caisse"] == "Caisse historique"
+    assert row["statut"] == "ouvert"

@@ -4,22 +4,24 @@ CREATE TABLE IF NOT EXISTS evenement_caisses (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     evenement_id INTEGER NOT NULL REFERENCES evenements(id),
     nom_caisse TEXT NOT NULL,
-    nom TEXT,
     commentaire TEXT,
-    statut TEXT DEFAULT 'ouvert',
-    created_at TEXT DEFAULT (datetime('now')),
-    updated_at TEXT DEFAULT (datetime('now'))
+    FOREIGN KEY (evenement_id) REFERENCES evenements(id)
 );
 
 -- Harmonisation de la table historique evenement_caisses
 ALTER TABLE evenement_caisses ADD COLUMN nom TEXT;
 ALTER TABLE evenement_caisses ADD COLUMN statut TEXT DEFAULT 'ouvert';
-ALTER TABLE evenement_caisses ADD COLUMN created_at TEXT DEFAULT (datetime('now'));
-ALTER TABLE evenement_caisses ADD COLUMN updated_at TEXT DEFAULT (datetime('now'));
+ALTER TABLE evenement_caisses ADD COLUMN created_at TEXT;
+ALTER TABLE evenement_caisses ADD COLUMN updated_at TEXT;
 
 UPDATE evenement_caisses
 SET nom = COALESCE(nom, nom_caisse)
 WHERE COALESCE(nom, '') = '';
+
+UPDATE evenement_caisses
+SET created_at = COALESCE(NULLIF(created_at, ''), datetime('now')),
+    updated_at = COALESCE(NULLIF(updated_at, ''), datetime('now')),
+    statut = COALESCE(NULLIF(statut, ''), 'ouvert');
 
 -- Détail des lignes de caisse (début / fin)
 CREATE TABLE IF NOT EXISTS evenement_caisse_lignes (
