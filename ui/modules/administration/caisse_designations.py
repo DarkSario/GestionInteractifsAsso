@@ -230,7 +230,6 @@ class _DialogDesignationCaisse(ctk.CTkToplevel):
         self._actif_var = tk.BooleanVar(value=bool((designation or {}).get("actif", 1)))
 
         self._build_ui()
-        self.bind("<Escape>", lambda _event: self.destroy())
         self.focus()
 
     def _build_ui(self) -> None:
