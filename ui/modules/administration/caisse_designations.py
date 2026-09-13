@@ -231,7 +231,6 @@ class _DialogDesignationCaisse(ctk.CTkToplevel):
 
         self._build_ui()
         self.bind("<Escape>", lambda _event: self.destroy())
-        self.bind("<Return>", lambda _event: self._valider())
         self.focus()
 
     def _build_ui(self) -> None:
