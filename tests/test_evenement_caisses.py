@@ -8,6 +8,13 @@ from core.caisses_evenement import calculer_bilan_complet_evenement
 from core.evenements import calculer_bilan_evenement
 from db.connection import set_db_file
 from db.migrations.runner import run_migrations
+from db.models.caisse_designations import (
+    creer_designation_caisse,
+    definir_activation_designation_caisse,
+    lister_designations_caisse,
+    reinitialiser_designations_caisses,
+    supprimer_designation_caisse,
+)
 from db.models.evenement_caisses import (
     ajouter_ligne_caisse,
     creer_caisse,
@@ -15,7 +22,13 @@ from db.models.evenement_caisses import (
     get_total_recettes_caisses_evenement,
     lister_caisses_evenement,
 )
-from db.models.evenements import add_depense, add_evenement, add_tarif, add_vente, add_vente_ligne
+from db.models.evenements import (
+    add_depense,
+    add_evenement,
+    add_tarif,
+    add_vente,
+    add_vente_ligne,
+)
 from db.models.tableaux import add_colonne, add_ligne, add_tableau, set_cellule
 
 
@@ -28,7 +41,9 @@ def setup_db(tmp_db):
 
 
 def test_caisse_lignes_debut_fin_et_recette() -> None:
-    evenement_id = add_evenement("Fête", None, None, "2026-06-10", None, "planifie", None)
+    evenement_id = add_evenement(
+        "Fête", None, None, "2026-06-10", None, "planifie", None
+    )
     caisse_id = creer_caisse(evenement_id, "Billetterie")
 
     ajouter_ligne_caisse(caisse_id, "debut", "Pièces 1€", 1.0, 15)
@@ -52,7 +67,9 @@ def test_caisse_lignes_debut_fin_et_recette() -> None:
 def test_bilan_evenement_integre_recette_caisses() -> None:
     from db.connection import get_connection
 
-    evenement_id = add_evenement("Kermesse", None, None, "2026-07-01", None, "planifie", None)
+    evenement_id = add_evenement(
+        "Kermesse", None, None, "2026-07-01", None, "planifie", None
+    )
 
     tarif_id = add_tarif(evenement_id, "Entrée", 5.0, 0, 0)
     vente_id = add_vente(
@@ -67,7 +84,16 @@ def test_bilan_evenement_integre_recette_caisses() -> None:
         commentaire=None,
     )
     add_vente_ligne(vente_id, tarif_id, 2, 5.0)
-    add_depense(evenement_id, "Achat déco", 4.0, "2026-06-30", "Décoration", None, "especes", None)
+    add_depense(
+        evenement_id,
+        "Achat déco",
+        4.0,
+        "2026-06-30",
+        "Décoration",
+        None,
+        "especes",
+        None,
+    )
 
     caisse_id = creer_caisse(evenement_id, "Caisse principale")
     ajouter_ligne_caisse(caisse_id, "debut", "Fond", 1.0, 10)
@@ -111,7 +137,9 @@ def test_bilan_evenement_integre_recette_caisses() -> None:
 
 
 def test_bilan_tableaux_compte_uniquement_colonnes_afficher_total() -> None:
-    evenement_id = add_evenement("Expo", None, None, "2026-09-01", None, "planifie", None)
+    evenement_id = add_evenement(
+        "Expo", None, None, "2026-09-01", None, "planifie", None
+    )
     tableau_id = add_tableau(evenement_id, "Recettes stand", None, 0)
     col_comptee = add_colonne(tableau_id, "Ventes", "montant", None, True, 0, 120)
     col_non_comptee = add_colonne(tableau_id, "Acompte", "montant", None, False, 1, 120)
@@ -122,3 +150,54 @@ def test_bilan_tableaux_compte_uniquement_colonnes_afficher_total() -> None:
     bilan = calculer_bilan_complet_evenement(evenement_id)
     assert bilan["recettes_tableaux"] == 10.0
     assert bilan["total_recettes"] == 10.0
+
+
+def test_designations_par_defaut_et_activation() -> None:
+    designations = lister_designations_caisse()
+    noms = [designation["nom"] for designation in designations]
+    assert "Pièces 1€" in noms
+    assert "Chèques" in noms
+
+    piece_1 = next(
+        designation for designation in designations if designation["nom"] == "Pièces 1€"
+    )
+    assert piece_1["montant_unitaire"] == 1.0
+    assert piece_1["actif"] == 1
+
+    assert definir_activation_designation_caisse(piece_1["id"], False)
+    actifs = lister_designations_caisse(actif_only=True)
+    assert all(designation["id"] != piece_1["id"] for designation in actifs)
+
+    total = reinitialiser_designations_caisses()
+    assert total >= len(designations)
+    piece_1_reloaded = next(
+        designation
+        for designation in lister_designations_caisse(actif_only=True)
+        if designation["nom"] == "Pièces 1€"
+    )
+    assert piece_1_reloaded["actif"] == 1
+
+
+def test_ligne_caisse_conserve_texte_si_designation_supprimee() -> None:
+    evenement_id = add_evenement(
+        "Marché", None, None, "2026-10-10", None, "planifie", None
+    )
+    designation_id = creer_designation_caisse(
+        "Jetons", 2.5, "Monnaie interne", 200, True
+    )
+    caisse_id = creer_caisse(evenement_id, "Accueil")
+
+    ajouter_ligne_caisse(
+        caisse_id, "fin", "Jetons", 2.5, 4, designation_id=designation_id
+    )
+    caisse = get_caisse(caisse_id)
+    assert caisse is not None
+    assert caisse["lignes_fin"][0]["designation_id"] == designation_id
+    assert caisse["lignes_fin"][0]["designation"] == "Jetons"
+
+    assert supprimer_designation_caisse(designation_id)
+
+    caisse_apres = get_caisse(caisse_id)
+    assert caisse_apres is not None
+    assert caisse_apres["lignes_fin"][0]["designation_id"] is None
+    assert caisse_apres["lignes_fin"][0]["designation"] == "Jetons"
