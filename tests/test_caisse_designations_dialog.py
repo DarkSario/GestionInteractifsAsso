@@ -130,6 +130,18 @@ def test_dialog_refuse_montant_vide(monkeypatch) -> None:
     ]
 
 
+def test_dialog_edition_sans_montant_initialise_un_champ_vide(monkeypatch) -> None:
+    module = _load_module_with_ui_stubs(monkeypatch)
+
+    dialog = module._DialogDesignationCaisse(
+        _BaseWidget(),
+        "Modifier la désignation",
+        {"nom": "Jetons", "montant_unitaire": None},
+    )
+
+    assert dialog._montant_var.get() == ""
+
+
 def test_dialog_enregistre_designation_valide(monkeypatch) -> None:
     module = _load_module_with_ui_stubs(monkeypatch)
     dialog = module._DialogDesignationCaisse(_BaseWidget(), "Nouvelle désignation", None)

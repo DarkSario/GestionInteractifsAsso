@@ -219,12 +219,9 @@ class _DialogDesignationCaisse(ctk.CTkToplevel):
         self.result: dict | None = None
 
         self._nom_var = tk.StringVar(value=(designation or {}).get("nom") or "")
+        montant_initial = (designation or {}).get("montant_unitaire")
         self._montant_var = tk.StringVar(
-            value=(
-                str((designation or {}).get("montant_unitaire"))
-                if designation is not None
-                else ""
-            )
+            value="" if montant_initial is None else str(montant_initial)
         )
         self._description_var = tk.StringVar(
             value=(designation or {}).get("description") or ""
