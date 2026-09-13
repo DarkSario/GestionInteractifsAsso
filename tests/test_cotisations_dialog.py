@@ -274,3 +274,30 @@ def test_formulaire_edition_affiche_erreur_si_modification_echoue(monkeypatch) -
             "Impossible d'enregistrer les modifications de la cotisation.",
         )
     ]
+
+
+def test_mini_formulaire_cotisation_rapide_retourne_none_si_statut_vide(monkeypatch) -> None:
+    module = _load_module_with_ui_stubs(monkeypatch)
+    monkeypatch.setattr(module, "get_montant_cotisation_defaut", lambda: 12.5)
+
+    mini = module.MiniFormulaireCotisationRapide(_BaseWidget())
+    mini._statut_var.set("Vide")
+
+    payload, erreur = mini.lire_saisie()
+
+    assert payload is None
+    assert erreur is None
+
+
+def test_mini_formulaire_cotisation_rapide_convertit_montant_et_force_offerte(monkeypatch) -> None:
+    module = _load_module_with_ui_stubs(monkeypatch)
+    monkeypatch.setattr(module, "get_montant_cotisation_defaut", lambda: 0.0)
+    mini = module.MiniFormulaireCotisationRapide(_BaseWidget())
+    mini._statut_var.set("Payée")
+    mini._annee_var.set("2026")
+    mini._montant_var.set("0,00")
+
+    payload, erreur = mini.lire_saisie()
+
+    assert erreur is None
+    assert payload == {"annee": 2026, "montant": 0.0, "statut": "offerte"}

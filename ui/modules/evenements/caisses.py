@@ -374,9 +374,19 @@ class CaissesEvenementView(ctk.CTkFrame):
     def _ajouter_ligne(self, type_ouverture: str) -> None:
         if not self._check_caisse():
             return
+        logger.debug(
+            "Ouverture dialog ligne caisse (action=ajout, caisse_id=%s, type=%s)",
+            self._caisse_id,
+            type_ouverture,
+        )
         dialog = _DialogLigneCaisse(self, title="Ajouter ligne", ligne=None)
         self.wait_window(dialog)
         if not dialog.result:
+            logger.debug(
+                "Dialog ligne caisse fermé sans résultat (action=ajout, caisse_id=%s, type=%s)",
+                self._caisse_id,
+                type_ouverture,
+            )
             return
         try:
             ajouter_ligne_caisse(
@@ -402,9 +412,19 @@ class CaissesEvenementView(ctk.CTkFrame):
             return
         ligne_id = int(sel[0])
         ligne = dict(self._lignes_by_id.get(ligne_id) or {})
+        logger.debug(
+            "Ouverture dialog ligne caisse (action=edition, ligne_id=%s, type=%s)",
+            ligne_id,
+            type_ouverture,
+        )
         dialog = _DialogLigneCaisse(self, title="Modifier ligne", ligne=ligne)
         self.wait_window(dialog)
         if not dialog.result:
+            logger.debug(
+                "Dialog ligne caisse fermé sans résultat (action=edition, ligne_id=%s, type=%s)",
+                ligne_id,
+                type_ouverture,
+            )
             return
         try:
             modifier_ligne_caisse(
@@ -452,11 +472,13 @@ class _DialogLigneCaisse(ctk.CTkToplevel):
     """Dialogue d'ajout/édition de ligne de caisse."""
 
     def __init__(self, parent: Any, title: str, ligne: dict | None) -> None:
-        super().__init__(parent)
+        owner = self._resolve_owner(parent)
+        super().__init__(owner)
         self.title(title)
         self.geometry("480x420")
         self.resizable(False, False)
         self.result: dict | None = None
+        self._owner = owner
 
         self._preset_warning = ""
         self._designations = self._charger_designations()
@@ -481,12 +503,34 @@ class _DialogLigneCaisse(ctk.CTkToplevel):
 
         self._build()
         self._sync_designation_state()
-        self.transient(parent)
+        deiconify = getattr(self, "deiconify", None)
+        if callable(deiconify):
+            deiconify()
+        self.transient(owner)
         self.update_idletasks()
         self.lift()
         self.grab_set()
         self.focus_set()
-        logger.debug("DialogLigneCaisse affiché (titre=%s)", title)
+        logger.debug(
+            "DialogLigneCaisse affiché (titre=%s, parent=%s, owner=%s)",
+            title,
+            type(parent).__name__,
+            type(owner).__name__,
+        )
+
+    @staticmethod
+    def _resolve_owner(parent: Any) -> Any:
+        if parent is None:
+            return parent
+        resolver = getattr(parent, "winfo_toplevel", None)
+        if callable(resolver):
+            try:
+                owner = resolver()
+                if owner is not None:
+                    return owner
+            except Exception as exc:  # noqa: BLE001
+                logger.debug("DialogLigneCaisse: winfo_toplevel indisponible: %s", exc)
+        return parent
 
     @staticmethod
     def _format_designation_label(designation: dict) -> str:
