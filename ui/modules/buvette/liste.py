@@ -29,6 +29,14 @@ class ListeBuvette(ctk.CTkToplevel):
             font=app_theme.FONTS.get("title"),
         ).pack(anchor="w", padx=16, pady=(14, 8))
 
+        actions = ctk.CTkFrame(self, fg_color="transparent")
+        actions.pack(fill="x", padx=16, pady=(0, 8))
+        ctk.CTkButton(
+            actions,
+            text="➕ Ajouter un achat buvette",
+            command=self._ouvrir_ajout_achat_buvette,
+        ).pack(side="left")
+
         self._tabs = ctk.CTkTabview(self)
         self._tabs.pack(fill="both", expand=True, padx=16, pady=(0, 14))
 
@@ -48,3 +56,16 @@ class ListeBuvette(ctk.CTkToplevel):
 
         self._onglet_bilan = OngletBilanAnnuel(self._tabs.tab("📈 Bilan annuel"))
         self._onglet_bilan.pack(fill="both", expand=True)
+
+    def _ouvrir_ajout_achat_buvette(self) -> None:
+        from ui.modules.stock.formulaire_entree import FormulaireEntreeMarchandise
+
+        form = FormulaireEntreeMarchandise(
+            self,
+            preselected_tag_names={"Buvette"},
+        )
+        form.grab_set()
+        self.wait_window(form)
+        self._tabs.set("📋 Achats buvette")
+        self._onglet_achats.refresh()
+        self._onglet_bilan.refresh()

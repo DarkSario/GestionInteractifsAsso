@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from datetime import date
 import tkinter as tk
+from datetime import UTC, datetime
 from typing import Any
 
 import customtkinter as ctk
@@ -23,7 +23,11 @@ _TYPE_ENTREE_ACHAT = "Entrée — Achat"
 class FormulaireEntreeMarchandise(ctk.CTkToplevel):
     """Saisie d'une entrée de marchandise en lot."""
 
-    def __init__(self, parent: Any) -> None:
+    def __init__(
+        self,
+        parent: Any,
+        preselected_tag_names: set[str] | None = None,
+    ) -> None:
         super().__init__(parent)
         self.title("📦 Entrée de marchandise")
         self.geometry("780x620")
@@ -35,6 +39,7 @@ class FormulaireEntreeMarchandise(ctk.CTkToplevel):
         self._fournisseur_labels = {f"{f['id']} — {f['nom']}": f for f in self._fournisseurs}
         self._tags = get_tags()
         self._tag_vars: dict[int, tk.BooleanVar] = {}
+        self._preselected_tag_names = set(preselected_tag_names or set())
 
         self._build_ui()
 
@@ -51,7 +56,7 @@ class FormulaireEntreeMarchandise(ctk.CTkToplevel):
         self._tva_var = ctk.StringVar(value="20")
         self._facture_var = ctk.StringVar()
         self._lot_var = ctk.StringVar()
-        self._date_achat_var = ctk.StringVar(value=date.today().isoformat())
+        self._date_achat_var = ctk.StringVar(value=datetime.now(UTC).date().isoformat())
         self._date_peremption_var = ctk.StringVar()
         self._fournisseur_var = ctk.StringVar(value="— Aucun —")
 
@@ -108,7 +113,9 @@ class FormulaireEntreeMarchandise(ctk.CTkToplevel):
         tags_frame = ctk.CTkFrame(frame, fg_color="transparent")
         tags_frame.grid(row=row, column=1, sticky="w", pady=5)
         for tag in self._tags:
-            var = tk.BooleanVar(value=False)
+            var = tk.BooleanVar(
+                value=(tag.get("nom") in self._preselected_tag_names)
+            )
             self._tag_vars[int(tag["id"])] = var
             ctk.CTkCheckBox(tags_frame, text=tag["nom"], variable=var).pack(side="left", padx=(0, 8))
         row += 1
@@ -144,7 +151,7 @@ class FormulaireEntreeMarchandise(ctk.CTkToplevel):
             if quantite > 0:
                 add_mouvement(
                     stock_id=article["id"],
-                    date=self._date_achat_var.get() or date.today().isoformat(),
+                    date=self._date_achat_var.get() or datetime.now(UTC).date().isoformat(),
                     type_mouvement=_TYPE_ENTREE_ACHAT,
                     quantite=quantite,
                     prix_unitaire=prix_ttc if prix_ttc > 0 else None,
@@ -160,8 +167,8 @@ class FormulaireEntreeMarchandise(ctk.CTkToplevel):
                 "Vérifiez les champs numériques (quantité, prix, TVA).",
             )
             return
-        except Exception as exc:  # noqa: BLE001
-            logger.exception("Erreur entrée de marchandise : %s", exc)
+        except Exception as exc:
+            logger.exception("Erreur entrée de marchandise.")
             afficher_erreur(self, "Erreur", f"Impossible d'enregistrer l'entrée : {exc}")
             return
 

@@ -46,3 +46,6 @@ class OngletBilanAnnuel(ctk.CTkFrame):
 
         self._resume.delete("1.0", "end")
         self._resume.insert("1.0", "\n".join(lignes))
+
+    def refresh(self) -> None:
+        self._refresh()
