@@ -635,20 +635,13 @@ class _DialogLigneCaisse(ctk.CTkToplevel):
         form.pack(fill="both", expand=True, padx=20, pady=(18, 0))
 
         ctk.CTkLabel(form, text="Préset").pack(anchor="w", pady=(0, 2))
-        try:
-            self._preset_menu = ttk.Combobox(
-                form,
-                values=self._preset_options,
-                textvariable=self._designation_preset_var,
-                state="readonly",
-                width=42,
-            )
-        except Exception as exc:  # noqa: BLE001
-            logger.exception(
-                "DialogLigneCaisse: impossible d'initialiser la liste des présets : %s",
-                exc,
-            )
-            raise
+        self._preset_menu = ttk.Combobox(
+            form,
+            values=self._preset_options,
+            textvariable=self._designation_preset_var,
+            state="readonly",
+            width=42,
+        )
         self._preset_menu.pack(fill="x")
         self._preset_menu.current(self._designation_index)
         self._preset_menu.bind("<<ComboboxSelected>>", self._on_designation_change)
