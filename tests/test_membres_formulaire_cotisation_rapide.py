@@ -290,6 +290,54 @@ def test_sauver_cotisation_rapide_met_a_jour_cotisation_initiale_meme_si_annee_c
     assert add_calls == []
 
 
+def test_sauver_cotisation_rapide_prefere_la_cotisation_de_l_annee_cible(
+    monkeypatch,
+) -> None:
+    module = _load_module(monkeypatch)
+    maj_calls: list[tuple[int, dict]] = []
+
+    monkeypatch.setattr(
+        module,
+        "get_cotisations_adherent",
+        lambda _adherent_id: [
+            {"id": 7, "annee": 2026, "montant": 10.0, "statut": "en_attente"},
+            {"id": 8, "annee": 2027, "montant": 5.0, "statut": "offerte"},
+        ],
+    )
+    monkeypatch.setattr(
+        module,
+        "update_cotisation",
+        lambda cotisation_id, **kwargs: (maj_calls.append((cotisation_id, kwargs)), True)[1],
+    )
+
+    form = module.FormulaireMembreModal.__new__(module.FormulaireMembreModal)
+    form._cotisation_rapide_initiale = {
+        "id": 7,
+        "adherent_id": 3,
+        "annee": 2026,
+        "montant": 10.0,
+        "statut": "en_attente",
+    }
+    form._error_labels = {"cotisation_rapide": _ErrorLabel()}
+
+    ok = form._sauver_cotisation_rapide(
+        3,
+        {"annee": 2027, "montant": 15.0, "statut": "payee"},
+    )
+
+    assert ok is True
+    assert maj_calls == [
+        (
+            8,
+            {
+                "annee": 2027,
+                "montant": 15.0,
+                "statut": "payee",
+            },
+        )
+    ]
+
+
 def test_soumettre_persiste_reellement_la_cotisation_rapide_en_creation(
     monkeypatch, tmp_db
 ) -> None:

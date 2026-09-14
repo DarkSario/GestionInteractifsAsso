@@ -279,18 +279,32 @@ class FormulaireMembreModal(ctk.CTkToplevel):
         )
         try:
             cotisation_existante = None
+            cotisations = get_cotisations_adherent(adherent_id)
+            cotisation_existante = next(
+                (c for c in cotisations if int(c.get("annee") or 0) == int(cotisation["annee"])),
+                None,
+            )
             if (
-                self._cotisation_rapide_initiale
+                cotisation_existante is None
+                and self._cotisation_rapide_initiale
                 and int(self._cotisation_rapide_initiale.get("adherent_id") or adherent_id)
                 == adherent_id
                 and int(self._cotisation_rapide_initiale.get("id") or 0) > 0
             ):
                 cotisation_existante = self._cotisation_rapide_initiale
-            if cotisation_existante is None:
-                cotisations = get_cotisations_adherent(adherent_id)
-                cotisation_existante = next(
-                    (c for c in cotisations if int(c.get("annee") or 0) == int(cotisation["annee"])),
-                    None,
+            if (
+                self._cotisation_rapide_initiale
+                and int(self._cotisation_rapide_initiale.get("adherent_id") or adherent_id)
+                == adherent_id
+                and cotisation_existante
+                and int(self._cotisation_rapide_initiale.get("id") or 0)
+                != int(cotisation_existante.get("id") or 0)
+            ):
+                logger.info(
+                    "Cotisation rapide: priorité à la cotisation de l'année cible (adherent_id=%s, annee=%s, cotisation_id=%s)",
+                    adherent_id,
+                    cotisation["annee"],
+                    cotisation_existante.get("id"),
                 )
             if cotisation_existante:
                 cotisation_id = int(cotisation_existante.get("id") or 0)
