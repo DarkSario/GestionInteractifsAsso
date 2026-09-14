@@ -29,17 +29,23 @@ class _ErrorLabel:
         self.text = kwargs.get("text", self.text)
 
 
-def _load_module(monkeypatch):
+def _install_tk_stubs(monkeypatch) -> None:
     fake_ttk = types.ModuleType("tkinter.ttk")
     fake_ttk.Treeview = _Widget
     fake_ttk.Scrollbar = _Widget
     fake_ttk.Style = _Widget
+
     fake_tk = types.ModuleType("tkinter")
     fake_tk.StringVar = lambda value=None: types.SimpleNamespace(get=lambda: value)
     fake_tk.Frame = _Widget
     fake_tk.ttk = fake_ttk
+
     monkeypatch.setitem(sys.modules, "tkinter", fake_tk)
     monkeypatch.setitem(sys.modules, "tkinter.ttk", fake_ttk)
+
+
+def _load_module(monkeypatch):
+    _install_tk_stubs(monkeypatch)
 
     fake_ctk = types.ModuleType("customtkinter")
     fake_ctk.CTkToplevel = _Widget
