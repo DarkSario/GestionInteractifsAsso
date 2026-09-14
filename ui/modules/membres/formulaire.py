@@ -6,8 +6,11 @@ from typing import Any
 
 import customtkinter as ctk
 
+from core.cotisations import get_annee_courante
 from core.membres import get_statuts_disponibles, valider_membre
+from db.models.cotisations import add_cotisation, get_cotisations_adherent, update_cotisation
 from db.models.membres import add_membre, update_membre
+from ui.modules.membres.cotisations import MiniFormulaireCotisationRapide
 from ui import theme as app_theme
 from utils.logger import get_logger
 
@@ -55,6 +58,7 @@ class FormulaireMembreModal(ctk.CTkToplevel):
         # ── Champs de saisie ─────────────────────────────────────────────────
         self._entries: dict[str, ctk.CTkEntry | ctk.CTkOptionMenu | ctk.CTkTextbox] = {}
         self._error_labels: dict[str, ctk.CTkLabel] = {}
+        self._cotisation_rapide_initiale: dict | None = None
 
         champs = [
             ("nom", "Nom *", "entry"),
@@ -136,6 +140,27 @@ class FormulaireMembreModal(ctk.CTkToplevel):
             row += 1
 
         # ── Boutons ───────────────────────────────────────────────────────────
+        ctk.CTkFrame(frame, height=1, fg_color="#555555").grid(
+            row=row, column=0, columnspan=2, sticky="ew", pady=(8, 6)
+        )
+        row += 1
+
+        self._cotisation_rapide_initiale = self._cotisation_courante()
+        self._cotisation_rapide = MiniFormulaireCotisationRapide(
+            frame, cotisation=self._cotisation_rapide_initiale
+        )
+        self._cotisation_rapide.grid(row=row, column=0, columnspan=2, sticky="ew")
+        row += 1
+        self._error_labels["cotisation_rapide"] = ctk.CTkLabel(
+            frame,
+            text="",
+            font=fonts.get("small"),
+            text_color="#e05050",
+            anchor="w",
+        )
+        self._error_labels["cotisation_rapide"].grid(row=row, column=0, columnspan=2, sticky="w")
+        row += 1
+
         frame_buttons = ctk.CTkFrame(frame, fg_color="transparent")
         frame_buttons.grid(row=row, column=0, columnspan=2, pady=(20, 0))
 
@@ -231,6 +256,68 @@ class FormulaireMembreModal(ctk.CTkToplevel):
         for label in self._error_labels.values():
             label.configure(text="")
 
+    def _cotisation_courante(self) -> dict | None:
+        if not self._est_edition:
+            return None
+        adherent_id = int(self._membre.get("id") or 0)
+        if adherent_id <= 0:
+            return None
+        annee = get_annee_courante()
+        cotisations = get_cotisations_adherent(adherent_id)
+        return next((c for c in cotisations if int(c.get("annee") or 0) == annee), None)
+
+    def _sauver_cotisation_rapide(self, adherent_id: int, cotisation: dict) -> bool:
+        cotisation_existante = None
+        if (
+            self._cotisation_rapide_initiale
+            and int(self._cotisation_rapide_initiale.get("adherent_id") or adherent_id)
+            == adherent_id
+            and int(self._cotisation_rapide_initiale.get("annee") or 0)
+            == int(cotisation["annee"])
+        ):
+            cotisation_existante = self._cotisation_rapide_initiale
+        if cotisation_existante is None:
+            cotisations = get_cotisations_adherent(adherent_id)
+            cotisation_existante = next(
+                (c for c in cotisations if int(c.get("annee") or 0) == int(cotisation["annee"])),
+                None,
+            )
+        if cotisation_existante:
+            ok = update_cotisation(
+                cotisation_existante["id"],
+                annee=cotisation["annee"],
+                montant=cotisation["montant"],
+                statut=cotisation["statut"],
+            )
+            if ok:
+                self._cotisation_rapide_initiale = {
+                    **cotisation_existante,
+                    "adherent_id": adherent_id,
+                    **cotisation,
+                }
+                return True
+            self._error_labels["cotisation_rapide"].configure(
+                text="Impossible de mettre à jour la cotisation rapide."
+            )
+            return False
+        cotisation_id = add_cotisation(
+            adherent_id=adherent_id,
+            annee=cotisation["annee"],
+            montant=cotisation["montant"],
+            statut=cotisation["statut"],
+        )
+        if isinstance(cotisation_id, int) and cotisation_id > 0:
+            self._cotisation_rapide_initiale = {
+                "id": cotisation_id,
+                "adherent_id": adherent_id,
+                **cotisation,
+            }
+            return True
+        self._error_labels["cotisation_rapide"].configure(
+            text="Impossible d'ajouter la cotisation rapide."
+        )
+        return False
+
     def _soumettre(self) -> None:
         self._effacer_erreurs()
 
@@ -249,11 +336,19 @@ class FormulaireMembreModal(ctk.CTkToplevel):
                 if champ in self._error_labels:
                     self._error_labels[champ].configure(text=message)
             return
+        cotisation_rapide = None
+        if self._cotisation_rapide.cotisation_active():
+            cotisation_rapide, erreur_cotisation = self._cotisation_rapide.lire_saisie()
+            if erreur_cotisation:
+                self._error_labels["cotisation_rapide"].configure(text=erreur_cotisation)
+                return
 
+        adherent_id: int | None = None
         try:
             if self._est_edition:
-                update_membre(
-                    self._membre["id"],
+                adherent_id = int(self._membre["id"])
+                ok = update_membre(
+                    adherent_id,
                     nom,
                     prenom,
                     email,
@@ -262,13 +357,44 @@ class FormulaireMembreModal(ctk.CTkToplevel):
                     date_adhesion,
                     commentaire,
                 )
-                logger.info("Membre modifié : id=%s", self._membre["id"])
+                if not ok:
+                    self._error_labels["nom"].configure(
+                        text="Impossible de mettre à jour ce membre."
+                    )
+                    return
+                logger.info("Membre modifié : id=%s", adherent_id)
             else:
-                new_id = add_membre(nom, prenom, email, telephone, statut, date_adhesion, commentaire)
-                logger.info("Membre ajouté : id=%s", new_id)
+                adherent_id = add_membre(
+                    nom, prenom, email, telephone, statut, date_adhesion, commentaire
+                )
+                if not isinstance(adherent_id, int) or adherent_id <= 0:
+                    self._error_labels["nom"].configure(
+                        text="Impossible d'ajouter ce membre."
+                    )
+                    return
+                self._membre = {
+                    "id": adherent_id,
+                    "nom": nom,
+                    "prenom": prenom,
+                    "email": email,
+                    "telephone": telephone,
+                    "statut": statut,
+                    "date_adhesion": date_adhesion,
+                    "commentaire": commentaire,
+                }
+                self._est_edition = True
+                logger.info("Membre ajouté : id=%s", adherent_id)
         except Exception as exc:
             logger.exception("Erreur lors de la sauvegarde du membre : %s", exc)
             self._error_labels["nom"].configure(text=f"Erreur : {exc}")
+            return
+
+        if cotisation_rapide and adherent_id and not self._sauver_cotisation_rapide(
+            adherent_id, cotisation_rapide
+        ):
+            logger.warning(
+                "Membre enregistré sans cotisation rapide (adherent_id=%s)", adherent_id
+            )
             return
 
         self.destroy()

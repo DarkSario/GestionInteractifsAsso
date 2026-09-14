@@ -201,6 +201,22 @@ def test_dialog_ligne_selection_preset_remplit_champs(monkeypatch) -> None:
     assert dialog._designation_entry.kwargs.get("state") == "disabled"
 
 
+def test_dialog_ligne_utilise_winfo_toplevel_comme_owner(monkeypatch) -> None:
+    module = _load_module_with_ui_stubs(monkeypatch)
+    monkeypatch.setattr(module, "lister_designations_caisse", lambda actif_only=True: [])
+    owner = _BaseWidget()
+
+    class _ParentAvecToplevel(_BaseWidget):
+        def winfo_toplevel(self):
+            return owner
+
+    parent = _ParentAvecToplevel()
+    dialog = module._DialogLigneCaisse(parent, "Ajouter ligne", None)
+
+    assert dialog.parent is owner
+    assert dialog.transient_called is True
+
+
 def test_dialog_ligne_signale_absence_de_presets_actifs(monkeypatch) -> None:
     module = _load_module_with_ui_stubs(monkeypatch)
     monkeypatch.setattr(module, "lister_designations_caisse", lambda actif_only=True: [])

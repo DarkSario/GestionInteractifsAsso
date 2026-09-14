@@ -40,6 +40,70 @@ _STATUTS_LIBELLES = {
     "en_attente": "En attente",
 }
 _AUCUN_ADHERENT_LABEL = "— Sélectionner un adhérent —"
+_STATUTS_RAPIDES_LIBELLES = {
+    "": "Vide",
+    "payee": "Payée",
+    "offerte": "Offerte",
+    "en_attente": "En attente",
+}
+_STATUTS_RAPIDES_VALEURS = {label: value for value, label in _STATUTS_RAPIDES_LIBELLES.items()}
+
+
+class MiniFormulaireCotisationRapide(ctk.CTkFrame):
+    """Mini-formulaire réutilisable de saisie rapide d'une cotisation."""
+
+    def __init__(self, parent: Any, cotisation: dict | None = None, **kwargs) -> None:
+        super().__init__(parent, fg_color="transparent", **kwargs)
+        self._annee_var = ctk.StringVar(
+            value=str((cotisation or {}).get("annee") or get_annee_courante())
+        )
+        self._montant_var = ctk.StringVar(
+            value=f"{float((cotisation or {}).get('montant') or get_montant_cotisation_defaut()):.2f}"
+        )
+        statut_initial = str((cotisation or {}).get("statut") or "")
+        self._statut_var = ctk.StringVar(
+            value=_STATUTS_RAPIDES_LIBELLES.get(statut_initial, "Vide")
+        )
+        self._build_ui()
+
+    def _build_ui(self) -> None:
+        ctk.CTkLabel(self, text="Cotisation rapide", anchor="w").pack(fill="x", pady=(4, 8))
+
+        row = ctk.CTkFrame(self, fg_color="transparent")
+        row.pack(fill="x", pady=2)
+        ctk.CTkLabel(row, text="Statut", width=90, anchor="w").pack(side="left")
+        ctk.CTkOptionMenu(
+            row,
+            variable=self._statut_var,
+            values=list(_STATUTS_RAPIDES_VALEURS),
+            width=160,
+        ).pack(side="left", padx=(8, 0))
+
+        row_montant = ctk.CTkFrame(self, fg_color="transparent")
+        row_montant.pack(fill="x", pady=2)
+        ctk.CTkLabel(row_montant, text="Montant (€)", width=90, anchor="w").pack(side="left")
+        ctk.CTkEntry(row_montant, textvariable=self._montant_var, width=120).pack(
+            side="left", padx=(8, 0)
+        )
+        ctk.CTkLabel(row_montant, text="Année", width=60, anchor="w").pack(side="left", padx=(16, 0))
+        ctk.CTkEntry(row_montant, textvariable=self._annee_var, width=90).pack(side="left", padx=(8, 0))
+
+    def lire_saisie(self) -> tuple[dict | None, str | None]:
+        statut = _STATUTS_RAPIDES_VALEURS.get(self._statut_var.get(), "")
+        if not statut:
+            return None, None
+        try:
+            annee = int(self._annee_var.get().strip())
+        except ValueError:
+            return None, "L'année de cotisation doit être un entier."
+        try:
+            montant = float(self._montant_var.get().strip().replace(",", "."))
+        except ValueError:
+            return None, "Le montant de cotisation doit être un nombre."
+        return {"annee": annee, "montant": montant, "statut": statut}, None
+
+    def cotisation_active(self) -> bool:
+        return bool(_STATUTS_RAPIDES_VALEURS.get(self._statut_var.get(), ""))
 
 
 class OngletCotisationsAdherent(ctk.CTkFrame):
