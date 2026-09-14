@@ -10,6 +10,7 @@ from core.cotisations import get_annee_courante
 from core.membres import get_statuts_disponibles, valider_membre
 from db.models.cotisations import add_cotisation, get_cotisations_adherent, update_cotisation
 from db.models.membres import add_membre, update_membre
+from ui.components.dialogs import afficher_erreur
 from ui.modules.membres.cotisations import MiniFormulaireCotisationRapide
 from ui import theme as app_theme
 from utils.logger import get_logger
@@ -267,56 +268,63 @@ class FormulaireMembreModal(ctk.CTkToplevel):
         return next((c for c in cotisations if int(c.get("annee") or 0) == annee), None)
 
     def _sauver_cotisation_rapide(self, adherent_id: int, cotisation: dict) -> bool:
-        cotisation_existante = None
-        if (
-            self._cotisation_rapide_initiale
-            and int(self._cotisation_rapide_initiale.get("adherent_id") or adherent_id)
-            == adherent_id
-            and int(self._cotisation_rapide_initiale.get("annee") or 0)
-            == int(cotisation["annee"])
-        ):
-            cotisation_existante = self._cotisation_rapide_initiale
-        if cotisation_existante is None:
-            cotisations = get_cotisations_adherent(adherent_id)
-            cotisation_existante = next(
-                (c for c in cotisations if int(c.get("annee") or 0) == int(cotisation["annee"])),
-                None,
-            )
-        if cotisation_existante:
-            ok = update_cotisation(
-                cotisation_existante["id"],
+        try:
+            cotisation_existante = None
+            if (
+                self._cotisation_rapide_initiale
+                and int(self._cotisation_rapide_initiale.get("adherent_id") or adherent_id)
+                == adherent_id
+                and int(self._cotisation_rapide_initiale.get("annee") or 0)
+                == int(cotisation["annee"])
+            ):
+                cotisation_existante = self._cotisation_rapide_initiale
+            if cotisation_existante is None:
+                cotisations = get_cotisations_adherent(adherent_id)
+                cotisation_existante = next(
+                    (c for c in cotisations if int(c.get("annee") or 0) == int(cotisation["annee"])),
+                    None,
+                )
+            if cotisation_existante:
+                ok = update_cotisation(
+                    cotisation_existante["id"],
+                    annee=cotisation["annee"],
+                    montant=cotisation["montant"],
+                    statut=cotisation["statut"],
+                )
+                if ok:
+                    self._cotisation_rapide_initiale = {
+                        **cotisation_existante,
+                        "adherent_id": adherent_id,
+                        **cotisation,
+                    }
+                    return True
+                self._error_labels["cotisation_rapide"].configure(
+                    text="Impossible de mettre à jour la cotisation rapide."
+                )
+                return False
+            cotisation_id = add_cotisation(
+                adherent_id=adherent_id,
                 annee=cotisation["annee"],
                 montant=cotisation["montant"],
                 statut=cotisation["statut"],
             )
-            if ok:
+            if isinstance(cotisation_id, int) and cotisation_id > 0:
                 self._cotisation_rapide_initiale = {
-                    **cotisation_existante,
+                    "id": cotisation_id,
                     "adherent_id": adherent_id,
                     **cotisation,
                 }
                 return True
             self._error_labels["cotisation_rapide"].configure(
-                text="Impossible de mettre à jour la cotisation rapide."
+                text="Impossible d'ajouter la cotisation rapide."
             )
             return False
-        cotisation_id = add_cotisation(
-            adherent_id=adherent_id,
-            annee=cotisation["annee"],
-            montant=cotisation["montant"],
-            statut=cotisation["statut"],
-        )
-        if isinstance(cotisation_id, int) and cotisation_id > 0:
-            self._cotisation_rapide_initiale = {
-                "id": cotisation_id,
-                "adherent_id": adherent_id,
-                **cotisation,
-            }
-            return True
-        self._error_labels["cotisation_rapide"].configure(
-            text="Impossible d'ajouter la cotisation rapide."
-        )
-        return False
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("Erreur lors de la sauvegarde de la cotisation rapide : %s", exc)
+            self._error_labels["cotisation_rapide"].configure(
+                text=f"Erreur cotisation rapide : {exc}"
+            )
+            return False
 
     def _soumettre(self) -> None:
         self._effacer_erreurs()
@@ -394,6 +402,11 @@ class FormulaireMembreModal(ctk.CTkToplevel):
         ):
             logger.warning(
                 "Membre enregistré sans cotisation rapide (adherent_id=%s)", adherent_id
+            )
+            afficher_erreur(
+                self,
+                "Cotisation rapide",
+                "Le membre a été enregistré, mais la cotisation rapide n'a pas pu être sauvegardée.",
             )
             return
 

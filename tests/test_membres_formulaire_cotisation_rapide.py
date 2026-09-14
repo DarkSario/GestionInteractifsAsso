@@ -30,6 +30,17 @@ class _ErrorLabel:
 
 
 def _load_module(monkeypatch):
+    fake_ttk = types.ModuleType("tkinter.ttk")
+    fake_ttk.Treeview = _Widget
+    fake_ttk.Scrollbar = _Widget
+    fake_ttk.Style = _Widget
+    fake_tk = types.ModuleType("tkinter")
+    fake_tk.StringVar = lambda value=None: types.SimpleNamespace(get=lambda: value)
+    fake_tk.Frame = _Widget
+    fake_tk.ttk = fake_ttk
+    monkeypatch.setitem(sys.modules, "tkinter", fake_tk)
+    monkeypatch.setitem(sys.modules, "tkinter.ttk", fake_ttk)
+
     fake_ctk = types.ModuleType("customtkinter")
     fake_ctk.CTkToplevel = _Widget
     fake_ctk.CTkLabel = _Widget
@@ -38,6 +49,7 @@ def _load_module(monkeypatch):
     fake_ctk.CTkButton = _Widget
     fake_ctk.CTkOptionMenu = _Widget
     fake_ctk.CTkTextbox = _Widget
+    fake_ctk.CTkFont = _Widget
     fake_ctk.StringVar = lambda value=None: types.SimpleNamespace(get=lambda: value)
     monkeypatch.setitem(sys.modules, "customtkinter", fake_ctk)
 
@@ -45,6 +57,7 @@ def _load_module(monkeypatch):
     fake_cotisations.MiniFormulaireCotisationRapide = _Widget
     monkeypatch.setitem(sys.modules, "ui.modules.membres.cotisations", fake_cotisations)
 
+    sys.modules.pop("ui.theme", None)
     sys.modules.pop("ui.modules.membres.formulaire", None)
     return importlib.import_module("ui.modules.membres.formulaire")
 
@@ -136,9 +149,15 @@ def test_soumettre_bloque_si_cotisation_rapide_invalide(monkeypatch) -> None:
 
 def test_soumettre_garde_la_fenetre_ouverte_si_cotisation_rapide_echoue(monkeypatch) -> None:
     module = _load_module(monkeypatch)
+    erreurs: list[tuple[str, str]] = []
 
     monkeypatch.setattr(module, "valider_membre", lambda *_args: [])
     monkeypatch.setattr(module, "add_membre", lambda *_args: 12)
+    monkeypatch.setattr(
+        module,
+        "afficher_erreur",
+        lambda _parent, titre, message: erreurs.append((titre, message)),
+    )
 
     form = module.FormulaireMembreModal.__new__(module.FormulaireMembreModal)
     form._est_edition = False
@@ -168,6 +187,12 @@ def test_soumettre_garde_la_fenetre_ouverte_si_cotisation_rapide_echoue(monkeypa
     form._soumettre()
 
     assert form.destroyed is False
+    assert erreurs == [
+        (
+            "Cotisation rapide",
+            "Le membre a été enregistré, mais la cotisation rapide n'a pas pu être sauvegardée.",
+        )
+    ]
 
 
 def test_sauver_cotisation_rapide_met_a_jour_la_cotisation_existante(monkeypatch) -> None:
