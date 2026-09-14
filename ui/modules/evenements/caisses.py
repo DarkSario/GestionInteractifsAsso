@@ -638,7 +638,7 @@ class _DialogLigneCaisse(ctk.CTkToplevel):
         self._preset_menu = ttk.Combobox(
             form,
             values=self._preset_options,
-            variable=self._designation_preset_var,
+            textvariable=self._designation_preset_var,
             state="readonly",
             width=42,
         )
