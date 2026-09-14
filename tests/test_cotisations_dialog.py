@@ -303,3 +303,31 @@ def test_mini_formulaire_cotisation_rapide_convertit_montant_et_garde_statut(mon
     assert mini.cotisation_active() is True
     assert erreur is None
     assert payload == {"annee": 2026, "montant": 0.0, "statut": "payee"}
+
+
+def test_mini_formulaire_cotisation_rapide_accepte_statut_brut(monkeypatch) -> None:
+    module = _load_module_with_ui_stubs(monkeypatch)
+    monkeypatch.setattr(module, "get_montant_cotisation_defaut", lambda: 12.5)
+    mini = module.MiniFormulaireCotisationRapide(_BaseWidget())
+    mini._statut_var.set("payee")
+    mini._annee_var.set("2026")
+    mini._montant_var.set("20")
+
+    payload, erreur = mini.lire_saisie()
+
+    assert mini.cotisation_active() is True
+    assert erreur is None
+    assert payload == {"annee": 2026, "montant": 20.0, "statut": "payee"}
+
+
+def test_mini_formulaire_cotisation_rapide_signale_statut_invalide(monkeypatch) -> None:
+    module = _load_module_with_ui_stubs(monkeypatch)
+    monkeypatch.setattr(module, "get_montant_cotisation_defaut", lambda: 12.5)
+    mini = module.MiniFormulaireCotisationRapide(_BaseWidget())
+    mini._statut_var.set("Statut inconnu")
+
+    payload, erreur = mini.lire_saisie()
+
+    assert mini.cotisation_active() is False
+    assert payload is None
+    assert erreur == "Le statut de cotisation est invalide."

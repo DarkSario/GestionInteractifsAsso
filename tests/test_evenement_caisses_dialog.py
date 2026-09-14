@@ -250,6 +250,28 @@ def test_dialog_ligne_signale_erreur_chargement_presets(monkeypatch) -> None:
     assert avertissements == ["Impossible de charger les présets de caisse : db indisponible"]
 
 
+def test_dialog_ligne_tolere_montant_preset_invalide(monkeypatch) -> None:
+    module = _load_module_with_ui_stubs(monkeypatch)
+    avertissements: list[str] = []
+    monkeypatch.setattr(
+        module,
+        "lister_designations_caisse",
+        lambda actif_only=True: [{"id": 9, "nom": "Jetons", "montant_unitaire": "abc"}],
+    )
+    monkeypatch.setattr(
+        module.logger,
+        "warning",
+        lambda message, value: avertissements.append(message % value),
+    )
+
+    dialog = module._DialogLigneCaisse(_BaseWidget(), "Ajouter ligne", None)
+
+    assert dialog._preset_options == ["Saisie libre", "Jetons — 0.00 €"]
+    assert avertissements == [
+        "DialogLigneCaisse: montant_unitaire de préset invalide ('abc'), valeur 0 utilisée"
+    ]
+
+
 def test_dialog_ligne_valide_avec_liaison_designation(monkeypatch) -> None:
     module = _load_module_with_ui_stubs(monkeypatch)
     monkeypatch.setattr(
@@ -304,7 +326,10 @@ def test_ajouter_ligne_affiche_erreur_si_dialog_ne_souvre_pas(monkeypatch) -> No
     vue._ajouter_ligne("debut")
 
     assert erreurs == [
-        ("Caisses", "Impossible d'ouvrir le formulaire d'ajout de ligne.")
+        (
+            "Caisses",
+            "Impossible d'ouvrir le formulaire d'ajout de ligne.\nConsultez les logs si le problème persiste.",
+        )
     ]
     assert appels == []
 
@@ -348,7 +373,7 @@ def test_modifier_ligne_affiche_erreur_si_dialog_ne_souvre_pas(monkeypatch) -> N
     assert erreurs == [
         (
             "Caisses",
-            "Impossible d'ouvrir le formulaire de modification de ligne.",
+            "Impossible d'ouvrir le formulaire de modification de ligne.\nConsultez les logs si le problème persiste.",
         )
     ]
     assert appels == []

@@ -392,7 +392,9 @@ class CaissesEvenementView(ctk.CTkFrame):
             afficher_erreur(
                 self,
                 "Caisses",
-                "Impossible d'ouvrir le formulaire d'ajout de ligne.",
+                self._build_dialog_open_error_message(
+                    "Impossible d'ouvrir le formulaire d'ajout de ligne.", exc
+                ),
             )
             return
         if not dialog.result:
@@ -444,7 +446,9 @@ class CaissesEvenementView(ctk.CTkFrame):
             afficher_erreur(
                 self,
                 "Caisses",
-                "Impossible d'ouvrir le formulaire de modification de ligne.",
+                self._build_dialog_open_error_message(
+                    "Impossible d'ouvrir le formulaire de modification de ligne.", exc
+                ),
             )
             return
         if not dialog.result:
@@ -494,6 +498,13 @@ class CaissesEvenementView(ctk.CTkFrame):
                 logger.warning(
                     "CaissesEvenementView: refresh parent callback failed: %s", exc
                 )
+
+    @staticmethod
+    def _build_dialog_open_error_message(base_message: str, exc: Exception) -> str:
+        message = base_message
+        if isinstance(exc, (TypeError, ValueError)):
+            return f"{message}\nVérifiez les désignations de caisse configurées."
+        return f"{message}\nConsultez les logs si le problème persiste."
 
 
 class _DialogLigneCaisse(ctk.CTkToplevel):
@@ -561,8 +572,22 @@ class _DialogLigneCaisse(ctk.CTkToplevel):
         return parent
 
     @staticmethod
+    def _coerce_designation_amount(value: Any) -> float:
+        try:
+            return round(float(value or 0), 2)
+        except (TypeError, ValueError):
+            logger.warning(
+                "DialogLigneCaisse: montant_unitaire de préset invalide (%r), valeur 0 utilisée",
+                value,
+            )
+            return 0.0
+
+    @staticmethod
     def _format_designation_label(designation: dict) -> str:
-        return f"{designation.get('nom') or ''} — {float(designation.get('montant_unitaire') or 0):.2f} €"
+        montant = _DialogLigneCaisse._coerce_designation_amount(
+            designation.get("montant_unitaire")
+        )
+        return f"{designation.get('nom') or ''} — {montant:.2f} €"
 
     def _find_initial_designation_index(self, ligne: dict | None) -> int:
         designation_id = (ligne or {}).get("designation_id")
@@ -581,7 +606,9 @@ class _DialogLigneCaisse(ctk.CTkToplevel):
             for idx, designation in enumerate(self._designation_by_index[1:], start=1):
                 if (
                     str(designation.get("nom") or "").strip() == designation_nom
-                    and round(float(designation.get("montant_unitaire") or 0), 2)
+                    and self._coerce_designation_amount(
+                        designation.get("montant_unitaire")
+                    )
                     == designation_montant
                 ):
                     return idx
