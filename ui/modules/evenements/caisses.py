@@ -379,8 +379,22 @@ class CaissesEvenementView(ctk.CTkFrame):
             self._caisse_id,
             type_ouverture,
         )
-        dialog = _DialogLigneCaisse(self, title="Ajouter ligne", ligne=None)
-        self.wait_window(dialog)
+        try:
+            dialog = _DialogLigneCaisse(self, title="Ajouter ligne", ligne=None)
+            self.wait_window(dialog)
+        except Exception as exc:  # noqa: BLE001
+            logger.exception(
+                "Échec ouverture dialog ligne caisse (action=ajout, caisse_id=%s, type=%s): %s",
+                self._caisse_id,
+                type_ouverture,
+                exc,
+            )
+            afficher_erreur(
+                self,
+                "Caisses",
+                "Impossible d'ouvrir le formulaire d'ajout de ligne.",
+            )
+            return
         if not dialog.result:
             logger.debug(
                 "Dialog ligne caisse fermé sans résultat (action=ajout, caisse_id=%s, type=%s)",
@@ -417,8 +431,22 @@ class CaissesEvenementView(ctk.CTkFrame):
             ligne_id,
             type_ouverture,
         )
-        dialog = _DialogLigneCaisse(self, title="Modifier ligne", ligne=ligne)
-        self.wait_window(dialog)
+        try:
+            dialog = _DialogLigneCaisse(self, title="Modifier ligne", ligne=ligne)
+            self.wait_window(dialog)
+        except Exception as exc:  # noqa: BLE001
+            logger.exception(
+                "Échec ouverture dialog ligne caisse (action=edition, ligne_id=%s, type=%s): %s",
+                ligne_id,
+                type_ouverture,
+                exc,
+            )
+            afficher_erreur(
+                self,
+                "Caisses",
+                "Impossible d'ouvrir le formulaire de modification de ligne.",
+            )
+            return
         if not dialog.result:
             logger.debug(
                 "Dialog ligne caisse fermé sans résultat (action=edition, ligne_id=%s, type=%s)",

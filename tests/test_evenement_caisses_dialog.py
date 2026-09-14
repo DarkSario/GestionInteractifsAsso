@@ -272,3 +272,83 @@ def test_dialog_ligne_valide_avec_liaison_designation(monkeypatch) -> None:
         "designation_id": 5,
     }
     assert dialog.destroyed is True
+
+
+def test_ajouter_ligne_affiche_erreur_si_dialog_ne_souvre_pas(monkeypatch) -> None:
+    module = _load_module_with_ui_stubs(monkeypatch)
+    erreurs: list[tuple[str, str]] = []
+    appels: list[str] = []
+    monkeypatch.setattr(
+        module,
+        "_DialogLigneCaisse",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("dialog KO")),
+    )
+    monkeypatch.setattr(
+        module,
+        "afficher_erreur",
+        lambda _parent, titre, message: erreurs.append((titre, message)),
+    )
+    monkeypatch.setattr(
+        module,
+        "ajouter_ligne_caisse",
+        lambda *_args, **_kwargs: appels.append("ajouter_ligne_caisse"),
+    )
+
+    vue = module.CaissesEvenementView.__new__(module.CaissesEvenementView)
+    vue._caisse_id = 7
+    vue._check_caisse = lambda: True
+    vue.wait_window = lambda _dialog: None
+    vue._charger_caisse = lambda *_args: appels.append("_charger_caisse")
+    vue._notifier_refresh_parent = lambda: appels.append("_notifier_refresh_parent")
+
+    vue._ajouter_ligne("debut")
+
+    assert erreurs == [
+        ("Caisses", "Impossible d'ouvrir le formulaire d'ajout de ligne.")
+    ]
+    assert appels == []
+
+
+def test_modifier_ligne_affiche_erreur_si_dialog_ne_souvre_pas(monkeypatch) -> None:
+    module = _load_module_with_ui_stubs(monkeypatch)
+    erreurs: list[tuple[str, str]] = []
+    appels: list[str] = []
+    monkeypatch.setattr(
+        module,
+        "_DialogLigneCaisse",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("dialog KO")),
+    )
+    monkeypatch.setattr(
+        module,
+        "afficher_erreur",
+        lambda _parent, titre, message: erreurs.append((titre, message)),
+    )
+    monkeypatch.setattr(
+        module,
+        "modifier_ligne_caisse",
+        lambda *_args, **_kwargs: appels.append("modifier_ligne_caisse"),
+    )
+
+    class _Tree:
+        @staticmethod
+        def selection():
+            return ["12"]
+
+    vue = module.CaissesEvenementView.__new__(module.CaissesEvenementView)
+    vue._caisse_id = 7
+    vue._check_caisse = lambda: True
+    vue._tree_for_type = lambda _type: _Tree()
+    vue._lignes_by_id = {12: {"id": 12, "designation": "Pièces 2€"}}
+    vue.wait_window = lambda _dialog: None
+    vue._charger_caisse = lambda *_args: appels.append("_charger_caisse")
+    vue._notifier_refresh_parent = lambda: appels.append("_notifier_refresh_parent")
+
+    vue._modifier_ligne("debut")
+
+    assert erreurs == [
+        (
+            "Caisses",
+            "Impossible d'ouvrir le formulaire de modification de ligne.",
+        )
+    ]
+    assert appels == []
