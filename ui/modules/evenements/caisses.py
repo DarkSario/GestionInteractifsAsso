@@ -392,7 +392,7 @@ class CaissesEvenementView(ctk.CTkFrame):
             afficher_erreur(
                 self,
                 "Caisses",
-                f"Impossible d'ouvrir le formulaire d'ajout de ligne : {exc}",
+                "Impossible d'ouvrir le formulaire d'ajout de ligne.",
             )
             return
         if not dialog.result:
@@ -444,7 +444,7 @@ class CaissesEvenementView(ctk.CTkFrame):
             afficher_erreur(
                 self,
                 "Caisses",
-                f"Impossible d'ouvrir le formulaire de modification de ligne : {exc}",
+                "Impossible d'ouvrir le formulaire de modification de ligne.",
             )
             return
         if not dialog.result:

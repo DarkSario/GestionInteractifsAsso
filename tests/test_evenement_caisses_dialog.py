@@ -296,7 +296,7 @@ def test_ajouter_ligne_affiche_erreur_si_dialog_ne_souvre_pas(monkeypatch) -> No
     vue._ajouter_ligne("debut")
 
     assert erreurs == [
-        ("Caisses", "Impossible d'ouvrir le formulaire d'ajout de ligne : dialog KO")
+        ("Caisses", "Impossible d'ouvrir le formulaire d'ajout de ligne.")
     ]
 
 
@@ -331,6 +331,6 @@ def test_modifier_ligne_affiche_erreur_si_dialog_ne_souvre_pas(monkeypatch) -> N
     assert erreurs == [
         (
             "Caisses",
-            "Impossible d'ouvrir le formulaire de modification de ligne : dialog KO",
+            "Impossible d'ouvrir le formulaire de modification de ligne.",
         )
     ]

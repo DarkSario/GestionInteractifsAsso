@@ -322,7 +322,7 @@ class FormulaireMembreModal(ctk.CTkToplevel):
         except Exception as exc:  # noqa: BLE001
             logger.exception("Erreur lors de la sauvegarde de la cotisation rapide : %s", exc)
             self._error_labels["cotisation_rapide"].configure(
-                text=f"Erreur cotisation rapide : {exc}"
+                text="Erreur lors de la sauvegarde de la cotisation rapide."
             )
             return False
 
