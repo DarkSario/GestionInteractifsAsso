@@ -236,3 +236,152 @@ def test_sauver_cotisation_rapide_met_a_jour_la_cotisation_existante(monkeypatch
             },
         )
     ]
+
+
+def test_soumettre_persiste_reellement_la_cotisation_rapide_en_creation(
+    monkeypatch, tmp_db
+) -> None:
+    import db.connection as db_module
+    from db.migrations.runner import run_migrations
+
+    db_module.set_db_file(str(tmp_db))
+    conn = db_module.get_connection()
+    conn.close()
+    run_migrations()
+
+    try:
+        module = _load_module(monkeypatch)
+
+        form = module.FormulaireMembreModal.__new__(module.FormulaireMembreModal)
+        form._est_edition = False
+        form._membre = None
+        form._cotisation_rapide_initiale = None
+        form._error_labels = {
+            champ: _ErrorLabel()
+            for champ in (
+                "nom",
+                "prenom",
+                "email",
+                "telephone",
+                "statut",
+                "date_adhesion",
+                "cotisation_rapide",
+            )
+        }
+        form._lire_valeur = lambda champ: {
+            "nom": "Durand",
+            "prenom": "Alice",
+            "email": "",
+            "telephone": "",
+            "statut": "Membre",
+            "date_adhesion": "2026-01-01",
+            "commentaire": "",
+        }[champ]
+        form._cotisation_rapide = types.SimpleNamespace(
+            cotisation_active=lambda: True,
+            lire_saisie=lambda: (
+                {"annee": 2026, "montant": 20.0, "statut": "payee"},
+                None,
+            ),
+        )
+        form.destroyed = False
+        form.destroy = lambda: setattr(form, "destroyed", True)
+
+        form._soumettre()
+
+        assert form.destroyed is True
+        assert form._membre is not None
+        assert module.get_cotisations_adherent(form._membre["id"]) == [
+            {
+                "id": 1,
+                "adherent_id": form._membre["id"],
+                "exercice_id": None,
+                "annee": 2026,
+                "montant": 20.0,
+                "statut": "payee",
+                "date_paiement": None,
+                "mode_paiement": None,
+                "commentaire": None,
+                "created_at": module.get_cotisations_adherent(form._membre["id"])[0][
+                    "created_at"
+                ],
+                "updated_at": module.get_cotisations_adherent(form._membre["id"])[0][
+                    "updated_at"
+                ],
+            }
+        ]
+    finally:
+        db_module.set_db_file("")
+
+
+def test_soumettre_persiste_reellement_la_cotisation_rapide_en_edition(
+    monkeypatch, tmp_db
+) -> None:
+    import db.connection as db_module
+    from db.migrations.runner import run_migrations
+    from db.models.cotisations import add_cotisation, get_cotisations_adherent
+    from db.models.membres import add_membre
+
+    db_module.set_db_file(str(tmp_db))
+    conn = db_module.get_connection()
+    conn.close()
+    run_migrations()
+
+    try:
+        module = _load_module(monkeypatch)
+        adherent_id = add_membre("Durand", "Alice", "", "", "Membre", "2026-01-01", "")
+        add_cotisation(adherent_id=adherent_id, annee=2026, montant=10.0, statut="en_attente")
+
+        form = module.FormulaireMembreModal.__new__(module.FormulaireMembreModal)
+        form._est_edition = True
+        form._membre = {
+            "id": adherent_id,
+            "nom": "Durand",
+            "prenom": "Alice",
+            "email": "",
+            "telephone": "",
+            "statut": "Membre",
+            "date_adhesion": "2026-01-01",
+            "commentaire": "",
+        }
+        form._cotisation_rapide_initiale = get_cotisations_adherent(adherent_id)[0]
+        form._error_labels = {
+            champ: _ErrorLabel()
+            for champ in (
+                "nom",
+                "prenom",
+                "email",
+                "telephone",
+                "statut",
+                "date_adhesion",
+                "cotisation_rapide",
+            )
+        }
+        form._lire_valeur = lambda champ: {
+            "nom": "Durand",
+            "prenom": "Alice",
+            "email": "",
+            "telephone": "",
+            "statut": "Membre",
+            "date_adhesion": "2026-01-01",
+            "commentaire": "Maj",
+        }[champ]
+        form._cotisation_rapide = types.SimpleNamespace(
+            cotisation_active=lambda: True,
+            lire_saisie=lambda: (
+                {"annee": 2026, "montant": 20.0, "statut": "payee"},
+                None,
+            ),
+        )
+        form.destroyed = False
+        form.destroy = lambda: setattr(form, "destroyed", True)
+
+        form._soumettre()
+
+        cotisations = get_cotisations_adherent(adherent_id)
+        assert form.destroyed is True
+        assert len(cotisations) == 1
+        assert cotisations[0]["montant"] == 20.0
+        assert cotisations[0]["statut"] == "payee"
+    finally:
+        db_module.set_db_file("")

@@ -66,6 +66,17 @@ class MiniFormulaireCotisationRapide(ctk.CTkFrame):
         )
         self._build_ui()
 
+    @staticmethod
+    def _normaliser_statut(valeur: str) -> str | None:
+        brut = str(valeur or "").strip()
+        if brut in _STATUTS_RAPIDES_VALEURS:
+            return _STATUTS_RAPIDES_VALEURS[brut]
+        if brut in _STATUTS_RAPIDES_LIBELLES:
+            return brut
+        if not brut:
+            return ""
+        return None
+
     def _build_ui(self) -> None:
         ctk.CTkLabel(self, text="Cotisation rapide", anchor="w").pack(fill="x", pady=(4, 8))
 
@@ -89,9 +100,11 @@ class MiniFormulaireCotisationRapide(ctk.CTkFrame):
         ctk.CTkEntry(row_montant, textvariable=self._annee_var, width=90).pack(side="left", padx=(8, 0))
 
     def lire_saisie(self) -> tuple[dict | None, str | None]:
-        statut = _STATUTS_RAPIDES_VALEURS.get(self._statut_var.get(), "")
-        if not statut:
+        statut = self._normaliser_statut(self._statut_var.get())
+        if statut == "":
             return None, None
+        if statut is None:
+            return None, "Le statut de cotisation est invalide."
         try:
             annee = int(self._annee_var.get().strip())
         except ValueError:
@@ -103,7 +116,8 @@ class MiniFormulaireCotisationRapide(ctk.CTkFrame):
         return {"annee": annee, "montant": montant, "statut": statut}, None
 
     def cotisation_active(self) -> bool:
-        return bool(_STATUTS_RAPIDES_VALEURS.get(self._statut_var.get(), ""))
+        statut = self._normaliser_statut(self._statut_var.get())
+        return bool(statut)
 
 
 class OngletCotisationsAdherent(ctk.CTkFrame):
