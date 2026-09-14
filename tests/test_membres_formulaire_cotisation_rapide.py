@@ -238,6 +238,79 @@ def test_sauver_cotisation_rapide_met_a_jour_la_cotisation_existante(monkeypatch
     ]
 
 
+def test_sauver_cotisation_rapide_met_a_jour_cotisation_initiale_meme_si_annee_change(
+    monkeypatch,
+) -> None:
+    module = _load_module(monkeypatch)
+    maj_calls: list[tuple[int, dict]] = []
+    add_calls: list[dict] = []
+
+    monkeypatch.setattr(
+        module,
+        "get_cotisations_adherent",
+        lambda _adherent_id: [{"id": 7, "annee": 2026, "montant": 10.0, "statut": "en_attente"}],
+    )
+    monkeypatch.setattr(
+        module,
+        "update_cotisation",
+        lambda cotisation_id, **kwargs: (maj_calls.append((cotisation_id, kwargs)), True)[1],
+    )
+    monkeypatch.setattr(
+        module,
+        "add_cotisation",
+        lambda **kwargs: (add_calls.append(kwargs), 99)[1],
+    )
+
+    form = module.FormulaireMembreModal.__new__(module.FormulaireMembreModal)
+    form._cotisation_rapide_initiale = {
+        "id": 7,
+        "adherent_id": 3,
+        "annee": 2026,
+        "montant": 10.0,
+        "statut": "en_attente",
+    }
+    form._error_labels = {"cotisation_rapide": _ErrorLabel()}
+
+    ok = form._sauver_cotisation_rapide(
+        3,
+        {"annee": 2027, "montant": 15.0, "statut": "payee"},
+    )
+
+    assert ok is True
+    assert maj_calls == [
+        (
+            7,
+            {
+                "annee": 2027,
+                "montant": 15.0,
+                "statut": "payee",
+            },
+        )
+    ]
+    assert add_calls == []
+
+
+def test_cotisation_courante_retombe_sur_plus_recente_hors_annee_courante(monkeypatch) -> None:
+    module = _load_module(monkeypatch)
+    monkeypatch.setattr(module, "get_annee_courante", lambda: 2026)
+    monkeypatch.setattr(
+        module,
+        "get_cotisations_adherent",
+        lambda _adherent_id: [{"id": 4, "adherent_id": 3, "annee": 2025, "statut": "payee"}],
+    )
+
+    form = module.FormulaireMembreModal.__new__(module.FormulaireMembreModal)
+    form._est_edition = True
+    form._membre = {"id": 3}
+
+    assert form._cotisation_courante() == {
+        "id": 4,
+        "adherent_id": 3,
+        "annee": 2025,
+        "statut": "payee",
+    }
+
+
 def test_soumettre_persiste_reellement_la_cotisation_rapide_en_creation(
     monkeypatch, tmp_db
 ) -> None:

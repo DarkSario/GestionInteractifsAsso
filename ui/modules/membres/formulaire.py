@@ -265,17 +265,27 @@ class FormulaireMembreModal(ctk.CTkToplevel):
             return None
         annee = get_annee_courante()
         cotisations = get_cotisations_adherent(adherent_id)
-        return next((c for c in cotisations if int(c.get("annee") or 0) == annee), None)
+        cotisation_annee = next(
+            (c for c in cotisations if int(c.get("annee") or 0) == annee), None
+        )
+        if cotisation_annee:
+            return cotisation_annee
+        return cotisations[0] if cotisations else None
 
     def _sauver_cotisation_rapide(self, adherent_id: int, cotisation: dict) -> bool:
+        logger.info(
+            "Sauvegarde cotisation rapide demandée (adherent_id=%s, annee=%s, statut=%s)",
+            adherent_id,
+            cotisation.get("annee"),
+            cotisation.get("statut"),
+        )
         try:
             cotisation_existante = None
             if (
                 self._cotisation_rapide_initiale
                 and int(self._cotisation_rapide_initiale.get("adherent_id") or adherent_id)
                 == adherent_id
-                and int(self._cotisation_rapide_initiale.get("annee") or 0)
-                == int(cotisation["annee"])
+                and int(self._cotisation_rapide_initiale.get("id") or 0) > 0
             ):
                 cotisation_existante = self._cotisation_rapide_initiale
             if cotisation_existante is None:
@@ -285,8 +295,14 @@ class FormulaireMembreModal(ctk.CTkToplevel):
                     None,
                 )
             if cotisation_existante:
+                cotisation_id = int(cotisation_existante.get("id") or 0)
+                logger.info(
+                    "Mise à jour cotisation rapide existante (adherent_id=%s, cotisation_id=%s)",
+                    adherent_id,
+                    cotisation_id,
+                )
                 ok = update_cotisation(
-                    cotisation_existante["id"],
+                    cotisation_id,
                     annee=cotisation["annee"],
                     montant=cotisation["montant"],
                     statut=cotisation["statut"],
@@ -297,11 +313,22 @@ class FormulaireMembreModal(ctk.CTkToplevel):
                         "adherent_id": adherent_id,
                         **cotisation,
                     }
+                    logger.info(
+                        "Cotisation rapide mise à jour (adherent_id=%s, cotisation_id=%s)",
+                        adherent_id,
+                        cotisation_id,
+                    )
                     return True
+                logger.warning(
+                    "Échec mise à jour cotisation rapide (adherent_id=%s, cotisation_id=%s)",
+                    adherent_id,
+                    cotisation_id,
+                )
                 self._error_labels["cotisation_rapide"].configure(
                     text="Impossible de mettre à jour la cotisation rapide."
                 )
                 return False
+            logger.info("Création cotisation rapide (adherent_id=%s)", adherent_id)
             cotisation_id = add_cotisation(
                 adherent_id=adherent_id,
                 annee=cotisation["annee"],
@@ -314,7 +341,17 @@ class FormulaireMembreModal(ctk.CTkToplevel):
                     "adherent_id": adherent_id,
                     **cotisation,
                 }
+                logger.info(
+                    "Cotisation rapide créée (adherent_id=%s, cotisation_id=%s)",
+                    adherent_id,
+                    cotisation_id,
+                )
                 return True
+            logger.warning(
+                "Échec création cotisation rapide (adherent_id=%s, retour=%s)",
+                adherent_id,
+                cotisation_id,
+            )
             self._error_labels["cotisation_rapide"].configure(
                 text="Impossible d'ajouter la cotisation rapide."
             )
