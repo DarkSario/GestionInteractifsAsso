@@ -268,16 +268,7 @@ class FormulaireMembreModal(ctk.CTkToplevel):
         cotisation_annee = next(
             (c for c in cotisations if int(c.get("annee") or 0) == annee), None
         )
-        if cotisation_annee:
-            return cotisation_annee
-        return (
-            max(
-                cotisations,
-                key=lambda c: (int(c.get("annee") or 0), int(c.get("id") or 0)),
-            )
-            if cotisations
-            else None
-        )
+        return cotisation_annee
 
     def _sauver_cotisation_rapide(self, adherent_id: int, cotisation: dict) -> bool:
         logger.info(

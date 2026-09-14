@@ -290,27 +290,6 @@ def test_sauver_cotisation_rapide_met_a_jour_cotisation_initiale_meme_si_annee_c
     assert add_calls == []
 
 
-def test_cotisation_courante_retombe_sur_plus_recente_hors_annee_courante(monkeypatch) -> None:
-    module = _load_module(monkeypatch)
-    monkeypatch.setattr(module, "get_annee_courante", lambda: 2026)
-    monkeypatch.setattr(
-        module,
-        "get_cotisations_adherent",
-        lambda _adherent_id: [{"id": 4, "adherent_id": 3, "annee": 2025, "statut": "payee"}],
-    )
-
-    form = module.FormulaireMembreModal.__new__(module.FormulaireMembreModal)
-    form._est_edition = True
-    form._membre = {"id": 3}
-
-    assert form._cotisation_courante() == {
-        "id": 4,
-        "adherent_id": 3,
-        "annee": 2025,
-        "statut": "payee",
-    }
-
-
 def test_soumettre_persiste_reellement_la_cotisation_rapide_en_creation(
     monkeypatch, tmp_db
 ) -> None:
