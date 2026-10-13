@@ -551,6 +551,7 @@ def get_bilan_dernier_evenement() -> dict | None:
     recettes += recettes_stands + recettes_tableaux + recettes_tombola + recettes_buvette + recettes_caisses
     depenses += depenses_stands
     return {
+        "id": ev_id,
         "nom": ev["nom"],
         "date": ev.get("date", ""),
         "recettes_nettes": round(recettes, 2),
