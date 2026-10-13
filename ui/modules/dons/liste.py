@@ -120,6 +120,7 @@ class ListeDons(ctk.CTkToplevel):
         self._tree.configure(yscrollcommand=sb.set)
         self._tree.pack(side='left', fill='both', expand=True)
         sb.pack(side='right', fill='y')
+        self._tree.bind('<Double-1>', self._on_double_click)
 
         actions = ctk.CTkFrame(self, fg_color='transparent')
         actions.pack(fill='x', padx=16, pady=(0, 6))
@@ -207,6 +208,9 @@ class ListeDons(ctk.CTkToplevel):
             return None
         don_id = int(selection[0])
         return next((don for don in self._dons if int(don['id']) == don_id), None) or get_don_by_id(don_id)
+
+    def _on_double_click(self, _event: Any) -> None:
+        self._modifier()
 
     def _ajouter(self) -> None:
         dialog = _DialogDon(self, self._membres, self._map_exercices)

@@ -315,6 +315,8 @@ class MainApp(ctk.CTk):
             "parametres": self._ouvrir_parametres,
             "remboursements": self._ouvrir_remboursements,
             "dons": self._ouvrir_dons,
+            "configuration_association": self._ouvrir_config_asso,
+            "manuel": self._ouvrir_manuel,
         }
         action = routes.get(destination)
         if action:

@@ -196,6 +196,23 @@ def test_naviguer_evenement_with_zero_id_opens_fiche(dummy_app, monkeypatch):
     assert opened == {"id": 0}
 
 
+def test_naviguer_dashboard_shortcuts(dummy_app, monkeypatch):
+    app, MainApp = dummy_app
+    opened = []
+    for destination, method_name in (
+        ("configuration_association", "_ouvrir_config_asso"),
+        ("manuel", "_ouvrir_manuel"),
+    ):
+        monkeypatch.setattr(
+            MainApp,
+            method_name,
+            lambda self, target=destination: opened.append(target),
+        )
+        app._naviguer(destination)
+
+    assert opened == ["configuration_association", "manuel"]
+
+
 def test_actualiser_configuration_refreshes_ui(dummy_app):
     app, _ = dummy_app
     conn = get_connection()

@@ -100,6 +100,7 @@ class ListeRemboursements(ctk.CTkToplevel):
         self._tree.configure(yscrollcommand=sb.set)
         self._tree.pack(side='left', fill='both', expand=True)
         sb.pack(side='right', fill='y')
+        self._tree.bind('<Double-1>', self._on_double_click)
 
         actions = ctk.CTkFrame(self, fg_color='transparent')
         actions.pack(fill='x', padx=16, pady=(0, 6))
@@ -173,6 +174,9 @@ class ListeRemboursements(ctk.CTkToplevel):
             return None
         identifiant = selection[0]
         return next((ligne for ligne in self._lignes if str(ligne['remboursement_id']) == identifiant), None)
+
+    def _on_double_click(self, _event: Any) -> None:
+        self._modifier()
 
     def _appliquer_dialog_rembourse(self, ligne: dict[str, Any], titre: str, msg_ok: str, msg_err: str) -> None:
         dialog = _DialogMarquerRembourse(self, ligne, titre=titre)

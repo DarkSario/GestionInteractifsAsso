@@ -75,6 +75,7 @@ class DashboardFrame(ctk.CTkFrame):
             return
 
         self._section_entete(d)
+        self._section_raccourcis()
         self._section_alertes(d)
         self._section_tresorerie(d)
         self._section_graphique(d)
@@ -112,6 +113,38 @@ class DashboardFrame(ctk.CTkFrame):
             hover_color=app_theme.COLORS.get("secondary", "#144870"),
             font=ctk.CTkFont(size=12),
         ).pack(side="right")
+
+    def _section_raccourcis(self) -> None:
+        if not self._navigation_callback:
+            return
+
+        frame = ctk.CTkFrame(self._scroll, fg_color="transparent")
+        frame.pack(fill="x", padx=12, pady=(0, 8))
+        ctk.CTkLabel(
+            frame,
+            text="Accès directs",
+            font=ctk.CTkFont(size=13, weight="bold"),
+        ).pack(anchor="w", pady=(0, 3))
+        raccourcis = ctk.CTkFrame(frame, fg_color="transparent")
+        raccourcis.pack(fill="x")
+
+        for label, destination in (
+            ("🎪 Événements", "evenements"),
+            ("💰 Trésorerie", "tresorerie"),
+            ("🍹 Buvette", "buvette"),
+            ("👥 Adhérents", "membres"),
+            ("💝 Dons", "dons"),
+            ("🏛️ Association", "configuration_association"),
+            ("📖 Manuel", "manuel"),
+        ):
+            ctk.CTkButton(
+                raccourcis,
+                text=label,
+                width=115,
+                height=30,
+                command=lambda dest=destination: self._navigation_callback(dest),
+                font=ctk.CTkFont(size=11),
+            ).pack(side="left", padx=3)
 
     def _section_alertes(self, d: dict) -> None:
         alertes = d.get("alertes", [])
