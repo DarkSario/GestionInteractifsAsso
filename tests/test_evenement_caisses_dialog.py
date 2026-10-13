@@ -105,9 +105,11 @@ class _Button(_BaseWidget):
 
 class _Combobox(_BaseWidget):
     def __init__(self, parent=None, **kwargs) -> None:
+        if "variable" in kwargs:
+            raise ValueError("unknown option '-variable'")
         super().__init__(parent, **kwargs)
         self.values = list(kwargs.get("values") or [])
-        self.variable = kwargs.get("variable")
+        self.variable = kwargs.get("textvariable")
         self._current = 0
 
     def current(self, value=None):
@@ -199,6 +201,16 @@ def test_dialog_ligne_selection_preset_remplit_champs(monkeypatch) -> None:
     assert dialog._designation_var.get() == "Billets 10€"
     assert dialog._montant_var.get() == "10.00"
     assert dialog._designation_entry.kwargs.get("state") == "disabled"
+
+
+def test_dialog_ligne_passe_textvariable_au_combobox(monkeypatch) -> None:
+    module = _load_module_with_ui_stubs(monkeypatch)
+    monkeypatch.setattr(module, "lister_designations_caisse", lambda actif_only=True: [])
+
+    dialog = module._DialogLigneCaisse(_BaseWidget(), "Ajouter ligne", None)
+
+    assert "textvariable" in dialog._preset_menu.kwargs
+    assert "variable" not in dialog._preset_menu.kwargs
 
 
 def test_dialog_ligne_utilise_winfo_toplevel_comme_owner(monkeypatch) -> None:
