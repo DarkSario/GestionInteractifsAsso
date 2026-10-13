@@ -59,6 +59,10 @@ pour une prise en main complète.
 ## Documentation
 
 📖 Manuel d'utilisation complet : [docs/MANUEL_UTILISATION.md](docs/MANUEL_UTILISATION.md)
+(également accessible dans l'application via le menu **Aide → 📖 Manuel d'utilisation**).
+
+Les informations de l'association (nom, exercice, solde d'ouverture) se modifient via
+**Administration → 🏛️ Informations de l'association**.
 
 ## Licence
 
