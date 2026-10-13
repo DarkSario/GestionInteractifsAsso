@@ -11,7 +11,7 @@ from typing import Any
 
 import customtkinter as ctk
 
-from db.models.evenements import get_parametre, set_parametre
+from db.models.evenements import get_parametre
 from ui import theme as app_theme
 from ui.components.dialogs import afficher_erreur, afficher_info
 from utils.logger import get_logger
@@ -137,28 +137,36 @@ class ConfigAssoDialog(ctk.CTkToplevel):
 
     def _enregistrer(self) -> None:
         """Enregistre les paramètres en DB."""
-        for cle, entry in self._champs.items():
-            set_parametre(cle, entry.get().strip())
-        nom = self._champs.get("asso_nom")
-        if nom:
-            nom_val = nom.get().strip()
-            try:
-                from db.connection import get_connection
-                conn = get_connection()
-                try:
-                    conn.execute("UPDATE config SET nom_asso = ?", (nom_val,))
-                    conn.commit()
-                finally:
-                    conn.close()
-            except Exception:
-                logger.exception("Impossible de synchroniser le nom de l'association")
-                afficher_erreur(
-                    self,
-                    "Erreur",
-                    "Les informations ont été enregistrées, mais le nom de "
-                    "l'association n'a pas pu être synchronisé.",
+        from db.connection import get_connection
+
+        conn = None
+        try:
+            conn = get_connection()
+            for cle, entry in self._champs.items():
+                conn.execute(
+                    "INSERT OR REPLACE INTO parametres (cle, valeur) VALUES (?, ?)",
+                    (cle, entry.get().strip()),
                 )
-                return
-        set_parametre("asso_logo_path", self._logo_path_var.get().strip())
+            nom = self._champs.get("asso_nom")
+            if nom:
+                conn.execute("UPDATE config SET nom_asso = ?", (nom.get().strip(),))
+            conn.execute(
+                "INSERT OR REPLACE INTO parametres (cle, valeur) VALUES (?, ?)",
+                ("asso_logo_path", self._logo_path_var.get().strip()),
+            )
+            conn.commit()
+        except Exception:
+            logger.exception("Impossible d'enregistrer les informations de l'association")
+            if conn:
+                conn.rollback()
+            afficher_erreur(
+                self,
+                "Erreur",
+                "Les informations de l'association n'ont pas pu être enregistrées.",
+            )
+            return
+        finally:
+            if conn:
+                conn.close()
         afficher_info(self, "Succès", "Les informations de l'association ont été enregistrées.")
         self.destroy()

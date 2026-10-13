@@ -279,3 +279,62 @@ def test_build_menu_exposes_asso_config_and_help(dummy_app, monkeypatch):
     assert "🏛️ Informations de l'association" in all_labels
     assert "📖 Manuel d'utilisation" in all_labels
     assert "ℹ️ À propos" in all_labels
+
+
+def test_config_asso_save_rolls_back_if_name_sync_fails(monkeypatch):
+    _setup_stubs(monkeypatch)
+    filedialog = types.ModuleType("tkinter.filedialog")
+    filedialog.askopenfilename = lambda *args, **kwargs: ""
+    sys.modules["tkinter"].filedialog = filedialog
+    monkeypatch.setitem(sys.modules, "tkinter.filedialog", filedialog)
+    sys.modules.pop("ui.modules.evenements.config_asso_dialog", None)
+    dialog_module = importlib.import_module("ui.modules.evenements.config_asso_dialog")
+
+    class Entry:
+        def __init__(self, value):
+            self.value = value
+
+        def get(self):
+            return self.value
+
+    class Connection:
+        def __init__(self):
+            self.executed = []
+            self.rolled_back = False
+            self.committed = False
+            self.closed = False
+
+        def execute(self, sql, params):
+            self.executed.append((sql, params))
+            if sql.startswith("UPDATE config"):
+                raise RuntimeError("sync failed")
+
+        def rollback(self):
+            self.rolled_back = True
+
+        def commit(self):
+            self.committed = True
+
+        def close(self):
+            self.closed = True
+
+    conn = Connection()
+    monkeypatch.setattr("db.connection.get_connection", lambda: conn)
+    errors = []
+    monkeypatch.setattr(
+        dialog_module, "afficher_erreur", lambda *args: errors.append(args)
+    )
+
+    dialog = dialog_module.ConfigAssoDialog.__new__(dialog_module.ConfigAssoDialog)
+    dialog._champs = {
+        "asso_nom": Entry(" Association "),
+        "asso_adresse": Entry(" Adresse "),
+    }
+    dialog._logo_path_var = DummyVar("/logo.png")
+    dialog._enregistrer()
+
+    assert conn.rolled_back
+    assert not conn.committed
+    assert conn.closed
+    assert len(conn.executed) == 3
+    assert errors
