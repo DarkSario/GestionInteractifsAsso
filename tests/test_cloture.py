@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import hashlib
 
-import pytest
 
 from db.connection import set_db_file
 from db.migrations.runner import run_migrations
@@ -12,7 +11,6 @@ from db.models.cloture import (
     add_exercice,
     cloturer_exercice,
     decloturer_exercice,
-    get_all_exercices,
     get_exercice_by_id,
     get_log_exercice,
     get_stats_exercice,
@@ -38,7 +36,6 @@ from core.cloture import (
     calculer_solde_cloture,
     generer_nom_exercice,
     verifier_chevauchement,
-    valider_cloture,
 )
 
 # Valeurs de test (non réelles — générées dynamiquement pour chaque suite)
@@ -303,7 +300,6 @@ def test_verifier_secret_incorrect():
 
 def test_retrocompat_sha256():
     """La vérification accepte les anciens hashes SHA-256 (sans sel)."""
-    import hashlib
     secret = "ancien_secret_sha256"
     hash_sha256 = hashlib.sha256(secret.encode()).hexdigest()
     # Doit fonctionner (format héritage : pas de $ dans le hash)

@@ -9,7 +9,6 @@ from tkinter import filedialog
 
 import customtkinter as ctk
 
-from db.connection import get_connection
 from db.models.parametres_globaux import get_parametre
 from ui import theme as app_theme
 from ui.components.dialogs import afficher_erreur, afficher_info

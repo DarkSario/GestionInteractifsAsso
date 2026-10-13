@@ -1,6 +1,5 @@
 """Tests du module métier core/membres.py."""
 
-import pytest
 
 from core.membres import get_statuts_disponibles, valider_membre
 

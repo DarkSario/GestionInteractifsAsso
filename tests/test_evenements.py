@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from db.connection import get_connection, set_db_file
+from db.connection import set_db_file
 from db.migrations.runner import run_migrations
 from db.models.evenements import (
     add_benevole,
@@ -19,7 +19,6 @@ from db.models.evenements import (
     delete_tarif,
     get_all_evenements,
     get_benevoles_evenement,
-    get_depenses_evenement,
     get_evenement_by_id,
     get_lignes_vente,
     get_parametre,
@@ -38,7 +37,6 @@ from core.evenements import (
     generer_numero_billet,
     valider_evenement,
     valider_tarif,
-    valider_vente,
 )
 
 

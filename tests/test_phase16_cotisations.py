@@ -294,8 +294,7 @@ def test_get_template_bilan_retourne_contenu():
 
 def test_save_and_reload_template(tmp_path):
     """Sauvegarder et recharger un template modifié."""
-    from core.bilan_ag import get_template_bilan, save_template_bilan, reset_template_bilan
-    from pathlib import Path
+    from core.bilan_ag import get_template_bilan, save_template_bilan
     import core.bilan_ag as bilan_module
 
     # Sauvegarder les chemins originaux
@@ -314,7 +313,6 @@ def test_save_and_reload_template(tmp_path):
 
 def test_reset_template_bilan(tmp_path):
     """Restaurer le template par défaut."""
-    import shutil
     import core.bilan_ag as bilan_module
 
     original_path = bilan_module._TEMPLATE_PATH

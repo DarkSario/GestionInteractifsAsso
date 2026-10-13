@@ -11,7 +11,6 @@ from db.models.categories import get_all_categories
 from db.models.fournisseurs import (
     add_fournisseur,
     get_fournisseurs_for_select,
-    search_or_create_fournisseur,
 )
 from db.models.stock import add_article, add_mouvement, update_article
 from db.models.unites import get_all_unites

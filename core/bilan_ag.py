@@ -6,7 +6,6 @@ modifié librement sans toucher au code Python.
 
 from __future__ import annotations
 
-import os
 import re
 from datetime import date
 from pathlib import Path
@@ -390,10 +389,7 @@ def generer_bilan_ag(
             Paragraph,
             SimpleDocTemplate,
             Spacer,
-            Table,
-            TableStyle,
         )
-        from reportlab.lib import colors as rl_colors
     except ImportError as exc:
         return {
             "succes": False,

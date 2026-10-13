@@ -7,7 +7,6 @@ import re
 from datetime import datetime
 from pathlib import Path
 
-from reportlab.lib import colors
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import cm
 from reportlab.platypus import (
@@ -22,7 +21,7 @@ from reportlab.platypus import (
     TableStyle,
 )
 
-from core.pdf_base_pro import PdfBasePro, COULEUR_GRIS, COULEUR_NOIR, MARGE
+from core.pdf_base_pro import PdfBasePro, COULEUR_GRIS, MARGE
 from utils.logger import get_logger
 
 logger = get_logger(__name__)

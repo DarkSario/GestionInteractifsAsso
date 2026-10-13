@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import os
 import shutil
-import tempfile
 from pathlib import Path
 
 import pytest
@@ -48,7 +47,7 @@ def test_set_logo_source_vide():
 
 def test_set_logo_et_get_logo_path(db_conn, tmp_path):
     """set_logo() copie le fichier et get_logo_path() le retrouve."""
-    from core.logo import set_logo, get_logo_path, _LOGO_PATH, supprimer_logo
+    from core.logo import set_logo, get_logo_path, supprimer_logo
 
     # Crée un PNG minimal (1×1 pixel)
     png_minimal = (
