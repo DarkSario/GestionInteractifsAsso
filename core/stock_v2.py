@@ -1,4 +1,9 @@
-"""Logique métier Phase 12 pour le stock (lots FIFO, tags, péremption)."""
+"""Logique des lots FIFO, tags et péremption du stock (Phase 12+).
+
+Le total des lots est synchronisé dans ``stock.quantite`` pour conserver la
+compatibilité avec les écrans et rapports qui utilisent encore les articles ou
+mouvements historiques.
+"""
 
 from __future__ import annotations
 

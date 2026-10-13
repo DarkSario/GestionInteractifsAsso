@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import sys
 import types
 
@@ -268,3 +269,65 @@ def test_dialog_modules(monkeypatch):
     assert "caisses" in dialog.result
     assert "billetterie" not in dialog.result
     assert dialog.destroyed is True
+
+
+def test_onglets_modules_a_masquer(monkeypatch):
+    fiche = _load_fiche_module_with_ui_stubs(monkeypatch)
+
+    assert fiche._onglets_modules_a_masquer({"billetterie"}) == [
+        "💸 Dépenses",
+        "💰 Budget",
+        "👥 Bénévoles",
+        "🎰 Tombola",
+        "🏪 Stands",
+        "📊 Tableaux",
+        "🧾 Caisses",
+    ]
+    assert (
+        fiche._onglets_modules_a_masquer(set(fiche.MODULES_EVENEMENT_DISPONIBLES))
+        == []
+    )
+
+
+def test_fiche_build_ui_delegue_entete_et_onglets(monkeypatch):
+    fiche = _load_fiche_module_with_ui_stubs(monkeypatch)
+    instance = object.__new__(fiche.FicheEvenement)
+    appels = []
+    instance._build_header = lambda: appels.append("header")
+    instance._build_tabs = lambda: appels.append("tabs")
+
+    instance._build_ui()
+
+    assert appels == ["header", "tabs"]
+
+
+def test_actualiser_resume_financier_logue_une_erreur(monkeypatch, caplog):
+    fiche = _load_fiche_module_with_ui_stubs(monkeypatch)
+
+    def fail_to_calculate(_evenement_id):
+        raise RuntimeError("database unavailable")
+
+    monkeypatch.setattr(fiche, "calculer_bilan_evenement", fail_to_calculate)
+    instance = object.__new__(fiche.FicheEvenement)
+    instance._evenement_id = 17
+
+    with caplog.at_level(logging.ERROR, logger=fiche.logger.name):
+        instance._actualiser_resume_financier()
+
+    assert (
+        "Impossible d'actualiser le résumé financier de l'événement 17." in caplog.text
+    )
+
+
+def test_charger_fournisseurs_logue_une_erreur(monkeypatch, caplog):
+    fiche = _load_fiche_module_with_ui_stubs(monkeypatch)
+
+    def fail_to_load():
+        raise RuntimeError("database unavailable")
+
+    monkeypatch.setattr(fiche, "get_all_fournisseurs", fail_to_load)
+    with caplog.at_level(logging.ERROR, logger=fiche.logger.name):
+        fournisseurs = fiche._DialogDepense._charger_fournisseurs()
+
+    assert fournisseurs == []
+    assert "Impossible de charger les fournisseurs" in caplog.text

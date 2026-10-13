@@ -1,4 +1,9 @@
-"""Logique métier pour le module Stock."""
+"""Validation et types de mouvements du stock historique.
+
+Les opérations de lots, tags et consommation FIFO sont gérées dans
+``core.stock_v2`` ; ces helpers restent utilisés par les écrans article et
+mouvements existants.
+"""
 
 TYPES_MOUVEMENTS: list[str] = [
     "Entrée — Achat",

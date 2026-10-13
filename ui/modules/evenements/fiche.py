@@ -133,6 +133,17 @@ def serialiser_modules_depuis_cases(
     return serialiser_modules_actifs(modules)
 
 
+def _onglets_modules_a_masquer(modules_actifs: set[str]) -> list[str]:
+    """Retourne les onglets associés à des modules désactivés."""
+    if modules_actifs == set(MODULES_EVENEMENT_DISPONIBLES):
+        return []
+    return [
+        nom_onglet
+        for nom_onglet, modules_onglet in ONGLETS_MODULES.items()
+        if not modules_actifs.intersection(modules_onglet)
+    ]
+
+
 class FicheEvenement(ctk.CTkToplevel):
     """Fenêtre de création/édition d'un événement avec onglets."""
 
@@ -155,9 +166,12 @@ class FicheEvenement(ctk.CTkToplevel):
     # ── Construction globale ──────────────────────────────────────────────────
 
     def _build_ui(self) -> None:
+        self._build_header()
+        self._build_tabs()
+
+    def _build_header(self) -> None:
         fonts = app_theme.FONTS
 
-        # Barre supérieure : titre + bouton exporter
         frame_top = ctk.CTkFrame(self, fg_color="transparent")
         frame_top.pack(fill="x", padx=16, pady=(14, 4))
 
@@ -181,6 +195,7 @@ class FicheEvenement(ctk.CTkToplevel):
             command=self._ouvrir_export,
         ).pack(side="right")
 
+    def _build_tabs(self) -> None:
         self._tabs = ctk.CTkTabview(self)
         self._tabs.pack(fill="both", expand=True, padx=16, pady=(0, 14))
 
@@ -358,7 +373,7 @@ class FicheEvenement(ctk.CTkToplevel):
 
         ctk.CTkButton(
             frame,
-            text="💾 Sauvegarder",
+            text="💾 Enregistrer",
             command=self._sauvegarder_general,
         ).pack(anchor="w")
 
@@ -474,14 +489,15 @@ class FicheEvenement(ctk.CTkToplevel):
         modules_actifs = set(
             modules_actifs_depuis_json(self._evenement.get("modules_actifs_json"))
         )
-        if modules_actifs == set(MODULES_EVENEMENT_DISPONIBLES):
-            return
-        for nom_onglet, modules_onglet in ONGLETS_MODULES.items():
-            if modules_actifs.intersection(modules_onglet):
-                continue
+        for nom_onglet in _onglets_modules_a_masquer(modules_actifs):
             try:
                 self._tabs.delete(nom_onglet)
             except Exception:
+                logger.debug(
+                    "Impossible de masquer l'onglet événement %s.",
+                    nom_onglet,
+                    exc_info=True,
+                )
                 continue
 
     def _ouvrir_modules(self) -> None:
@@ -531,7 +547,10 @@ class FicheEvenement(ctk.CTkToplevel):
                 text_color=couleur,
             )
         except Exception:
-            pass
+            logger.exception(
+                "Impossible d'actualiser le résumé financier de l'événement %s.",
+                self._evenement_id,
+            )
 
     # ══════════════════════════════════════════════════════════════════════════
     # Onglet Billetterie
@@ -1312,7 +1331,7 @@ class _DialogTarif(ctk.CTkToplevel):
 
         frame_btn = ctk.CTkFrame(self, fg_color="transparent")
         frame_btn.pack(pady=(6, 16))
-        ctk.CTkButton(frame_btn, text="Valider", width=100, command=self._valider).pack(
+        ctk.CTkButton(frame_btn, text="Enregistrer", width=110, command=self._valider).pack(
             side="left", padx=8
         )
         ctk.CTkButton(
@@ -1437,9 +1456,9 @@ class _DialogVente(ctk.CTkToplevel):
 
         frame_btn = ctk.CTkFrame(scroll, fg_color="transparent")
         frame_btn.pack(pady=4)
-        ctk.CTkButton(frame_btn, text="Valider", width=100, command=self._valider).pack(
-            side="left", padx=8
-        )
+        ctk.CTkButton(
+            frame_btn, text="Enregistrer", width=140, command=self._valider
+        ).pack(side="left", padx=8)
         ctk.CTkButton(
             frame_btn,
             text="Annuler",
@@ -1554,7 +1573,6 @@ class _DialogDepense(ctk.CTkToplevel):
         self._var_avance_par = tk.StringVar(value="— Aucun —")
         self._var_remboursement = tk.StringVar(value="Non applicable")
         self._membres = get_all_membres()
-        self._fournisseurs: list[dict] = []
         self._fournisseur_id: int | None = (
             depense.get("fournisseur_id") if depense else None
         )
@@ -1564,12 +1582,19 @@ class _DialogDepense(ctk.CTkToplevel):
             self._var_avance_par.set(nom or "— Aucun —")
         if depense and depense.get("remboursement_statut") == "en_attente":
             self._var_remboursement.set("En attente")
-        try:
-            self._fournisseurs = get_all_fournisseurs()
-        except Exception:
-            pass
+        self._fournisseurs = self._charger_fournisseurs()
 
         self._build()
+
+    @staticmethod
+    def _charger_fournisseurs() -> list[dict]:
+        try:
+            return get_all_fournisseurs()
+        except Exception:
+            logger.exception(
+                "Impossible de charger les fournisseurs pour le dialogue de dépense."
+            )
+            return []
 
     def _build(self) -> None:
         scroll = ctk.CTkScrollableFrame(self)
@@ -1640,7 +1665,7 @@ class _DialogDepense(ctk.CTkToplevel):
 
         frame_btn = ctk.CTkFrame(scroll, fg_color="transparent")
         frame_btn.pack(pady=(12, 4))
-        ctk.CTkButton(frame_btn, text="Valider", width=100, command=self._valider).pack(
+        ctk.CTkButton(frame_btn, text="Enregistrer", width=110, command=self._valider).pack(
             side="left", padx=8
         )
         ctk.CTkButton(
@@ -1851,7 +1876,7 @@ class _DialogBenevole(ctk.CTkToplevel):
 
         frame_btn = ctk.CTkFrame(scroll, fg_color="transparent")
         frame_btn.pack(pady=(12, 4))
-        ctk.CTkButton(frame_btn, text="Valider", width=100, command=self._valider).pack(
+        ctk.CTkButton(frame_btn, text="Enregistrer", width=110, command=self._valider).pack(
             side="left", padx=8
         )
         ctk.CTkButton(
@@ -2013,4 +2038,3 @@ class _DialogModules(ctk.CTkToplevel):
     def _valider(self) -> None:
         self.result = [mod for mod, var in self._vars.items() if var.get()]
         self.destroy()
-

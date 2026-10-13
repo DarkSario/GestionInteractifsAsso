@@ -150,7 +150,7 @@ class FormulaireEntreeMarchandise(ctk.CTkToplevel):
                 commentaire="",
                 tag_ids=[tag_id for tag_id, var in self._tag_vars.items() if var.get()],
             )
-            # Créer un mouvement dans mouvements_stock pour synchroniser l'affichage
+            # Garder l'agrégat historique synchronisé ; le lot conserve le détail FIFO.
             if quantite > 0:
                 add_mouvement(
                     stock_id=article["id"],
