@@ -31,6 +31,8 @@ def split_sql_script(sql: str) -> list[str]:
     current: list[str] = []
     in_single_quote = False
     in_double_quote = False
+    in_backtick = False
+    in_bracket = False
     in_line_comment = False
     in_block_comment = False
     i = 0
@@ -66,6 +68,18 @@ def split_sql_script(sql: str) -> list[str]:
                     i += 1
                 else:
                     in_double_quote = False
+        elif in_backtick:
+            current.append(c)
+            if c == "`":
+                if next_c == "`":
+                    current.append(next_c)
+                    i += 1
+                else:
+                    in_backtick = False
+        elif in_bracket:
+            current.append(c)
+            if c == "]":
+                in_bracket = False
         else:
             if c == "-" and next_c == "-":
                 current.append(c)
@@ -83,6 +97,12 @@ def split_sql_script(sql: str) -> list[str]:
             elif c == '"':
                 current.append(c)
                 in_double_quote = True
+            elif c == "`":
+                current.append(c)
+                in_backtick = True
+            elif c == "[":
+                current.append(c)
+                in_bracket = True
             elif c == ";":
                 current.append(c)
                 candidate = "".join(current)
@@ -200,4 +220,3 @@ def _execute_migration(conn, sql: str) -> None:
                     raise
         else:
             conn.execute(stmt)
-
