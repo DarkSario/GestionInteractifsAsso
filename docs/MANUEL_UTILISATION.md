@@ -46,10 +46,12 @@ Si vous avez déjà une base de données, cliquez sur **"Ouvrir une base existan
 
 ### Configurer votre association
 
-Dès la première ouverture, allez dans **Administration → ⚙️ Paramètres** :
-1. Onglet **🏢 Association** : saisissez le nom, l'adresse, le téléphone et l'email de votre association
+Dès la première ouverture, allez dans **Administration → 🏛️ Informations de l'association** :
+1. Saisissez le nom, l'adresse, le téléphone et l'email de votre association
 2. Ajoutez votre logo si vous en avez un (utilisé dans les exports PDF)
 3. Cliquez **"💾 Enregistrer"**
+
+Les réglages généraux de l'application restent accessibles via **Administration → ⚙️ Paramètres**.
 
 **Erreurs fréquentes :**
 - Oublier de renseigner le nom de l'association → obligatoire pour les exports PDF
@@ -95,7 +97,7 @@ Le tableau de bord se rafraîchit automatiquement toutes les 5 minutes. Vous pou
 
 ### Créer un événement
 
-1. Allez dans **Événements** depuis le menu latéral
+1. Ouvrez **Modules → Événements** dans la barre de menu
 2. Cliquez **"+ Créer un événement"**
 3. Remplissez :
    - Nom de l'événement (ex. : "Fête de l'école 2026")

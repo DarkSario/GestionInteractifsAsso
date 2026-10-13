@@ -63,6 +63,8 @@ pour une prise en main complète.
 
 Les informations de l'association (nom, exercice, solde d'ouverture) se modifient via
 **Administration → 🏛️ Informations de l'association**.
+Les modules sont accessibles depuis **Modules** ; le tableau de bord propose aussi des accès directs
+aux événements, à la trésorerie, à la buvette, aux adhérents, aux dons, à la configuration de l'association et au manuel.
 
 ## Licence
 
