@@ -5,9 +5,9 @@ from __future__ import annotations
 from reportlab.lib import colors
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import cm
-from reportlab.platypus import CondPageBreak, HRFlowable, KeepTogether, PageBreak, Paragraph, Spacer, Table, TableStyle
+from reportlab.platypus import CondPageBreak, HRFlowable, KeepTogether, Paragraph, Spacer, Table, TableStyle
 
-from core.pdf_base_pro import PdfBasePro, COULEUR_GRIS, COULEUR_NOIR, MARGE
+from core.pdf_base_pro import PdfBasePro, COULEUR_GRIS
 from utils.logger import get_logger
 
 logger = get_logger(__name__)

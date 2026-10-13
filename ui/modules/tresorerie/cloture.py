@@ -8,11 +8,9 @@ from typing import Any
 
 import customtkinter as ctk
 
-from core.cloture import generer_nom_exercice, verifier_chevauchement, calculer_solde_cloture
+from core.cloture import generer_nom_exercice, verifier_chevauchement
 from db.models.cloture import (
     add_exercice,
-    cloturer_exercice,
-    decloturer_exercice,
     get_all_exercices,
     get_exercice_by_id,
     get_log_exercice,
@@ -20,7 +18,7 @@ from db.models.cloture import (
     update_exercice,
 )
 from ui import theme as app_theme
-from ui.components.dialogs import afficher_erreur, afficher_info, demander_confirmation
+from ui.components.dialogs import afficher_erreur
 
 
 class GestionExercices(ctk.CTkToplevel):

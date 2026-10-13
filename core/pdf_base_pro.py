@@ -10,14 +10,11 @@ Hérite de BasePDF et ajoute :
 from __future__ import annotations
 
 import os
-from datetime import datetime
 
 from reportlab.lib import colors
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import cm
 from reportlab.platypus import (
-    HRFlowable,
-    Image,
     Paragraph,
     Spacer,
     Table,
@@ -346,7 +343,7 @@ class PdfBasePro(BasePDF):
         elements.append(Spacer(1, 0.5 * cm))
         elements.append(
             Paragraph(
-                f"Fait à _________________________, le _______________________",
+                "Fait à _________________________, le _______________________",
                 self._style_normal,
             )
         )

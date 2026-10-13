@@ -5,13 +5,11 @@ Utilise uniquement reportlab (pas de matplotlib).
 
 from __future__ import annotations
 
-import math
-from typing import Sequence
 
 from reportlab.graphics.charts.barcharts import VerticalBarChart
 from reportlab.graphics.charts.legends import Legend
 from reportlab.graphics.charts.piecharts import Pie
-from reportlab.graphics.shapes import Drawing, Line, Rect, String
+from reportlab.graphics.shapes import Drawing, Rect, String
 from reportlab.lib import colors
 from reportlab.lib.units import cm
 

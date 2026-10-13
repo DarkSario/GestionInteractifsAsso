@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import datetime
 
 from db.models.cloture import (
-    add_exercice,
     get_all_exercices,
     get_exercice_by_id,
     get_stats_exercice,

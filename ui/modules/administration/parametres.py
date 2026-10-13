@@ -1255,10 +1255,8 @@ class ParametresApp(ctk.CTkToplevel):
     def _choisir_couleur_export(self, type_couleur: str) -> None:
         if type_couleur == "principale":
             var = self._export_couleur_principale_var
-            btn = self._export_couleur_principale_btn
         else:
             var = self._export_couleur_secondaire_var
-            btn = self._export_couleur_secondaire_btn
         result = _askcolor(color=var.get(), parent=self)
         couleur = result[1] if result else None
         if couleur:
