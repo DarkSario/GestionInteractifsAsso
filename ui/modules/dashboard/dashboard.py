@@ -282,12 +282,20 @@ class DashboardFrame(ctk.CTkFrame):
                     date_fin_txt = f" (jusqu'au {dt.strftime('%d/%m/%Y')})"
                 except ValueError:
                     date_fin_txt = f" (jusqu'au {en_cours['date_fin']})"
-            ctk.CTkLabel(
+            ev_encours_label = ctk.CTkLabel(
                 frame_encours,
                 text=f"🟢  EN COURS : {en_cours['nom']}{date_fin_txt}",
                 font=ctk.CTkFont(size=12, weight="bold"),
                 text_color=("#1b5e20", "#a5d6a7"),
-            ).pack(anchor="w", padx=10, pady=6)
+                cursor="hand2" if (en_cours.get("id") and self._navigation_callback) else "",
+            )
+            ev_encours_label.pack(anchor="w", padx=10, pady=6)
+            encours_id = en_cours.get("id")
+            if encours_id and self._navigation_callback:
+                ev_encours_label.bind(
+                    "<Button-1>",
+                    lambda e, eid=encours_id: self._navigation_callback("evenement", eid),
+                )
 
         # Prochains événements
         prochains = d.get("prochains_evenements", [])
@@ -346,7 +354,7 @@ class DashboardFrame(ctk.CTkFrame):
                     date_txt = f"  {bilan['date']}"
             benefice = bilan.get("benefice_net", 0.0)
             benefice_txt = f"+{self._fmt_monnaie(benefice)}" if benefice >= 0 else self._fmt_monnaie(benefice)
-            ctk.CTkLabel(
+            lbl_bilan = ctk.CTkLabel(
                 frame_ev,
                 text=(
                     f"  {bilan['nom']}{date_txt}  |  "
@@ -355,7 +363,15 @@ class DashboardFrame(ctk.CTkFrame):
                     f"| Bénéfice : {benefice_txt}"
                 ),
                 font=ctk.CTkFont(size=12),
-            ).pack(anchor="w", padx=10, pady=(0, 8))
+                cursor="hand2" if (bilan.get("id") and self._navigation_callback) else "",
+            )
+            lbl_bilan.pack(anchor="w", padx=10, pady=(0, 8))
+            bilan_id = bilan.get("id")
+            if bilan_id and self._navigation_callback:
+                lbl_bilan.bind(
+                    "<Button-1>",
+                    lambda e, eid=bilan_id: self._navigation_callback("evenement", eid),
+                )
 
         # Nb bénévoles total sur les prochains événements
         nb_benv_total = d.get("nb_benevoles", 0)

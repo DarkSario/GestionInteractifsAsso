@@ -76,15 +76,21 @@ class MainApp(ctk.CTk):
             logger.error("Impossible de charger la configuration : %s", exc)
             return default_config
 
-        if not row:
-            return default_config
+        nom_asso = row["nom_asso"] if row else ""
+        try:
+            from db.models.parametres_globaux import get_parametre
+            nom_param = get_parametre("asso_nom", None)
+            if nom_param:
+                nom_asso = nom_param
+        except Exception:
+            pass
 
         return {
-            "nom_asso": row["nom_asso"] or default_config["nom_asso"],
-            "exercice": row["exercice"] or default_config["exercice"],
-            "date_debut": row["date_debut"] or "",
-            "date_fin": row["date_fin"] or "",
-            "solde_ouverture": row["solde_ouverture"] or 0.0,
+            "nom_asso": nom_asso or default_config["nom_asso"],
+            "exercice": (row["exercice"] if row else "") or default_config["exercice"],
+            "date_debut": (row["date_debut"] if row else "") or "",
+            "date_fin": (row["date_fin"] if row else "") or "",
+            "solde_ouverture": (row["solde_ouverture"] if row else 0.0) or 0.0,
         }
 
     # ── Menu ─────────────────────────────────────────────────────────────────
@@ -122,6 +128,7 @@ class MainApp(ctk.CTk):
 
         menu_admin = tk.Menu(menubar, tearoff=0)
         menu_admin.add_command(label="⚙️ Paramètres", command=self._ouvrir_parametres)
+        menu_admin.add_command(label="🏛️ Informations de l'association", command=self._ouvrir_config_asso)
         menu_admin.add_separator()
         menu_admin.add_command(label="Référentiels Stock", command=self._ouvrir_referentiels_stock)
         menu_admin.add_command(label="Désignations de caisses", command=self._ouvrir_designations_caisses)
@@ -134,6 +141,12 @@ class MainApp(ctk.CTk):
         menu_admin.add_command(label="📅 Gestion des exercices", command=self._ouvrir_gestion_exercices)
         menu_admin.add_command(label="🔐 Mot de passe déclôture", command=self._ouvrir_mdp_decloture)
         menubar.add_cascade(label="Administration", menu=menu_admin)
+
+        menu_aide = tk.Menu(menubar, tearoff=0)
+        menu_aide.add_command(label="📖 Manuel d'utilisation", command=self._ouvrir_manuel)
+        menu_aide.add_separator()
+        menu_aide.add_command(label="ℹ️ À propos", command=self._ouvrir_a_propos)
+        menubar.add_cascade(label="Aide", menu=menu_aide)
 
         self.configure(menu=menubar)
 
@@ -170,17 +183,19 @@ class MainApp(ctk.CTk):
         self._status_bar.pack(fill="x", side="bottom")
 
         db_path = get_db_file() or "Aucune base sélectionnée"
+        periode_str = f" | Période : {self._format_period()}" if self._format_period() != "—" else ""
         self._status_label = ctk.CTkLabel(
             self._status_bar,
-            text=f"Base de données : {db_path}",
+            text=f"Base de données : {db_path}{periode_str}",
             font=app_theme.FONTS.get("small"),
             anchor="w",
         )
         self._status_label.pack(side="left", padx=10)
 
+        exercice_str = f"Exercice : {self._config.get('exercice', '—')} | " if self._config.get("exercice") != "—" else ""
         self._status_balance_label = ctk.CTkLabel(
             self._status_bar,
-            text=f"Solde d'ouverture : {self._format_currency(self._config['solde_ouverture'])}",
+            text=f"{exercice_str}Solde d'ouverture : {self._format_currency(self._config['solde_ouverture'])}",
             font=app_theme.FONTS.get("small"),
             anchor="e",
         )
@@ -201,15 +216,82 @@ class MainApp(ctk.CTk):
 
     # ── Actions ──────────────────────────────────────────────────────────────
 
-    def _todo(self) -> None:
-        """Placeholder pour les fonctionnalités non encore implémentées."""
+    def actualiser_configuration(self) -> None:
+        """Recharge la configuration et met à jour le titre, la barre de statut et le tableau de bord."""
+        self._config = self._load_config()
+        nom_asso = self._config.get("nom_asso", "")
+        if nom_asso and nom_asso != "Mon Association":
+            self.title(f"{nom_asso} — {APP_NAME} v{APP_VERSION}")
+        else:
+            self.title(f"{APP_NAME} v{APP_VERSION}")
+
+        if hasattr(self, "_status_balance_label") and self._status_balance_label.winfo_exists():
+            exercice_str = f"Exercice : {self._config.get('exercice', '—')} | " if self._config.get("exercice") != "—" else ""
+            self._status_balance_label.configure(
+                text=f"{exercice_str}Solde d'ouverture : {self._format_currency(self._config['solde_ouverture'])}"
+            )
+
+        if hasattr(self, "_status_label") and self._status_label.winfo_exists():
+            db_path = get_db_file() or "Aucune base sélectionnée"
+            periode_str = f" | Période : {self._format_period()}" if self._format_period() != "—" else ""
+            self._status_label.configure(
+                text=f"Base de données : {db_path}{periode_str}"
+            )
+
+        if self._dashboard_frame is not None and hasattr(self._dashboard_frame, "actualiser"):
+            try:
+                self._dashboard_frame.actualiser()
+            except Exception:  # noqa: BLE001
+                pass
+
+    def _ouvrir_manuel(self) -> None:
+        """Ouvre le manuel d'utilisation de l'application."""
+        import subprocess
+        import sys
+        from pathlib import Path
         from ui.components.dialogs import afficher_info
 
-        afficher_info(
-            self,
-            "En construction",
-            "Ce module n'est pas encore disponible.\nIl sera implémenté prochainement.",
+        manuel_path = Path(__file__).resolve().parents[1] / "docs" / "MANUEL_UTILISATION.md"
+        if not manuel_path.exists():
+            afficher_info(
+                self,
+                "Manuel d'utilisation",
+                "Le fichier du manuel d'utilisation est introuvable.",
+            )
+            return
+
+        try:
+            if sys.platform == "win32":
+                import os
+
+                os.startfile(str(manuel_path))
+            elif sys.platform == "darwin":
+                subprocess.Popen(["open", str(manuel_path)])
+            else:
+                subprocess.Popen(["xdg-open", str(manuel_path)])
+        except Exception:
+            afficher_info(
+                self,
+                "Manuel d'utilisation",
+                f"Le manuel est disponible à l'emplacement suivant :\n{manuel_path}",
+            )
+
+    def _ouvrir_a_propos(self) -> None:
+        """Affiche les informations sur l'application."""
+        import sqlite3
+        import sys
+        from ui.components.dialogs import afficher_info
+
+        nom_asso = self._config.get("nom_asso", "Mon Association")
+        message = (
+            f"{APP_NAME} — Version {APP_VERSION}\n\n"
+            f"Association : {nom_asso}\n"
+            f"Python : {sys.version.split()[0]}\n"
+            f"SQLite : {sqlite3.sqlite_version}\n\n"
+            "Application de gestion intégrée pour associations loi 1901 :\n"
+            "adhérents, trésorerie, événements, buvette, stock et bilans."
         )
+        afficher_info(self, f"À propos de {APP_NAME}", message)
 
     def _ouvrir_dashboard(self) -> None:
         """Reconstruit et affiche le tableau de bord."""
@@ -236,8 +318,11 @@ class MainApp(ctk.CTk):
         action = routes.get(destination)
         if action:
             action()
-        elif destination == "evenement" and extra:
-            self._ouvrir_evenements()
+        elif destination == "evenement":
+            if extra:
+                self._ouvrir_evenement_fiche(extra)
+            else:
+                self._ouvrir_evenements()
         elif destination == "sauvegarde":
             self._ouvrir_sauvegardes()
 
@@ -290,12 +375,21 @@ class MainApp(ctk.CTk):
         fenetre = ListeDons(self)
         fenetre.grab_set()
 
+    def _ouvrir_evenement_fiche(self, evenement_id: int | None = None) -> None:
+        """Ouvre directement la fiche d'un événement."""
+        from ui.modules.evenements.fiche import FicheEvenement
+
+        fenetre = FicheEvenement(self, evenement_id=evenement_id)
+        fenetre.grab_set()
+
     def _ouvrir_parametres(self) -> None:
         """Ouvre la fenêtre des paramètres globaux de l'application."""
         from ui.modules.administration.parametres import ParametresApp
 
         fenetre = ParametresApp(self)
         fenetre.grab_set()
+        self.wait_window(fenetre)
+        self.actualiser_configuration()
 
     def _ouvrir_sauvegardes(self) -> None:
         """Ouvre la fenêtre de gestion des sauvegardes."""
@@ -310,6 +404,8 @@ class MainApp(ctk.CTk):
 
         dialog = ConfigAssoDialog(self)
         dialog.grab_set()
+        self.wait_window(dialog)
+        self.actualiser_configuration()
 
     def _ouvrir_referentiels_stock(self) -> None:
         """Ouvre la fenêtre de gestion des référentiels du stock."""
@@ -331,6 +427,8 @@ class MainApp(ctk.CTk):
 
         fenetre = GestionExercices(self)
         fenetre.grab_set()
+        self.wait_window(fenetre)
+        self.actualiser_configuration()
 
 
 

@@ -49,7 +49,7 @@ from db.models.evenements import (
 from db.models.fournisseurs import get_all_fournisseurs
 from db.models.membres import get_all_membres
 from ui import theme as app_theme
-from ui.components.dialogs import afficher_erreur, afficher_info, demander_confirmation
+from ui.components.dialogs import afficher_erreur, afficher_info, afficher_succes, demander_confirmation
 from ui.modules.evenements.budget_evenement import BudgetEvenementView
 from ui.modules.evenements.caisses import CaissesEvenementView
 from ui.modules.evenements.stands import StandsView
@@ -485,7 +485,28 @@ class FicheEvenement(ctk.CTkToplevel):
                 continue
 
     def _ouvrir_modules(self) -> None:
-        self._tabs.set("📋 Général")
+        modules_actuels = [
+            mod for mod, var in self._vars_modules.items() if var.get()
+        ]
+        dialog = _DialogModules(self, modules_actuels)
+        dialog.grab_set()
+        self.wait_window(dialog)
+        if dialog.result is not None:
+            self._definir_modules_selection(dialog.result)
+            if self._evenement_id:
+                modules_json = serialiser_modules_depuis_cases(self._vars_modules)
+                try:
+                    update_evenement(self._evenement_id, modules_actifs_json=modules_json)
+                    if self._evenement:
+                        self._evenement["modules_actifs_json"] = modules_json
+                    afficher_succes(
+                        self,
+                        "Modules",
+                        "Les modules ont été mis à jour avec succès.\n"
+                        "Enregistrez ou rouvrez la fiche pour appliquer l'affichage des onglets.",
+                    )
+                except Exception as exc:
+                    afficher_erreur(self, "Erreur", f"Impossible d'enregistrer les modules :\n{exc}")
 
     def _definir_modules_selection(self, modules: list[str]) -> None:
         selection = set(modules)
@@ -1821,9 +1842,6 @@ class _DialogBenevole(ctk.CTkToplevel):
                 width=180,
             ),
         )
-        membres_values = ["— Aucun —"] + [f"{m['nom']} {m['prenom']}".strip() for m in self._membres]
-        field("Avancé par", lambda p: ctk.CTkOptionMenu(p, values=membres_values, variable=self._var_avance_par, width=240))
-        field("Statut remboursement", lambda p: ctk.CTkOptionMenu(p, values=["Non applicable", "En attente"], variable=self._var_remboursement, width=240))
         field(
             "Commentaire",
             lambda p: ctk.CTkEntry(p, textvariable=self._var_commentaire, width=240),
@@ -1927,3 +1945,72 @@ class _DialogMotif(ctk.CTkToplevel):
     def _ok(self) -> None:
         self.motif = self._var.get().strip()
         self.destroy()
+
+
+class _DialogModules(ctk.CTkToplevel):
+    """Dialogue d'activation/désactivation des modules d'un événement."""
+
+    def __init__(self, parent: Any, modules_actuels: list[str]) -> None:
+        super().__init__(parent)
+        self.title("⚙️ Modules de l'événement")
+        self.geometry("440x380")
+        self.resizable(False, False)
+        self.transient(parent)
+        self.result: list[str] | None = None
+
+        self._vars: dict[str, tk.BooleanVar] = {}
+        actifs_set = set(modules_actuels)
+
+        fonts = app_theme.FONTS
+        colors = app_theme.COLORS
+
+        label = ctk.CTkLabel(
+            self,
+            text="Modules activés",
+            font=fonts.get("subtitle", ("Arial", 14, "bold")),
+        )
+        label.pack(anchor="w", padx=20, pady=(16, 4))
+
+        sous_titre = ctk.CTkLabel(
+            self,
+            text="Sélectionnez les modules à activer pour cet événement :",
+            font=fonts.get("small"),
+            text_color="gray",
+        )
+        sous_titre.pack(anchor="w", padx=20, pady=(0, 12))
+
+        frame_cases = ctk.CTkFrame(self, fg_color="transparent")
+        frame_cases.pack(fill="x", padx=20, pady=(0, 16))
+
+        for module in MODULES_EVENEMENT_DISPONIBLES:
+            libelle = LIBELLES_MODULES.get(module, module.capitalize())
+            var = tk.BooleanVar(value=(module in actifs_set))
+            self._vars[module] = var
+            chk = ctk.CTkCheckBox(frame_cases, text=libelle, variable=var)
+            chk.pack(anchor="w", pady=4)
+
+        frame_btns = ctk.CTkFrame(self, fg_color="transparent")
+        frame_btns.pack(pady=(12, 16))
+
+        ctk.CTkButton(
+            frame_btns,
+            text="Valider",
+            width=110,
+            fg_color=colors.get("primary", "#1f6aa5"),
+            hover_color=colors.get("secondary", "#144870"),
+            command=self._valider,
+        ).pack(side="left", padx=8)
+
+        ctk.CTkButton(
+            frame_btns,
+            text="Annuler",
+            width=100,
+            fg_color="gray",
+            hover_color="#555",
+            command=self.destroy,
+        ).pack(side="left", padx=8)
+
+    def _valider(self) -> None:
+        self.result = [mod for mod, var in self._vars.items() if var.get()]
+        self.destroy()
+

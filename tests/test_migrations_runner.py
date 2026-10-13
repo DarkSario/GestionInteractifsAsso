@@ -1,9 +1,15 @@
 """Tests du système d'initialisation et de migrations SQLite."""
 
 from pathlib import Path
+import sqlite3
+import pytest
 
 from db.connection import get_connection, set_db_file
-from db.migrations.runner import run_migrations
+from db.migrations.runner import (
+    run_migrations,
+    split_sql_script,
+    _execute_migration,
+)
 
 MIGRATIONS_DIR = Path(__file__).resolve().parents[1] / "db" / "migrations"
 
@@ -269,3 +275,89 @@ def test_run_migrations_met_a_jour_evenement_caisses_historique(tmp_db) -> None:
     assert row["nom"] == "Caisse historique"
     assert row["nom_caisse"] == "Caisse historique"
     assert row["statut"] == "ouvert"
+
+
+def test_split_sql_script_handles_semicolons_comments_and_triggers() -> None:
+    sql = """
+    -- Commentaire avec point-virgule ; ici
+    CREATE TABLE test_items (
+        id INTEGER PRIMARY KEY,
+        label TEXT NOT NULL
+    );
+
+    /* Commentaire bloc
+       avec ; dedans */
+    INSERT INTO test_items (label) VALUES ('Valeur ; avec point virgule ;');
+
+    CREATE TRIGGER trg_test_items_after_insert
+    AFTER INSERT ON test_items
+    BEGIN
+        UPDATE test_items SET label = label || ' [notifié]' WHERE id = NEW.id;
+    END;
+
+    INSERT INTO test_items (label) VALUES ('Deuxième item');
+    """
+
+    statements = split_sql_script(sql)
+    assert len(statements) == 4
+
+    conn = sqlite3.connect(":memory:")
+    try:
+        conn.row_factory = sqlite3.Row
+        _execute_migration(conn, sql)
+        conn.commit()
+
+        rows = conn.execute("SELECT * FROM test_items ORDER BY id").fetchall()
+        assert len(rows) == 2
+        assert rows[0]["label"] == "Valeur ; avec point virgule ;"
+        assert rows[1]["label"] == "Deuxième item [notifié]"
+    finally:
+        conn.close()
+
+
+def test_migration_atomic_rollback_on_failure(tmp_db) -> None:
+    set_db_file(str(tmp_db))
+    conn = get_connection()
+    try:
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS test_atomic (
+                id INTEGER PRIMARY KEY,
+                val TEXT UNIQUE
+            )
+            """
+        )
+        conn.commit()
+
+        bad_sql = """
+        INSERT INTO test_atomic (val) VALUES ('ok1');
+        INSERT INTO test_atomic (val) VALUES ('ok1'); -- Duplication viole UNIQUE
+        """
+
+        conn.execute("BEGIN IMMEDIATE")
+        with pytest.raises(sqlite3.IntegrityError):
+            _execute_migration(conn, bad_sql)
+            conn.commit()
+        conn.rollback()
+
+        count = conn.execute("SELECT COUNT(*) AS total FROM test_atomic").fetchone()["total"]
+        assert count == 0
+    finally:
+        conn.close()
+        set_db_file("")
+
+
+def test_migrations_with_0014_applied(tmp_db) -> None:
+    set_db_file(str(tmp_db))
+    run_migrations()
+
+    conn = get_connection()
+    try:
+        row = conn.execute(
+            "SELECT nom FROM _migrations WHERE nom = '0014_gap_reconciliation.sql'"
+        ).fetchone()
+        assert row is not None
+    finally:
+        conn.close()
+        set_db_file("")
+

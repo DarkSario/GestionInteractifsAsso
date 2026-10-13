@@ -97,6 +97,18 @@ class ConfigAssoDialog(ctk.CTkToplevel):
         """Charge les valeurs depuis la DB."""
         for cle, entry in self._champs.items():
             val = get_parametre(cle) or ""
+            if not val and cle == "asso_nom":
+                try:
+                    from db.connection import get_connection
+                    conn = get_connection()
+                    try:
+                        row = conn.execute("SELECT nom_asso FROM config LIMIT 1").fetchone()
+                        if row and row["nom_asso"]:
+                            val = row["nom_asso"]
+                    finally:
+                        conn.close()
+                except Exception:
+                    pass
             entry.delete(0, "end")
             entry.insert(0, val)
         logo = get_parametre("asso_logo_path") or ""
@@ -124,6 +136,19 @@ class ConfigAssoDialog(ctk.CTkToplevel):
         """Enregistre les paramètres en DB."""
         for cle, entry in self._champs.items():
             set_parametre(cle, entry.get().strip())
+        nom = self._champs.get("asso_nom")
+        if nom:
+            nom_val = nom.get().strip()
+            try:
+                from db.connection import get_connection
+                conn = get_connection()
+                try:
+                    conn.execute("UPDATE config SET nom_asso = ?", (nom_val,))
+                    conn.commit()
+                finally:
+                    conn.close()
+            except Exception:
+                pass
         set_parametre("asso_logo_path", self._logo_path_var.get().strip())
         afficher_info(self, "Succès", "Les informations de l'association ont été enregistrées.")
         self.destroy()

@@ -1,6 +1,7 @@
 """Exécuteur de migrations SQLite."""
 
 import re
+import sqlite3
 from pathlib import Path
 
 from db.connection import get_connection
@@ -16,6 +17,89 @@ _ALTER_ADD_COLUMN_RE = re.compile(
     rf"(?P<column>{_SQL_IDENTIFIER_PATTERN})",
     re.IGNORECASE,
 )
+
+
+def split_sql_script(sql: str) -> list[str]:
+    """Découpe un script SQL en instructions individuelles de manière robuste.
+
+    Gère correctement les points-virgules présents :
+    - dans des commentaires de ligne (-- ...) ou de bloc (/* ... */)
+    - dans des chaînes littérales ('...') y compris avec échappement ('' ...)
+    - dans des blocs BEGIN ... END de triggers (via sqlite3.complete_statement).
+    """
+    statements: list[str] = []
+    current: list[str] = []
+    in_single_quote = False
+    in_double_quote = False
+    in_line_comment = False
+    in_block_comment = False
+    i = 0
+    n = len(sql)
+
+    while i < n:
+        c = sql[i]
+        next_c = sql[i + 1] if i + 1 < n else ""
+
+        if in_line_comment:
+            current.append(c)
+            if c == "\n":
+                in_line_comment = False
+        elif in_block_comment:
+            current.append(c)
+            if c == "*" and next_c == "/":
+                current.append(next_c)
+                i += 1
+                in_block_comment = False
+        elif in_single_quote:
+            current.append(c)
+            if c == "'":
+                if next_c == "'":
+                    current.append(next_c)
+                    i += 1
+                else:
+                    in_single_quote = False
+        elif in_double_quote:
+            current.append(c)
+            if c == '"':
+                if next_c == '"':
+                    current.append(next_c)
+                    i += 1
+                else:
+                    in_double_quote = False
+        else:
+            if c == "-" and next_c == "-":
+                current.append(c)
+                current.append(next_c)
+                i += 1
+                in_line_comment = True
+            elif c == "/" and next_c == "*":
+                current.append(c)
+                current.append(next_c)
+                i += 1
+                in_block_comment = True
+            elif c == "'":
+                current.append(c)
+                in_single_quote = True
+            elif c == '"':
+                current.append(c)
+                in_double_quote = True
+            elif c == ";":
+                current.append(c)
+                candidate = "".join(current)
+                if sqlite3.complete_statement(candidate):
+                    trimmed = candidate.strip()
+                    if trimmed and trimmed != ";":
+                        statements.append(trimmed)
+                    current = []
+            else:
+                current.append(c)
+        i += 1
+
+    remainder = "".join(current).strip()
+    if remainder and remainder != ";":
+        statements.append(remainder)
+
+    return statements
 
 
 def run_migrations() -> None:
@@ -45,6 +129,8 @@ def run_migrations() -> None:
 
             logger.info("Application de la migration : %s", migration_name)
             try:
+                if not conn.in_transaction:
+                    conn.execute("BEGIN IMMEDIATE")
                 _execute_migration(conn, sql_file.read_text(encoding="utf-8"))
                 conn.execute(
                     """
@@ -56,7 +142,8 @@ def run_migrations() -> None:
                 conn.commit()
                 logger.info("Migration appliquée avec succès : %s", migration_name)
             except Exception:
-                conn.rollback()
+                if conn.in_transaction:
+                    conn.rollback()
                 logger.exception("Échec de la migration : %s", migration_name)
                 raise
         logger.info("Fin de run_migrations() sans erreur")
@@ -89,9 +176,9 @@ def _execute_migration(conn, sql: str) -> None:
 
     Les instructions ``ALTER TABLE ... ADD COLUMN`` dont la colonne existe déjà
     sont ignorées silencieusement (SQLite ne supporte pas ``IF NOT EXISTS``).
-    Les autres instructions sont exécutées via ``executescript``.
+    Chaque instruction est exécutée de façon transactionnelle via ``conn.execute(stmt)``.
     """
-    statements = [s.strip() for s in sql.split(";") if s.strip()]
+    statements = split_sql_script(sql)
 
     for stmt in statements:
         if match := _ALTER_ADD_COLUMN_RE.search(stmt):
@@ -112,4 +199,5 @@ def _execute_migration(conn, sql: str) -> None:
                 else:
                     raise
         else:
-            conn.executescript(stmt + ";")
+            conn.execute(stmt)
+
