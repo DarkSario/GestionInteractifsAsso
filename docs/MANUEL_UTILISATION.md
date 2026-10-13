@@ -89,6 +89,8 @@ Des alertes colorées apparaissent en haut du tableau de bord pour vous préveni
 
 Le tableau de bord se rafraîchit automatiquement toutes les 5 minutes. Vous pouvez aussi fermer et rouvrir la page depuis le menu.
 
+La ligne **Accès directs** donne accès aux événements, à la trésorerie, à la buvette, aux adhérents, aux dons, aux informations de l'association et au manuel.
+
 ---
 
 ## 3. Événements
@@ -98,7 +100,7 @@ Le tableau de bord se rafraîchit automatiquement toutes les 5 minutes. Vous pou
 ### Créer un événement
 
 1. Ouvrez **Modules → Événements** dans la barre de menu
-2. Cliquez **"+ Créer un événement"**
+2. Cliquez **"+ Nouvel événement"**
 3. Remplissez :
    - Nom de l'événement (ex. : "Fête de l'école 2026")
    - Date de début et de fin
