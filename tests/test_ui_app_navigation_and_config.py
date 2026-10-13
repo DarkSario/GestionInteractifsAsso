@@ -182,6 +182,20 @@ def test_naviguer_evenement_with_id_opens_fiche(dummy_app, monkeypatch):
     assert "id" not in opened
 
 
+def test_naviguer_evenement_with_zero_id_opens_fiche(dummy_app, monkeypatch):
+    app, MainApp = dummy_app
+    opened = {}
+    monkeypatch.setattr(
+        MainApp,
+        "_ouvrir_evenement_fiche",
+        lambda self, evenement_id=None: opened.setdefault("id", evenement_id),
+    )
+
+    app._naviguer("evenement", 0)
+
+    assert opened == {"id": 0}
+
+
 def test_actualiser_configuration_refreshes_ui(dummy_app):
     app, _ = dummy_app
     conn = get_connection()
@@ -202,6 +216,43 @@ def test_actualiser_configuration_refreshes_ui(dummy_app):
     assert "Asso Les Amis du Jeu" in app.title_val
     assert "2026-2027" in app._status_balance_label._text
     assert "1 500,50 €" in app._status_balance_label._text
+
+
+def test_ouvrir_config_asso_refreshes_after_dialog_closes(dummy_app, monkeypatch):
+    app, _ = dummy_app
+    opened = {}
+    refreshes = []
+
+    class ConfigDialog(DummyWidget):
+        def __init__(self, parent):
+            super().__init__(parent)
+            opened["parent"] = parent
+            opened["dialog"] = self
+
+        def grab_set(self):
+            opened["grabbed"] = True
+
+    dialog_module = types.ModuleType(
+        "ui.modules.evenements.config_asso_dialog"
+    )
+    dialog_module.ConfigAssoDialog = ConfigDialog
+    monkeypatch.setitem(
+        sys.modules, "ui.modules.evenements.config_asso_dialog", dialog_module
+    )
+    monkeypatch.setattr(
+        app,
+        "wait_window",
+        lambda dialog: opened.setdefault("waited", dialog),
+        raising=False,
+    )
+    monkeypatch.setattr(app, "actualiser_configuration", lambda: refreshes.append(True))
+
+    app._ouvrir_config_asso()
+
+    assert opened["parent"] is app
+    assert opened["grabbed"] is True
+    assert opened["waited"] is opened["dialog"]
+    assert refreshes == [True]
 
 
 def test_build_menu_exposes_asso_config_and_help(dummy_app, monkeypatch):
@@ -228,4 +279,3 @@ def test_build_menu_exposes_asso_config_and_help(dummy_app, monkeypatch):
     assert "🏛️ Informations de l'association" in all_labels
     assert "📖 Manuel d'utilisation" in all_labels
     assert "ℹ️ À propos" in all_labels
-

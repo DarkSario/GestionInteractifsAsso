@@ -14,6 +14,9 @@ import customtkinter as ctk
 from db.models.evenements import get_parametre, set_parametre
 from ui import theme as app_theme
 from ui.components.dialogs import afficher_erreur, afficher_info
+from utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class ConfigAssoDialog(ctk.CTkToplevel):
@@ -108,7 +111,7 @@ class ConfigAssoDialog(ctk.CTkToplevel):
                     finally:
                         conn.close()
                 except Exception:
-                    pass
+                    logger.exception("Impossible de charger le nom de l'association")
             entry.delete(0, "end")
             entry.insert(0, val)
         logo = get_parametre("asso_logo_path") or ""
@@ -148,7 +151,14 @@ class ConfigAssoDialog(ctk.CTkToplevel):
                 finally:
                     conn.close()
             except Exception:
-                pass
+                logger.exception("Impossible de synchroniser le nom de l'association")
+                afficher_erreur(
+                    self,
+                    "Erreur",
+                    "Les informations ont été enregistrées, mais le nom de "
+                    "l'association n'a pas pu être synchronisé.",
+                )
+                return
         set_parametre("asso_logo_path", self._logo_path_var.get().strip())
         afficher_info(self, "Succès", "Les informations de l'association ont été enregistrées.")
         self.destroy()

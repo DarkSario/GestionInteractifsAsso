@@ -83,7 +83,7 @@ class MainApp(ctk.CTk):
             if nom_param:
                 nom_asso = nom_param
         except Exception:
-            pass
+            logger.exception("Impossible de charger le nom de l'association")
 
         return {
             "nom_asso": nom_asso or default_config["nom_asso"],
@@ -160,8 +160,8 @@ class MainApp(ctk.CTk):
             try:
                 self._dashboard_frame.annuler_actualisation()
                 self._dashboard_frame.destroy()
-            except Exception:  # noqa: BLE001
-                pass
+            except Exception:
+                logger.exception("Impossible de fermer l'ancien tableau de bord")
 
         self._dashboard_frame = DashboardFrame(
             self,
@@ -241,8 +241,8 @@ class MainApp(ctk.CTk):
         if self._dashboard_frame is not None and hasattr(self._dashboard_frame, "actualiser"):
             try:
                 self._dashboard_frame.actualiser()
-            except Exception:  # noqa: BLE001
-                pass
+            except Exception:
+                logger.exception("Impossible d'actualiser le tableau de bord")
 
     def _ouvrir_manuel(self) -> None:
         """Ouvre le manuel d'utilisation de l'application."""
@@ -270,6 +270,7 @@ class MainApp(ctk.CTk):
             else:
                 subprocess.Popen(["xdg-open", str(manuel_path)])
         except Exception:
+            logger.exception("Impossible d'ouvrir le manuel d'utilisation")
             afficher_info(
                 self,
                 "Manuel d'utilisation",
@@ -319,7 +320,7 @@ class MainApp(ctk.CTk):
         if action:
             action()
         elif destination == "evenement":
-            if extra:
+            if extra is not None:
                 self._ouvrir_evenement_fiche(extra)
             else:
                 self._ouvrir_evenements()

@@ -296,10 +296,15 @@ def test_split_sql_script_handles_semicolons_comments_and_triggers() -> None:
     END;
 
     INSERT INTO test_items (label) VALUES ('Deuxième item');
+
+    CREATE TABLE `back;tick` (label TEXT);
+    INSERT INTO `back;tick` (label) VALUES ('identifiant entre accents graves');
+    CREATE TABLE [square;name] (label TEXT);
+    INSERT INTO [square;name] (label) VALUES ('identifiant entre crochets');
     """
 
     statements = split_sql_script(sql)
-    assert len(statements) == 4
+    assert len(statements) == 8
 
     conn = sqlite3.connect(":memory:")
     try:
@@ -311,6 +316,12 @@ def test_split_sql_script_handles_semicolons_comments_and_triggers() -> None:
         assert len(rows) == 2
         assert rows[0]["label"] == "Valeur ; avec point virgule ;"
         assert rows[1]["label"] == "Deuxième item [notifié]"
+        assert conn.execute("SELECT label FROM `back;tick`").fetchone()["label"] == (
+            "identifiant entre accents graves"
+        )
+        assert conn.execute("SELECT label FROM [square;name]").fetchone()["label"] == (
+            "identifiant entre crochets"
+        )
     finally:
         conn.close()
 
@@ -347,6 +358,41 @@ def test_migration_atomic_rollback_on_failure(tmp_db) -> None:
         set_db_file("")
 
 
+def test_run_migrations_rolls_back_failed_migration_file(tmp_db, tmp_path, monkeypatch):
+    from db.migrations import runner
+
+    migrations_dir = tmp_path / "migrations"
+    migrations_dir.mkdir()
+    (migrations_dir / "0001_atomic.sql").write_text(
+        """
+        CREATE TABLE atomic_probe (value TEXT UNIQUE);
+        INSERT INTO atomic_probe VALUES ('duplicate');
+        INSERT INTO atomic_probe VALUES ('duplicate');
+        """,
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(runner, "MIGRATIONS_DIR", migrations_dir)
+    set_db_file(str(tmp_db))
+
+    with pytest.raises(sqlite3.IntegrityError):
+        run_migrations()
+
+    conn = get_connection()
+    try:
+        table = conn.execute(
+            "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'atomic_probe'"
+        ).fetchone()
+        migration = conn.execute(
+            "SELECT nom FROM _migrations WHERE nom = '0001_atomic.sql'"
+        ).fetchone()
+    finally:
+        conn.close()
+        set_db_file("")
+
+    assert table is None
+    assert migration is None
+
+
 def test_migrations_with_0014_applied(tmp_db) -> None:
     set_db_file(str(tmp_db))
     run_migrations()
@@ -360,4 +406,3 @@ def test_migrations_with_0014_applied(tmp_db) -> None:
     finally:
         conn.close()
         set_db_file("")
-
