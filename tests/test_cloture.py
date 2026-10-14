@@ -576,3 +576,91 @@ def test_add_operation_atomique_vis_a_vis_cloture(tmp_db):
     blocker.close()
     t.join(10)
     assert errors and isinstance(errors[0], PeriodeClotureeError)
+
+
+# ── PR1 : verrouillage atomique update/annulation/suppression + événements ───
+
+
+def _cloture_en_vol(fn):
+    """Lance fn pendant qu'une autre connexion clôture l'exercice 2025."""
+    import threading
+    import time
+
+    from db.connection import get_connection
+
+    blocker = get_connection()
+    blocker.execute("BEGIN IMMEDIATE")
+    blocker.execute("UPDATE exercices SET statut='cloture' WHERE date_debut='2025-01-01'")
+    result = []
+    t = threading.Thread(target=lambda: result.append(fn()))
+    t.start()
+    time.sleep(0.3)
+    blocker.commit()
+    blocker.close()
+    t.join(10)
+    return result
+
+
+def test_update_annuler_delete_atomiques_vis_a_vis_cloture(tmp_db):
+    from db.models.tresorerie import annuler_operation, delete_operation, update_operation
+
+    _setup(tmp_db)
+    compte, cat = _ctx()
+    add_exercice("2025", "civile", "2025-01-01", "2025-12-31", 0.0)
+    op = _add_op(compte, "recette", "Op", 10.0, "2025-05-01", cat)
+
+    assert _cloture_en_vol(lambda: update_operation(op, montant=99.0)) == [False]
+    assert float(get_operation_by_id(op)["montant"]) == 10.0
+    assert _cloture_en_vol(lambda: annuler_operation(op)) == [False]
+    assert _cloture_en_vol(lambda: delete_operation(op)) == [False]
+    assert get_operation_by_id(op)["statut"] == "valide"
+
+
+def test_ecritures_evenement_refusees_en_periode_cloturee(tmp_db):
+    import pytest
+
+    from db.connection import get_connection
+    from db.models.cloture import PeriodeClotureeError
+    from db.models.evenements import (
+        add_depense,
+        add_vente,
+        annuler_vente,
+        delete_depense,
+        update_depense,
+    )
+
+    _setup(tmp_db)
+    conn = get_connection()
+    try:
+        cur = conn.execute("INSERT INTO evenements (nom) VALUES ('Fête')")
+        conn.commit()
+        ev = cur.lastrowid
+    finally:
+        conn.close()
+    ex_id = add_exercice("2025", "civile", "2025-01-01", "2025-12-31", 0.0)
+    dep = add_depense(ev, "Achat", 5.0, "2025-05-01", None, None, None, None)
+    vente = add_vente(ev, "2025-05-01", "sur_place", "especes", None, 10.0, 0.0, 10.0, None)
+    assert cloturer_exercice(ex_id, 0.0)
+
+    with pytest.raises(PeriodeClotureeError):
+        add_depense(ev, "Nouveau", 1.0, "2025-06-01", None, None, None, None)
+    with pytest.raises(PeriodeClotureeError):
+        add_vente(ev, "2025-06-01", "sur_place", "especes", None, 1.0, 0.0, 1.0, None)
+    assert update_depense(dep, montant=50.0) is False
+    assert delete_depense(dep) is False
+    assert annuler_vente(vente, "test") is False
+
+    conn = get_connection()
+    try:
+        assert conn.execute(
+            "SELECT montant FROM evenement_depenses WHERE id=?", (dep,)
+        ).fetchone()[0] == 5.0
+        assert conn.execute(
+            "SELECT statut FROM evenement_ventes WHERE id=?", (vente,)
+        ).fetchone()[0] == "valide"
+    finally:
+        conn.close()
+    # Hors période : inchangé
+    assert add_depense(ev, "Ok", 1.0, "2026-01-10", None, None, None, None)
+    assert decloturer_exercice(ex_id)
+    assert update_depense(dep, montant=50.0) is True

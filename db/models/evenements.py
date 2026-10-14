@@ -6,9 +6,13 @@ import json
 from datetime import datetime
 
 from db.connection import get_connection
+from db.models.cloture import periode_cloturee_conn, verifier_periode_ouverte
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
+
+# Modèle de clôture : la clôture d'un exercice fige aussi les sous-registres
+# événementiels datés (ventes, dépenses) qui alimentent les rapports financiers.
 
 MODULES_EVENEMENT_DISPONIBLES = (
     "billetterie",
@@ -356,9 +360,11 @@ def add_vente(
     montant_net: float,
     commentaire: str | None,
 ) -> int:
-    """Crée une vente et retourne son identifiant."""
+    """Crée une vente et retourne son identifiant (refusée en période clôturée)."""
     conn = get_connection()
     try:
+        conn.execute("BEGIN IMMEDIATE")
+        verifier_periode_ouverte(conn, date)
         cur = conn.execute(
             """
             INSERT INTO evenement_ventes
@@ -380,6 +386,9 @@ def add_vente(
         )
         conn.commit()
         return cur.lastrowid
+    except Exception:
+        conn.rollback()
+        raise
     finally:
         conn.close()
 
@@ -466,9 +475,16 @@ def get_lignes_vente(vente_id: int) -> list[dict]:
 
 
 def annuler_vente(vente_id: int, motif: str) -> bool:
-    """Annule une vente et marque ses billets comme annulés."""
+    """Annule une vente et marque ses billets comme annulés (refusé si période clôturée)."""
     conn = get_connection()
     try:
+        conn.execute("BEGIN IMMEDIATE")
+        vente = conn.execute(
+            "SELECT date FROM evenement_ventes WHERE id = ?", (vente_id,)
+        ).fetchone()
+        if vente and periode_cloturee_conn(conn, vente["date"]):
+            conn.rollback()
+            return False
         conn.execute(
             "UPDATE evenement_ventes SET statut = 'annule', motif_annulation = ? WHERE id = ?",
             (motif, vente_id),
@@ -486,6 +502,7 @@ def annuler_vente(vente_id: int, motif: str) -> bool:
         return True
     except Exception as exc:
         logger.error("annuler_vente: %s", exc)
+        conn.rollback()
         return False
     finally:
         conn.close()
@@ -592,9 +609,11 @@ def add_depense(
     remboursement_mode: str | None = None,
     remboursement_reference: str | None = None,
 ) -> int:
-    """Crée une dépense et retourne son identifiant."""
+    """Crée une dépense et retourne son identifiant (refusée en période clôturée)."""
     conn = get_connection()
     try:
+        conn.execute("BEGIN IMMEDIATE")
+        verifier_periode_ouverte(conn, date)
         cur = conn.execute(
             """
             INSERT INTO evenement_depenses
@@ -621,6 +640,9 @@ def add_depense(
         )
         conn.commit()
         return cur.lastrowid
+    except Exception:
+        conn.rollback()
+        raise
     finally:
         conn.close()
 
@@ -671,6 +693,13 @@ def update_depense(depense_id: int, **kwargs) -> bool:
     valeurs = list(kwargs.values()) + [depense_id]
     conn = get_connection()
     try:
+        conn.execute("BEGIN IMMEDIATE")
+        actuelle = conn.execute(
+            "SELECT date FROM evenement_depenses WHERE id = ?", (depense_id,)
+        ).fetchone()
+        if actuelle and periode_cloturee_conn(conn, actuelle["date"], kwargs.get("date")):
+            conn.rollback()
+            return False
         conn.execute(
             f"UPDATE evenement_depenses SET {colonnes} WHERE id = ?",
             valeurs,
@@ -679,6 +708,7 @@ def update_depense(depense_id: int, **kwargs) -> bool:
         return True
     except Exception as exc:
         logger.error("update_depense: %s", exc)
+        conn.rollback()
         return False
     finally:
         conn.close()
@@ -688,11 +718,19 @@ def delete_depense(depense_id: int) -> bool:
     """Supprime une dépense."""
     conn = get_connection()
     try:
+        conn.execute("BEGIN IMMEDIATE")
+        actuelle = conn.execute(
+            "SELECT date FROM evenement_depenses WHERE id = ?", (depense_id,)
+        ).fetchone()
+        if actuelle and periode_cloturee_conn(conn, actuelle["date"]):
+            conn.rollback()
+            return False
         conn.execute("DELETE FROM evenement_depenses WHERE id = ?", (depense_id,))
         conn.commit()
         return True
     except Exception as exc:
         logger.error("delete_depense: %s", exc)
+        conn.rollback()
         return False
     finally:
         conn.close()
