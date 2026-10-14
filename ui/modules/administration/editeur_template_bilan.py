@@ -1,7 +1,8 @@
-"""Éditeur du template Bilan AG (Phase 16).
+"""Éditeur historique du template Markdown Bilan AG.
 
 Fenêtre CTkToplevel permettant de modifier le fichier
 config/bilan_ag_template.md directement depuis l'interface.
+Ce template n'est plus utilisé pour le PDF Bilan AG.
 """
 
 from __future__ import annotations
@@ -72,8 +73,8 @@ class EditeurTemplateBilan(ctk.CTkToplevel):
         ).pack(anchor="w", padx=8, pady=(8, 2))
         ctk.CTkLabel(
             frame_editor,
-            text="Utilisez {{variable}} pour insérer des données dynamiques. "
-            "Le PDF du Bilan AG (menu Exports) est produit par le même générateur unique.",
+            text="Éditeur historique : ce template Markdown n'est plus utilisé par le PDF. "
+            "L'export du Bilan AG passe par le générateur unique du menu Exports.",
             font=fonts.get("small"),
             text_color="grey",
             anchor="w",

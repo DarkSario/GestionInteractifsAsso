@@ -310,6 +310,7 @@ TABLES = {
         "est_automatique INTEGER DEFAULT 0",
         "source_module TEXT",
         "source_id INTEGER",
+        "remise_cheque_id INTEGER REFERENCES remises_cheques(id)",
         "commentaire TEXT",
         "avance_par_membre_id INTEGER REFERENCES membres(id)",
         "remboursement_statut TEXT DEFAULT 'non_applicable'",
@@ -317,7 +318,6 @@ TABLES = {
         "remboursement_mode TEXT",
         "remboursement_reference TEXT",
         "created_at TEXT DEFAULT (datetime('now'))",
-        "updated_at TEXT DEFAULT (datetime('now'))",
     ),
     # ── Phase 7 — Paramètres globaux ─────────────────────────────────────────
     "parametres_globaux": (

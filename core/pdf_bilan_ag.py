@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import date, timedelta
+
 from reportlab.lib import colors
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import cm
@@ -239,10 +241,21 @@ class PdfBilanAG(PdfBasePro):
             elements.append(Paragraph(f"Soldes des comptes au {self._formater_date(date_fin)}.", self._style_normal))
         comptes = get_all_comptes(actif_only=False, date_fin=date_fin or None)
         stats = get_stats_tresorerie(date_debut=date_debut or None, date_fin=date_fin or None)
+        solde_ouverture = None
+        if date_debut:
+            try:
+                veille_periode = (date.fromisoformat(date_debut[:10]) - timedelta(days=1)).isoformat()
+                comptes_ouverture = get_all_comptes(actif_only=False, date_fin=veille_periode)
+                solde_ouverture = sum(
+                    float(compte.get("solde_actuel") or 0) for compte in comptes_ouverture
+                )
+            except ValueError:
+                logger.warning("Date de début invalide pour le solde d'ouverture : %s", date_debut)
 
         if not comptes:
             return elements + [self._message_aucune_donnee()]
 
+        solde_cloture = sum(float(compte.get("solde_actuel") or 0) for compte in comptes)
         donnees = [["Compte", "Type", "Solde (fin de période)"]]
         for compte in comptes:
             donnees.append(
@@ -252,17 +265,23 @@ class PdfBilanAG(PdfBasePro):
                     self._formater_montant(compte.get("solde_actuel")),
                 ]
             )
-        donnees.append(["Total", "", self._formater_montant(sum(float(c.get("solde_actuel") or 0) for c in comptes))])
+        donnees.append(["Total", "", self._formater_montant(solde_cloture)])
         elements.append(self._creer_tableau(donnees, col_widths=[7 * cm, 4 * cm, 4 * cm], avec_total=True))
         elements.append(Spacer(1, 0.2 * cm))
+        indicateurs = [["Indicateur", "Montant"]]
+        if solde_ouverture is not None:
+            indicateurs.append(["Solde d'ouverture", self._formater_montant(solde_ouverture)])
+        indicateurs.extend(
+            [
+                ["Recettes", self._formater_montant(stats.get("total_recettes"))],
+                ["Dépenses", self._formater_montant(stats.get("total_depenses"))],
+                ["Variation nette", self._formater_montant(stats.get("solde"))],
+                ["Solde de clôture", self._formater_montant(solde_cloture)],
+            ]
+        )
         elements.append(
             self._creer_tableau(
-                [
-                    ["Indicateur", "Montant"],
-                    ["Recettes", self._formater_montant(stats.get("total_recettes"))],
-                    ["Dépenses", self._formater_montant(stats.get("total_depenses"))],
-                    ["Solde", self._formater_montant(stats.get("solde"))],
-                ],
+                indicateurs,
                 col_widths=[7 * cm, 4 * cm],
                 avec_total=True,
             )
@@ -337,11 +356,11 @@ class PdfBilanAG(PdfBasePro):
                     f"""
                     SELECT {colonnes}
                     FROM evenements
-                    WHERE substr(COALESCE(date_debut, date_fin, ''), 1, 10) BETWEEN ? AND ?
-                       OR substr(COALESCE(date_fin, date_debut, ''), 1, 10) BETWEEN ? AND ?
+                    WHERE substr(COALESCE(NULLIF(date_debut, ''), date_fin, ''), 1, 10) <= ?
+                      AND substr(COALESCE(NULLIF(date_fin, ''), date_debut, ''), 1, 10) >= ?
                     ORDER BY date_debut DESC, id DESC
                     """,
-                    (date_debut, date_fin, date_debut, date_fin),
+                    (date_fin, date_debut),
                 ).fetchall()
             else:
                 rows = conn.execute(
@@ -393,8 +412,9 @@ class PdfBilanAG(PdfBasePro):
         elements.append(
             Paragraph(
                 "Recettes et dépenses issues du module Événements (billetterie, stands, tombola, "
-                "buvette, caisses). Ces montants sont informatifs et ne s'ajoutent pas aux "
-                "totaux de trésorerie.",
+                "buvette, caisses) : bilan complet de chaque événement, pas uniquement les "
+                "opérations de la période. Ces montants sont informatifs et ne s'ajoutent pas "
+                "aux totaux de trésorerie.",
                 self._style_normal,
             )
         )
@@ -452,10 +472,13 @@ class PdfBilanAG(PdfBasePro):
         try:
             from db.models.dons import get_all_dons
 
-            filtres: dict = {}
-            if self._annee:
-                filtres["exercice_annee"] = self._annee
-            dons = get_all_dons(filtres) if filtres else get_all_dons()
+            date_debut, date_fin = self._periode()
+            filtres = {}
+            if date_debut:
+                filtres["date_debut"] = date_debut
+            if date_fin:
+                filtres["date_fin"] = date_fin
+            dons = get_all_dons(filtres)
         except Exception:
             dons = []
 

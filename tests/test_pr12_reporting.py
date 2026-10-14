@@ -41,6 +41,17 @@ def test_bilan_ag_erreur_distincte_de_aucune_donnee(db_fin, monkeypatch):
     assert "Aucun compte" not in tableau
 
 
+def test_bilan_ag_valorise_stock_avec_le_schema_courant(db_fin):
+    from core.bilan_ag import collecter_donnees_bilan
+
+    _exec(
+        db_fin,
+        "INSERT INTO stock (nom, prix_achat, quantite) VALUES ('Article bilan', 2.5, 4)",
+    )
+    donnees = collecter_donnees_bilan(1)
+    assert "10,00" in donnees["valeur_stock"]
+
+
 def test_totaux_evenement_liste_alignes_sur_fiche(db_fin):
     from core.caisses_evenement import calculer_bilan_complet_evenement
     from db.models.evenements import get_all_evenements
@@ -145,15 +156,67 @@ def test_pdf_ag_resume_utilise_solde_fin_periode(db_fin):
     assert "100,00" in texte and "600,00" not in texte
 
 
+def test_pdf_ag_reconcilie_soldes_et_flux_de_periode(db_fin):
+    from core.pdf_bilan_ag import PdfBilanAG
+
+    cid = _exec(db_fin, "INSERT INTO comptes_bancaires (nom, solde_initial, actif) VALUES ('C', 100, 1)")
+    for date, type_operation, montant in (
+        ("2025-08-31", "recette", 20),
+        ("2025-10-01", "recette", 50),
+        ("2026-01-01", "depense", 15),
+        ("2026-12-01", "recette", 500),
+    ):
+        _exec(
+            db_fin,
+            "INSERT INTO tresorerie_operations (compte_id, date_operation, type_operation, montant, statut, libelle) "
+            "VALUES (?, ?, ?, ?, 'valide', 'x')",
+            (cid, date, type_operation, montant),
+        )
+    texte = _textes_section(PdfBilanAG("2025-2026")._section_resume_financier())
+    assert "120,00" in texte
+    assert "50,00" in texte
+    assert "15,00" in texte
+    assert "35,00" in texte
+    assert "155,00" in texte
+    assert "600,00" not in texte
+
+
 def test_pdf_ag_evenements_annee_scolaire_complete(db_fin):
     from core.pdf_bilan_ag import PdfBilanAG
 
     _exec(db_fin, "INSERT INTO evenements (nom, date_debut, date_fin) VALUES ('Fête automne', '2025-10-10', '2025-10-10')")
     _exec(db_fin, "INSERT INTO evenements (nom, date_debut, date_fin) VALUES ('Kermesse juin', '2026-06-20', '2026-06-20')")
     _exec(db_fin, "INSERT INTO evenements (nom, date_debut, date_fin) VALUES ('Hors période', '2026-09-15', '2026-09-15')")
+    _exec(db_fin, "INSERT INTO evenements (nom, date_debut, date_fin) VALUES ('Événement long', '2025-01-01', '2026-12-31')")
     texte = _textes_section(PdfBilanAG("2025-2026")._section_evenements())
-    assert "Fête automne" in texte and "Kermesse juin" in texte
+    assert "Fête automne" in texte and "Kermesse juin" in texte and "Événement long" in texte
     assert "Hors période" not in texte
+    assert "ne s'ajoutent pas aux" in texte
+
+
+def test_pdf_ag_dons_filtres_sur_toute_la_periode(db_fin):
+    from core.pdf_bilan_ag import PdfBilanAG
+
+    conn = db_fin.get_connection()
+    try:
+        for nom, date_don in (
+            ("Don automne", "2025-09-01"),
+            ("Don été", "2026-08-31"),
+            ("Don avant", "2025-08-31"),
+            ("Don après", "2026-09-01"),
+        ):
+            conn.execute(
+                "INSERT INTO dons (date_don, type_donateur, donateur_nom, nature_don, montant) "
+                "VALUES (?, 'particulier', ?, 'argent', 10)",
+                (date_don, nom),
+            )
+        conn.commit()
+    finally:
+        conn.close()
+    texte = _textes_section(PdfBilanAG("2025-2026")._section_dons())
+    assert "Don automne" in texte and "Don été" in texte
+    assert "Don avant" not in texte and "Don après" not in texte
+    assert "20,00" in texte
 
 
 def test_pdf_ag_buvette_sans_troncature_et_periode_complete(db_fin):
@@ -184,7 +247,7 @@ def test_pdf_ag_buvette_sans_troncature_et_periode_complete(db_fin):
     assert "1 100,00" in texte.replace("\u202f", " ").replace("\xa0", " ") or "1100,00" in texte
 
 
-def test_export_et_editeur_utilisent_le_meme_generateur(db_fin, monkeypatch, tmp_path):
+def test_generer_bilan_ag_delegue_au_generateur_pdf_unique(db_fin, monkeypatch, tmp_path):
     import core.exports as exports
     from core.bilan_ag import generer_bilan_ag
 
@@ -205,7 +268,14 @@ def test_schema_reference_exercices_et_evenements(db_fin):
 
     conn = db_fin.get_connection()
     try:
-        for table in ("exercices", "evenements"):
+        for table in (
+            "exercices",
+            "evenements",
+            "comptes_bancaires",
+            "tresorerie_operations",
+            "evenement_caisses",
+            "evenement_caisse_lignes",
+        ):
             reel = {r["name"] for r in conn.execute(f"PRAGMA table_info({table})")}
             doc = {c.split()[0] for c in TABLES[table]}
             assert reel == doc, (table, reel ^ doc)
