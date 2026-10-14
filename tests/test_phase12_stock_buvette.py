@@ -34,7 +34,7 @@ from core.stock_v2 import (
 from db.connection import get_connection, set_db_file
 from db.migrations.runner import run_migrations
 from db.models.evenements import add_depense, add_evenement, add_tarif, add_vente, add_vente_ligne
-from db.models.stock import add_article
+from db.models.stock import add_article, get_article_by_id
 
 
 @pytest.fixture(autouse=True)
@@ -125,6 +125,14 @@ def test_stock_theorique():
     _add_lot(article_id, 4, 12.0, "2026-02-01")
 
     assert get_stock_theorique(article_id) == 6
+
+
+def test_lots_synchronisent_la_quantite_historique():
+    article_id = _create_article()
+    _add_lot(article_id, 6, 10.0, "2026-01-01")
+
+    assert get_stock_theorique(article_id) == 6
+    assert get_article_by_id(article_id)["quantite"] == 6
 
 
 def test_articles_peremption_proche():

@@ -1,8 +1,8 @@
 """Validation et types de mouvements du stock historique.
 
-Les opérations de lots, tags et consommation FIFO sont gérées dans
-``core.stock_v2`` ; ces helpers restent utilisés par les écrans article et
-mouvements existants.
+Ce module reste utilisé par les écrans article et mouvements historiques.
+Les opérations de lots, tags, péremption et consommation FIFO doivent utiliser
+``core.stock_v2``, qui maintient la quantité agrégée compatible avec ces écrans.
 """
 
 TYPES_MOUVEMENTS: list[str] = [

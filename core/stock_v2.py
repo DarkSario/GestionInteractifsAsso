@@ -1,8 +1,8 @@
-"""Logique des lots FIFO, tags et péremption du stock (Phase 12+).
+"""Entrée principale pour les lots, le FIFO, les tags et les péremptions.
 
-Le total des lots est synchronisé dans ``stock.quantite`` pour conserver la
-compatibilité avec les écrans et rapports qui utilisent encore les articles ou
-mouvements historiques.
+Ce module complète le catalogue d'articles et les mouvements historiques; il ne
+les remplace pas. Le total des lots est synchronisé dans ``stock.quantite`` pour
+conserver la compatibilité des écrans et rapports historiques.
 """
 
 from __future__ import annotations
