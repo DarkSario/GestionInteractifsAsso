@@ -324,3 +324,120 @@ def test_initialiser_secrets_idempotent(tmp_db):
     assert verifier_mot_de_passe_decloture("premier_mdp") is True
     assert verifier_mot_de_passe_decloture("autre_mdp") is False
     set_db_file("")
+
+
+# ── PR10 : verrouillage des périodes clôturées ───────────────────────────────
+
+
+def _ctx():
+    return _compte_principal_id(), _categorie_recette_id()
+
+
+def test_decloture_ne_touche_pas_rapprochements_preexistants(tmp_db):
+    _setup(tmp_db)
+    compte, cat = _ctx()
+    ex_id = add_exercice("2025", "civile", "2025-01-01", "2025-12-31", 0.0)
+    deja = _add_op(compte, "recette", "Déjà rapprochée", 10.0, "2025-02-01", cat, "rapproche")
+    valide = _add_op(compte, "recette", "Valide", 20.0, "2025-03-01", cat)
+
+    assert cloturer_exercice(ex_id, 30.0)
+    assert decloturer_exercice(ex_id)
+
+    assert get_operation_by_id(deja)["statut"] == "rapproche"
+    assert get_operation_by_id(valide)["statut"] == "valide"
+
+
+def test_exercices_chevauchants_statuts_preserves(tmp_db):
+    _setup(tmp_db)
+    compte, cat = _ctx()
+    a = add_exercice("A", "civile", "2025-01-01", "2025-12-31", 0.0)
+    b = add_exercice("B", "scolaire", "2025-09-01", "2026-08-31", 0.0)
+    commun = _add_op(compte, "recette", "Commun", 10.0, "2025-10-01", cat)
+    seul_b = _add_op(compte, "recette", "Seul B", 10.0, "2026-02-01", cat)
+
+    assert cloturer_exercice(a, 10.0)
+    assert cloturer_exercice(b, 20.0)
+    # Réouvrir A : l'opération commune reste verrouillée par B
+    assert decloturer_exercice(a)
+    assert get_operation_by_id(commun)["statut"] == "rapproche"
+    assert get_operation_by_id(seul_b)["statut"] == "rapproche"
+    # Réouvrir B : tout revient à l'état d'origine
+    assert decloturer_exercice(b)
+    assert get_operation_by_id(commun)["statut"] == "valide"
+    assert get_operation_by_id(seul_b)["statut"] == "valide"
+
+
+def test_ecritures_refusees_en_periode_cloturee(tmp_db):
+    import pytest
+
+    from db.models.cloture import PeriodeClotureeError
+    from db.models.tresorerie import (
+        annuler_operation,
+        delete_operation,
+        update_operation,
+        upsert_operation_auto,
+    )
+    from db.connection import get_connection
+
+    _setup(tmp_db)
+    compte, cat = _ctx()
+    ex_id = add_exercice("2025", "civile", "2025-01-01", "2025-12-31", 0.0)
+    op = _add_op(compte, "recette", "Op", 10.0, "2025-05-01", cat)
+    hors = _add_op(compte, "recette", "Hors", 10.0, "2026-05-01", cat)
+    conn = get_connection()
+    upsert_operation_auto(
+        conn, "don", 1, type_operation="recette", libelle="Don", montant=5.0,
+        date_operation="2025-06-01", categorie_id=cat, mode_paiement="especes",
+        commentaire=None,
+    )
+    conn.commit()
+    conn.close()
+    assert cloturer_exercice(ex_id, 15.0)
+
+    with pytest.raises(PeriodeClotureeError):
+        _add_op(compte, "recette", "Nouvelle", 1.0, "2025-07-01", cat)
+    assert update_operation(op, montant=99.0) is False
+    assert update_operation(hors, date_operation="2025-07-01") is False
+    assert annuler_operation(op) is False
+    assert delete_operation(op) is False
+    assert float(get_operation_by_id(op)["montant"]) == 10.0
+
+    conn = get_connection()
+    try:
+        with pytest.raises(PeriodeClotureeError):
+            upsert_operation_auto(
+                conn, "don", 1, type_operation="recette", libelle="Don", montant=500.0,
+                date_operation="2025-06-01", categorie_id=cat, mode_paiement="especes",
+                commentaire=None,
+            )
+        with pytest.raises(PeriodeClotureeError):
+            upsert_operation_auto(
+                conn, "don", 2, type_operation="recette", libelle="Don2", montant=1.0,
+                date_operation="2025-08-01", categorie_id=cat, mode_paiement="especes",
+                commentaire=None,
+            )
+    finally:
+        conn.close()
+    # Hors période : toujours modifiable
+    assert update_operation(hors, montant=11.0) is True
+    # Après réouverture : modifiable
+    assert decloturer_exercice(ex_id)
+    assert update_operation(op, montant=99.0) is True
+
+
+def test_commentaire_cloture_journalise(tmp_db):
+    _setup(tmp_db)
+    ex_id = add_exercice("2025", "civile", "2025-01-01", "2025-12-31", 0.0)
+    assert cloturer_exercice(ex_id, 0.0, "Validé en AG")
+    logs = get_log_exercice(ex_id)
+    assert logs[0]["action"] == "cloture"
+    assert logs[0]["commentaire"] == "Validé en AG"
+
+
+def test_cloture_refusee_avec_operations_en_attente(tmp_db):
+    _setup(tmp_db)
+    compte, cat = _ctx()
+    ex_id = add_exercice("2025", "civile", "2025-01-01", "2025-12-31", 0.0)
+    _add_op(compte, "recette", "Attente", 1.0, "2025-02-01", cat, "en_attente")
+    assert cloturer_exercice(ex_id, 0.0) is False
+    assert get_exercice_by_id(ex_id)["statut"] == "ouvert"

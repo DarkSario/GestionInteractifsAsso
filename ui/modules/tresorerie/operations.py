@@ -87,16 +87,24 @@ _STATUTS = {
 }
 
 
-def _periode_contient_cloture() -> bool | None:
-    """Retourne True si des opérations rapprochées signalent une période clôturée."""
+def _periode_contient_cloture(
+    date_debut: str | None = None, date_fin: str | None = None
+) -> bool | None:
+    """Retourne True si la période (ou tout) recoupe un exercice clôturé."""
     try:
         from db.connection import get_connection
 
         conn = get_connection()
         try:
-            row = conn.execute(
-                "SELECT COUNT(*) AS nb FROM tresorerie_operations WHERE statut = 'rapproche'"
-            ).fetchone()
+            query = "SELECT COUNT(*) AS nb FROM exercices WHERE statut = 'cloture'"
+            params: list[str] = []
+            if date_debut:
+                query += " AND date_fin >= ?"
+                params.append(date_debut)
+            if date_fin:
+                query += " AND date_debut <= ?"
+                params.append(date_fin)
+            row = conn.execute(query, params).fetchone()
         finally:
             conn.close()
         return (row["nb"] if row else 0) > 0
@@ -354,7 +362,7 @@ class _DialogOperation(FormDialog):
                 cat_nom = formulaire["categorie"]
                 cat = next((c for c in categories if (c.get("nom") or "") == cat_nom), None)
                 cat_id = int(cat["id"]) if cat else None
-                update_operation(
+                ok = update_operation(
                     int(self._operation["id"]),
                     type_operation=formulaire["type_operation"],
                     libelle=formulaire["libelle"],
@@ -368,6 +376,11 @@ class _DialogOperation(FormDialog):
                     avance_par_membre_id=formulaire["avance_par_membre_id"],
                     remboursement_statut=formulaire["remboursement_statut"],
                 )
+                if not ok:
+                    raise ValueError(
+                        "Modification impossible : la période est clôturée "
+                        "ou l'opération n'est pas modifiable."
+                    )
             else:
                 enregistrer_operation_depuis_formulaire(formulaire)
         except Exception as exc:
@@ -400,36 +413,26 @@ class _OperationsTab(ctk.CTkFrame):
         header.pack(fill="x", padx=12, pady=(10, 6))
         ctk.CTkLabel(header, text="📋 Opérations", font=fonts.get("subtitle")).pack(side="left")
 
-        ctk.CTkButton(
+        self._boutons_edition: list[Any] = []
+        self._boutons_edition.append(ctk.CTkButton(
             header,
             text="+ Recette",
             width=110,
             fg_color=colors.get("primary", "#1f6aa5"),
             hover_color=colors.get("secondary", "#144870"),
             command=lambda: self._ouvrir_formulaire("recette"),
-        ).pack(side="right")
-        ctk.CTkButton(
-            header,
-            text="+ Dépense",
-            width=110,
-            command=lambda: self._ouvrir_formulaire("depense"),
-        ).pack(side="right", padx=(0, 8))
-        ctk.CTkButton(
-            header,
-            text="✏️ Modifier",
-            width=110,
-            fg_color="gray",
-            hover_color="#555",
-            command=self._modifier_operation,
-        ).pack(side="right", padx=(0, 8))
-        ctk.CTkButton(
-            header,
-            text="🗑️ Supprimer",
-            width=110,
-            fg_color="#b71c1c",
-            hover_color="#7f0000",
-            command=self._supprimer_operation,
-        ).pack(side="right", padx=(0, 8))
+        ))
+        self._boutons_edition[-1].pack(side="right")
+        for texte, kwargs in (
+            ("+ Dépense", {"command": lambda: self._ouvrir_formulaire("depense")}),
+            ("✏️ Modifier", {"fg_color": "gray", "hover_color": "#555",
+                             "command": self._modifier_operation}),
+            ("🗑️ Supprimer", {"fg_color": "#b71c1c", "hover_color": "#7f0000",
+                              "command": self._supprimer_operation}),
+        ):
+            bouton = ctk.CTkButton(header, text=texte, width=110, **kwargs)
+            bouton.pack(side="right", padx=(0, 8))
+            self._boutons_edition.append(bouton)
         ctk.CTkButton(
             header,
             text="🔄 Actualiser",
@@ -439,28 +442,18 @@ class _OperationsTab(ctk.CTkFrame):
             command=self.refresh,
         ).pack(side="right", padx=(0, 8))
 
-        etat_cloture = _periode_contient_cloture()
-        if etat_cloture:
-            bandeau = ctk.CTkFrame(self, fg_color="#fff3e0", corner_radius=6)
-            bandeau.pack(fill="x", padx=12, pady=(0, 4))
-            ctk.CTkLabel(
-                bandeau,
-                text="🔒 Période clôturée — Les opérations affichées sont en lecture seule",
-                font=fonts.get("bold"),
-                text_color="#e65100",
-            ).pack(padx=12, pady=6)
-        elif etat_cloture is None:
-            bandeau = ctk.CTkFrame(self, fg_color="#fff3e0", corner_radius=6)
-            bandeau.pack(fill="x", padx=12, pady=(0, 4))
-            ctk.CTkLabel(
-                bandeau,
-                text="⚠️ Impossible de vérifier l'état de clôture de la période",
-                font=fonts.get("bold"),
-                text_color="#e65100",
-            ).pack(padx=12, pady=6)
+        self._bandeau_cloture = ctk.CTkFrame(self, fg_color="#fff3e0", corner_radius=6)
+        self._lbl_bandeau_cloture = ctk.CTkLabel(
+            self._bandeau_cloture,
+            text="",
+            font=fonts.get("bold"),
+            text_color="#e65100",
+        )
+        self._lbl_bandeau_cloture.pack(padx=12, pady=6)
 
         contenu = ctk.CTkFrame(self, fg_color="transparent")
         contenu.pack(fill="both", expand=True, padx=12, pady=6)
+        self._contenu = contenu
 
         # Barre de filtres
         barre_filtres = ctk.CTkFrame(contenu, fg_color="transparent")
@@ -504,7 +497,28 @@ class _OperationsTab(ctk.CTkFrame):
         self._lbl_stats = ctk.CTkLabel(self, text="")
         self._lbl_stats.pack(anchor="w", padx=12, pady=(0, 10))
 
+    def _appliquer_etat_cloture(self, date_debut: str | None, date_fin: str | None) -> None:
+        """Aligne bandeau et boutons d'édition sur le verrou réel de la période."""
+        etat = _periode_contient_cloture(date_debut, date_fin)
+        self._periode_cloturee = bool(etat)
+        for bouton in getattr(self, "_boutons_edition", []):
+            bouton.configure(state="disabled" if etat else "normal")
+        if etat:
+            texte = "🔒 Période clôturée — Les opérations affichées sont en lecture seule"
+        elif etat is None:
+            texte = "⚠️ Impossible de vérifier l'état de clôture de la période"
+        else:
+            self._bandeau_cloture.pack_forget()
+            return
+        self._lbl_bandeau_cloture.configure(text=texte)
+        self._bandeau_cloture.pack(
+            fill="x", padx=12, pady=(0, 4), before=self._contenu
+        )
+
     def _ouvrir_formulaire(self, type_operation: str) -> None:
+        if getattr(self, "_periode_cloturee", False):
+            afficher_info(self, "Opérations", "La période est clôturée : ajout impossible.")
+            return
         if not self._comptes:
             afficher_info(self, "Opérations", "Créez d'abord un compte actif.")
             return
@@ -516,6 +530,9 @@ class _OperationsTab(ctk.CTkFrame):
         self.wait_window(popup)
 
     def _modifier_operation(self) -> None:
+        if getattr(self, "_periode_cloturee", False):
+            afficher_info(self, "Opérations", "La période est clôturée : modification impossible.")
+            return
         selected = self._tree.selection()
         if not selected:
             afficher_info(self, "Opérations", "Sélectionnez une opération à modifier.")
@@ -539,6 +556,9 @@ class _OperationsTab(ctk.CTkFrame):
         self.wait_window(popup)
 
     def _supprimer_operation(self) -> None:
+        if getattr(self, "_periode_cloturee", False):
+            afficher_info(self, "Opérations", "La période est clôturée : suppression impossible.")
+            return
         selected = self._tree.selection()
         if not selected:
             afficher_info(self, "Opérations", "Sélectionnez une opération à supprimer.")
@@ -613,6 +633,7 @@ class _OperationsTab(ctk.CTkFrame):
             date_debut, date_fin = self._exercices_map.get(exercice_label, (None, None))
         except AttributeError:
             pass
+        self._appliquer_etat_cloture(date_debut, date_fin)
 
         # Exclure les dépôts espèces et remises chèques (traçabilité bancaire uniquement)
         operations = get_operations(
