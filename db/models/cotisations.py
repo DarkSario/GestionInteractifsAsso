@@ -299,6 +299,11 @@ def delete_cotisation(cotisation_id: int) -> bool:
     conn = get_connection()
     try:
         conn.execute("DELETE FROM cotisations WHERE id = ?", (cotisation_id,))
+        conn.execute(
+            "UPDATE tresorerie_operations SET statut = 'annule' "
+            "WHERE source_module = 'cotisation' AND source_id = ? AND statut != 'annule'",
+            (cotisation_id,),
+        )
         conn.commit()
         return True
     except Exception as exc:

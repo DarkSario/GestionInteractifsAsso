@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import csv
-from datetime import date
 
 import pytest
 
@@ -217,3 +216,36 @@ def test_export_csv_exclut_tracabilite(dataset, tmp_path):
     with open(fichier, encoding="utf-8-sig", newline="") as f:
         lignes = list(csv.reader(f, delimiter=";"))[1:]
     assert len(lignes) == 2
+
+
+def test_suppression_cotisation_neutralise_ecriture(db_fin):
+    from db.models.cotisations import add_cotisation, delete_cotisation
+
+    cid = add_cotisation(_membre_id(db_fin), 2026, 20.0, "payee", date_paiement="2026-01-10", mode_paiement="especes")
+    assert [o["statut"] for o in _ops("cotisation", cid)] == ["valide"]
+    assert delete_cotisation(cid)
+    assert [o["statut"] for o in _ops("cotisation", cid)] == ["annule"]
+
+
+def test_suppression_don_neutralise_ecriture(db_fin):
+    from db.models.dons import add_don, delete_don
+
+    don_id = add_don(donateur_nom="Martin", nature_don="argent", montant=40.0, date_don="2026-02-01")
+    assert [o["statut"] for o in _ops("don", don_id)] == ["valide"]
+    assert delete_don(don_id)
+    assert [o["statut"] for o in _ops("don", don_id)] == ["annule"]
+
+
+@pytest.mark.parametrize("champs", [{"nature_don": "nature", "valeur_estimee": 30.0}, {"montant": 0}])
+def test_requalification_don_annule_puis_restaure(db_fin, champs):
+    from db.models.dons import add_don, update_don
+
+    don_id = add_don(donateur_nom="Martin", nature_don="argent", montant=40.0, date_don="2026-02-01")
+    update_don(don_id, **champs)
+    update_don(don_id, **champs)
+    assert [o["statut"] for o in _ops("don", don_id)] == ["annule"]
+
+    update_don(don_id, nature_don="argent", montant=40.0)
+    update_don(don_id, nature_don="argent", montant=40.0)
+    ops = _ops("don", don_id)
+    assert len(ops) == 1 and ops[0]["statut"] == "valide" and ops[0]["montant"] == 40.0
