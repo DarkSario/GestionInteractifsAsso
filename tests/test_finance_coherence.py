@@ -249,3 +249,55 @@ def test_requalification_don_annule_puis_restaure(db_fin, champs):
     update_don(don_id, nature_don="argent", montant=40.0)
     ops = _ops("don", don_id)
     assert len(ops) == 1 and ops[0]["statut"] == "valide" and ops[0]["montant"] == 40.0
+
+
+# ── Clôture d'exercice : le statut « rapproche » reste comptabilisé ──────────
+
+
+def test_rapproche_comptabilise_dans_regle_canonique():
+    op = {"type_operation": "recette", "montant": 40, "statut": "rapproche"}
+    assert montant_signe(op) == 40
+    assert totaux_operations([op])["solde"] == 40.0
+
+
+def test_totaux_identiques_avant_et_apres_cloture(dataset):
+    from core.bilan_ag import collecter_donnees_bilan
+    from db.models.cloture import cloturer_exercice, decloturer_exercice, get_stats_exercice
+    from db.models.dashboard import get_recettes_depenses_mois
+    from db.models.tresorerie import get_solde_compte, get_stats_tresorerie
+
+    def snapshot():
+        stats = get_stats_tresorerie()
+        dash = get_recettes_depenses_mois(2026, 5)
+        bilan = collecter_donnees_bilan(900)
+        ex = get_stats_exercice(900)
+        return {
+            "treso": (stats["total_recettes"], stats["total_depenses"], stats["solde"]),
+            "dash": (dash["total_recettes"], dash["total_depenses"]),
+            "bilan": (bilan["total_recettes"], bilan["total_depenses"], bilan["solde"]),
+            "exercice": (ex["total_recettes"], ex["total_depenses"], ex["nb_operations"]),
+            "solde_compte": get_solde_compte(dataset),
+        }
+
+    avant = snapshot()
+    assert avant["treso"] == (200.0, 50.0, 150.0)
+    assert avant["exercice"] == (200.0, 50.0, 2)
+
+    assert cloturer_exercice(900, 150.0)
+    conn = db_module_conn()
+    try:
+        statuts = {r["statut"] for r in conn.execute(
+            "SELECT statut FROM tresorerie_operations WHERE source_module = 'manuel'")}
+    finally:
+        conn.close()
+    assert statuts == {"rapproche"}
+    assert snapshot() == avant
+
+    assert decloturer_exercice(900)
+    assert snapshot() == avant
+
+
+def db_module_conn():
+    import db.connection as db_module
+
+    return db_module.get_connection()

@@ -476,7 +476,9 @@ def get_operations(
     if categorie_id:
         query += " AND o.categorie_id = ?"
         params.append(categorie_id)
-    if statut:
+    if statut == "comptable":
+        query += " AND o.statut IN ('valide', 'rapproche')"
+    elif statut:
         query += " AND o.statut = ?"
         params.append(statut)
     if evenement_id:
@@ -886,7 +888,7 @@ def get_stats_tresorerie(compte_id=None, date_debut=None, date_fin=None) -> dict
         compte_id=compte_id,
         date_debut=date_debut,
         date_fin=date_fin,
-        statut="valide",
+        statut="comptable",
         exclude_non_comptable=True,
     )
 
@@ -921,7 +923,7 @@ def get_evolution_solde(compte_id: int, nb_mois=12) -> list[dict]:
         return []
 
     solde_initial = float(compte.get("solde_initial") or 0)
-    operations = get_operations(compte_id=compte_id, statut="valide")
+    operations = get_operations(compte_id=compte_id, statut="comptable")
 
     # On cumule mois par mois depuis le plus ancien demandé.
     today = date.today().replace(day=1)

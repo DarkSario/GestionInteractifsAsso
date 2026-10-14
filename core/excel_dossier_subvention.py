@@ -207,7 +207,7 @@ class ExcelDossierSubvention:
                 # Recettes
                 row = conn.execute(
                     f"""SELECT COALESCE(SUM(montant), 0) as total FROM tresorerie_operations
-                       WHERE type_operation = 'recette' AND statut = 'valide'
+                       WHERE type_operation = 'recette' AND statut IN ('valide', 'rapproche')
                          AND {sql_filtre_comptable()}
                          AND date_operation >= ? AND date_operation <= ?""",
                     (self._date_debut, self._date_fin),
@@ -218,7 +218,7 @@ class ExcelDossierSubvention:
                 # Dépenses
                 row = conn.execute(
                     f"""SELECT COALESCE(SUM(montant), 0) as total FROM tresorerie_operations
-                       WHERE type_operation = 'depense' AND statut = 'valide'
+                       WHERE type_operation = 'depense' AND statut IN ('valide', 'rapproche')
                          AND {sql_filtre_comptable()}
                          AND date_operation >= ? AND date_operation <= ?""",
                     (self._date_debut, self._date_fin),
@@ -257,7 +257,7 @@ class ExcelDossierSubvention:
                        LEFT JOIN tresorerie_categories c ON o.categorie_id = c.id
                        LEFT JOIN comptes_bancaires cp ON o.compte_id = cp.id
                        WHERE o.date_operation >= ? AND o.date_operation <= ?
-                         AND o.statut = 'valide'
+                         AND o.statut IN ('valide', 'rapproche')
                          AND o.type_operation IN ('recette', 'depense')
                          AND {sql_filtre_comptable('o')}
                        ORDER BY o.date_operation""",
@@ -335,7 +335,7 @@ class ExcelDossierSubvention:
                        FROM tresorerie_operations o
                        LEFT JOIN tresorerie_categories c ON o.categorie_id = c.id
                        WHERE o.date_operation >= ? AND o.date_operation <= ?
-                         AND o.statut = 'valide'
+                         AND o.statut IN ('valide', 'rapproche')
                          AND {sql_filtre_comptable('o')}
                        GROUP BY c.nom, o.type_operation
                        ORDER BY c.nom, o.type_operation""",

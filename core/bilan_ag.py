@@ -231,7 +231,7 @@ def collecter_donnees_bilan(
                     COALESCE(SUM(CASE WHEN type_operation = 'depense' THEN montant ELSE 0 END), 0) AS depenses
                 FROM tresorerie_operations
                 WHERE date_operation BETWEEN ? AND ?
-                  AND statut = 'valide'
+                  AND statut IN ('valide', 'rapproche')
                   AND {sql_filtre_comptable()}
                 """,
                 (periode_debut, periode_fin),
@@ -261,7 +261,7 @@ def collecter_donnees_bilan(
                     COALESCE(SUM(CASE WHEN o.type_operation = 'depense' THEN o.montant ELSE 0 END), 0) AS total_depenses
                 FROM evenements e
                 LEFT JOIN tresorerie_operations o ON o.evenement_id = e.id
-                    AND o.statut = 'valide'
+                    AND o.statut IN ('valide', 'rapproche')
                     AND {sql_filtre_comptable('o')}
                 WHERE e.date_debut BETWEEN ? AND ?
                 GROUP BY e.id, e.nom, e.date_debut

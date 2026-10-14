@@ -28,7 +28,7 @@ class PdfReleverCompte(BasePDF):
         if not compte:
             raise ValueError(f"Compte introuvable : id={self._compte_id}")
 
-        operations = get_operations(compte_id=self._compte_id, statut="valide")
+        operations = get_operations(compte_id=self._compte_id, statut="comptable")
         operations = sorted(operations, key=lambda op: (str(op.get("date_operation") or ""), int(op.get("id") or 0)))
 
         solde_depart = float(compte.get("solde_initial") or 0)

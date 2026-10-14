@@ -486,7 +486,7 @@ class PdfDossierSubvention(PdfBasePro):
                        FROM tresorerie_operations o
                        LEFT JOIN tresorerie_categories c ON o.categorie_id = c.id
                        WHERE o.date_operation >= ? AND o.date_operation <= ?
-                         AND o.statut = 'valide'
+                         AND o.statut IN ('valide', 'rapproche')
                          AND {sql_filtre_comptable('o')}
                        GROUP BY c.nom, o.type_operation
                        ORDER BY c.nom, o.type_operation""",
@@ -536,7 +536,7 @@ class PdfDossierSubvention(PdfBasePro):
                        FROM comptes_bancaires c
                        LEFT JOIN tresorerie_operations o ON o.compte_id = c.id
                            AND o.date_operation >= ? AND o.date_operation <= ?
-                           AND o.statut = 'valide'
+                           AND o.statut IN ('valide', 'rapproche')
                            AND {sql_filtre_comptable('o')}
                        WHERE c.actif = 1
                        GROUP BY c.id, c.nom
