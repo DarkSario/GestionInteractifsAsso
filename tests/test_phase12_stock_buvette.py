@@ -10,6 +10,7 @@ from core.budget_evenement import (
     get_seuil_rentabilite,
     sauvegarder_budget,
 )
+from core.stock import get_types_mouvements, valider_article, valider_mouvement
 from core.inventaire import (
     calculer_cout_buvette_evenement,
     creer_inventaire,
@@ -34,7 +35,7 @@ from core.stock_v2 import (
 from db.connection import get_connection, set_db_file
 from db.migrations.runner import run_migrations
 from db.models.evenements import add_depense, add_evenement, add_tarif, add_vente, add_vente_ligne
-from db.models.stock import add_article, get_article_by_id
+from db.models.stock import add_article, add_mouvement, get_article_by_id
 
 
 @pytest.fixture(autouse=True)
@@ -133,6 +134,29 @@ def test_lots_synchronisent_la_quantite_historique():
 
     assert get_stock_theorique(article_id) == 6
     assert get_article_by_id(article_id)["quantite"] == 6
+
+
+def test_api_stock_historique_reste_compatible():
+    article_id = _create_article("Stock historique")
+
+    assert get_types_mouvements()[-1] == "Inventaire"
+    assert valider_article("Article", 1, 1, "0", "0", "1,50") == []
+    assert valider_mouvement("Entrée — Achat", "2026-01-01", "3", "1,50") == []
+
+    mouvement_id = add_mouvement(
+        article_id,
+        "2026-01-01",
+        "Entrée — Achat",
+        3,
+        1.5,
+        None,
+        None,
+        None,
+        None,
+    )
+
+    assert mouvement_id > 0
+    assert get_article_by_id(article_id)["quantite"] == 3
 
 
 def test_articles_peremption_proche():

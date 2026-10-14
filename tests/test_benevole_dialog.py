@@ -271,6 +271,29 @@ def test_dialog_modules(monkeypatch):
     assert dialog.destroyed is True
 
 
+def test_dialogues_extraits_reexportes_par_fiche(monkeypatch):
+    fiche = _load_fiche_module_with_ui_stubs(monkeypatch)
+    import importlib
+
+    benevole_dialog = importlib.import_module(
+        "ui.modules.evenements.benevole_dialog"
+    )
+    billetterie_dialogs = importlib.import_module(
+        "ui.modules.evenements.billetterie_dialogs"
+    )
+    modules_dialog = importlib.import_module(
+        "ui.modules.evenements.modules_dialog"
+    )
+    constantes = importlib.import_module("ui.modules.evenements.constantes")
+
+    assert fiche._DialogBenevole is benevole_dialog._DialogBenevole
+    assert fiche._DialogTarif is billetterie_dialogs._DialogTarif
+    assert fiche._DialogVente is billetterie_dialogs._DialogVente
+    assert fiche._DialogMotif is billetterie_dialogs._DialogMotif
+    assert fiche._DialogModules is modules_dialog._DialogModules
+    assert fiche.MODES_PAIEMENT is constantes.MODES_PAIEMENT
+
+
 def test_onglets_modules_a_masquer(monkeypatch):
     fiche = _load_fiche_module_with_ui_stubs(monkeypatch)
 
