@@ -508,95 +508,93 @@ def annuler_operations_auto(conn, source_module: str, source_id) -> int:
 
 
 def update_operation(operation_id, **kwargs) -> bool:
-    operation = _fetch_one(
-        "SELECT est_automatique, date_operation FROM tresorerie_operations WHERE id = ?",
-        (operation_id,),
-    )
-    if not operation:
-        return False
-    if int(operation.get("est_automatique") or 0) == 1:
-        return False
-
     allowed = {
-        "compte_id": "UPDATE tresorerie_operations SET compte_id = ? WHERE id = ?",
-        "type_operation": "UPDATE tresorerie_operations SET type_operation = ? WHERE id = ?",
-        "libelle": "UPDATE tresorerie_operations SET libelle = ? WHERE id = ?",
-        "montant": "UPDATE tresorerie_operations SET montant = ? WHERE id = ?",
-        "date_operation": "UPDATE tresorerie_operations SET date_operation = ? WHERE id = ?",
-        "categorie_id": "UPDATE tresorerie_operations SET categorie_id = ? WHERE id = ?",
-        "mode_paiement": "UPDATE tresorerie_operations SET mode_paiement = ? WHERE id = ?",
-        "numero_facture": "UPDATE tresorerie_operations SET numero_facture = ? WHERE id = ?",
-        "evenement_id": "UPDATE tresorerie_operations SET evenement_id = ? WHERE id = ?",
-        "fournisseur_id": "UPDATE tresorerie_operations SET fournisseur_id = ? WHERE id = ?",
-        "statut": "UPDATE tresorerie_operations SET statut = ? WHERE id = ?",
-        "commentaire": "UPDATE tresorerie_operations SET commentaire = ? WHERE id = ?",
-        "avance_par_membre_id": "UPDATE tresorerie_operations SET avance_par_membre_id = ? WHERE id = ?",
-        "remboursement_statut": "UPDATE tresorerie_operations SET remboursement_statut = ? WHERE id = ?",
-        "remboursement_date": "UPDATE tresorerie_operations SET remboursement_date = ? WHERE id = ?",
-        "remboursement_mode": "UPDATE tresorerie_operations SET remboursement_mode = ? WHERE id = ?",
-        "remboursement_reference": "UPDATE tresorerie_operations SET remboursement_reference = ? WHERE id = ?",
+        "compte_id", "type_operation", "libelle", "montant", "date_operation",
+        "categorie_id", "mode_paiement", "numero_facture", "evenement_id",
+        "fournisseur_id", "statut", "commentaire", "avance_par_membre_id",
+        "remboursement_statut", "remboursement_date", "remboursement_mode",
+        "remboursement_reference",
     }
-    updates: list[tuple[str, Any]] = []
-    for key, value in kwargs.items():
-        if key not in allowed:
-            continue
-        updates.append((allowed[key], value))
-
+    updates = [(k, v) for k, v in kwargs.items() if k in allowed]
     if not updates:
         return False
 
     conn = get_connection()
     try:
-        if periode_cloturee_conn(
-            conn, operation.get("date_operation"), kwargs.get("date_operation")
-        ):
+        conn.execute("BEGIN IMMEDIATE")
+        operation = conn.execute(
+            "SELECT est_automatique, date_operation FROM tresorerie_operations WHERE id = ?",
+            (operation_id,),
+        ).fetchone()
+        if not operation or int(operation["est_automatique"] or 0) == 1:
+            conn.rollback()
             return False
-        for statement, value in updates:
-            conn.execute(statement, (value, operation_id))
+        if periode_cloturee_conn(
+            conn, operation["date_operation"], kwargs.get("date_operation")
+        ):
+            conn.rollback()
+            return False
+        for key, value in updates:
+            conn.execute(
+                f"UPDATE tresorerie_operations SET {key} = ? WHERE id = ?",
+                (value, operation_id),
+            )
         conn.commit()
+        return True
+    except Exception:
+        conn.rollback()
+        raise
     finally:
         conn.close()
-    return True
 
 
 def annuler_operation(operation_id: int) -> bool:
-    operation = get_operation_by_id(operation_id)
-    if not operation:
-        return False
-
     conn = get_connection()
     try:
-        if periode_cloturee_conn(conn, operation.get("date_operation")):
+        conn.execute("BEGIN IMMEDIATE")
+        operation = conn.execute(
+            "SELECT date_operation FROM tresorerie_operations WHERE id = ?",
+            (operation_id,),
+        ).fetchone()
+        if not operation or periode_cloturee_conn(conn, operation["date_operation"]):
+            conn.rollback()
             return False
         conn.execute(
             "UPDATE tresorerie_operations SET statut = 'annule' WHERE id = ?",
             (operation_id,),
         )
         conn.commit()
+        return True
+    except Exception:
+        conn.rollback()
+        raise
     finally:
         conn.close()
-    return True
 
 
 def delete_operation(operation_id: int) -> bool:
     """Supprime définitivement une opération manuelle."""
-    operation = _fetch_one(
-        "SELECT est_automatique, date_operation FROM tresorerie_operations WHERE id = ?",
-        (operation_id,),
-    )
-    if not operation:
-        return False
-    if int(operation.get("est_automatique") or 0) == 1:
-        return False
     conn = get_connection()
     try:
-        if periode_cloturee_conn(conn, operation.get("date_operation")):
+        conn.execute("BEGIN IMMEDIATE")
+        operation = conn.execute(
+            "SELECT est_automatique, date_operation FROM tresorerie_operations WHERE id = ?",
+            (operation_id,),
+        ).fetchone()
+        if not operation or int(operation["est_automatique"] or 0) == 1:
+            conn.rollback()
+            return False
+        if periode_cloturee_conn(conn, operation["date_operation"]):
+            conn.rollback()
             return False
         conn.execute("DELETE FROM tresorerie_operations WHERE id = ?", (operation_id,))
         conn.commit()
+        return True
+    except Exception:
+        conn.rollback()
+        raise
     finally:
         conn.close()
-    return True
 
 
 def get_operations(
