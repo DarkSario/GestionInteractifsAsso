@@ -23,12 +23,29 @@ _ALLOWED_FIELDS = {
 _COLUMN_SQL = {field: field for field in _ALLOWED_FIELDS}
 
 
+def _annuler_operation_tresorerie_don(don_id: int) -> None:
+    """Neutralise (statut 'annule') l'opération automatique liée à un don."""
+    conn = get_connection()
+    try:
+        conn.execute(
+            "UPDATE tresorerie_operations SET statut = 'annule' "
+            "WHERE source_module = 'don' AND source_id = ? AND statut != 'annule'",
+            (don_id,),
+        )
+        conn.commit()
+    except Exception as exc:  # noqa: BLE001
+        logger.error("_annuler_operation_tresorerie_don (don %s): %s", don_id, exc)
+    finally:
+        conn.close()
+
+
 def _sync_operation_tresorerie_don(don_id: int, don_data: dict) -> None:
     """Crée ou met à jour l'opération trésorerie liée à un don en argent."""
     try:
         nature_don = (don_data.get('nature_don') or 'argent').lower()
         montant = float(don_data.get('montant') or 0)
         if nature_don != 'argent' or montant <= 0:
+            _annuler_operation_tresorerie_don(don_id)
             return
 
         from db.models.tresorerie import add_operation, get_all_comptes, get_all_categories
@@ -264,9 +281,10 @@ def delete_don(don_id: int) -> bool:
     try:
         conn.execute('DELETE FROM dons WHERE id = ?', (don_id,))
         conn.commit()
-        return True
     finally:
         conn.close()
+    _annuler_operation_tresorerie_don(don_id)
+    return True
 
 
 def marquer_recu_emis(don_id: int) -> bool:

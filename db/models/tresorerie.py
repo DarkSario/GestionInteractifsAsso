@@ -7,7 +7,6 @@ from typing import Any
 
 from db.connection import get_connection
 from utils.finance_rules import (
-    SOURCES_NON_COMPTABLES as _SOURCES_NON_COMPTABLES,
     montant_signe as _montant_signe,
     sql_filtre_comptable,
 )
