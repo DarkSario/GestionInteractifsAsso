@@ -150,13 +150,17 @@ def update_lot(lot_id, **kwargs) -> bool:
 
 def delete_lot(lot_id: int) -> bool:
     """Supprime un lot."""
+    from db.models.tresorerie import annuler_operations_auto
+
     conn = get_connection()
     try:
         cur = conn.execute("DELETE FROM tombola_lots WHERE id = ?", (lot_id,))
+        annuler_operations_auto(conn, "tombola_remboursement", lot_id)
         conn.commit()
         return cur.rowcount > 0
     except Exception as exc:
         logger.error("delete_lot: %s", exc)
+        conn.rollback()
         return False
     finally:
         conn.close()

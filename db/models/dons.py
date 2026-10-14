@@ -23,102 +23,40 @@ _ALLOWED_FIELDS = {
 _COLUMN_SQL = {field: field for field in _ALLOWED_FIELDS}
 
 
-def _annuler_operation_tresorerie_don(don_id: int) -> None:
-    """Neutralise (statut 'annule') l'opération automatique liée à un don."""
-    conn = get_connection()
-    try:
-        conn.execute(
-            "UPDATE tresorerie_operations SET statut = 'annule' "
-            "WHERE source_module = 'don' AND source_id = ? AND statut != 'annule'",
-            (don_id,),
-        )
-        conn.commit()
-    except Exception as exc:  # noqa: BLE001
-        logger.error("_annuler_operation_tresorerie_don (don %s): %s", don_id, exc)
-    finally:
-        conn.close()
+def _sync_operation_tresorerie_don(conn, don_id: int, don_data: dict) -> None:
+    """Crée, met à jour ou neutralise l'opération trésorerie liée à un don.
 
+    Utilise la connexion fournie sans commit (même transaction que le don) ;
+    les erreurs sont propagées. Un don non monétaire ou de montant nul annule
+    l'écriture existante (statut 'annule', historique conservé).
+    """
+    from db.models.tresorerie import (
+        annuler_operations_auto,
+        get_categorie_id_par_mot,
+        upsert_operation_auto,
+    )
 
-def _sync_operation_tresorerie_don(don_id: int, don_data: dict) -> None:
-    """Crée ou met à jour l'opération trésorerie liée à un don en argent."""
-    try:
-        nature_don = (don_data.get('nature_don') or 'argent').lower()
-        montant = float(don_data.get('montant') or 0)
-        if nature_don != 'argent' or montant <= 0:
-            _annuler_operation_tresorerie_don(don_id)
-            return
+    nature_don = (don_data.get('nature_don') or 'argent').lower()
+    montant = float(don_data.get('montant') or 0)
+    if nature_don != 'argent' or montant <= 0:
+        annuler_operations_auto(conn, 'don', don_id)
+        return
 
-        from db.models.tresorerie import add_operation, get_all_comptes, get_all_categories
-        from db.connection import get_connection as _gc
-
-        # Vérifier si une opération existe déjà pour ce don
-        _conn = _gc()
-        try:
-            row = _conn.execute(
-                "SELECT id FROM tresorerie_operations WHERE source_module = 'don' AND source_id = ?",
-                (don_id,),
-            ).fetchone()
-            existing_id = row[0] if row else None
-        finally:
-            _conn.close()
-
-        comptes = get_all_comptes(actif_only=True)
-        if not comptes:
-            return
-
-        categories = get_all_categories("recette")
-        cat_don = next(
-            (c for c in categories if "don" in (c.get("nom") or "").lower()),
-            None,
-        )
-
-        # Libellé du donateur
-        donateur = _build_nom_complet(
-            don_data.get('donateur_prenom'), don_data.get('donateur_nom'), defaut="Donateur"
-        )
-        date_don = str(don_data.get('date_don') or date.today().isoformat())
-        mode = don_data.get('mode_versement') or "autre"
-        compte_id = comptes[0]["id"]
-        cat_id = int(cat_don["id"]) if cat_don else None
-        libelle = f"Don — {donateur}"
-        commentaire = "Don automatique enregistré"
-
-        if existing_id:
-            _conn2 = _gc()
-            try:
-                _conn2.execute(
-                    """
-                    UPDATE tresorerie_operations
-                    SET montant = ?, date_operation = ?, mode_paiement = ?,
-                        categorie_id = ?, libelle = ?, statut = 'valide'
-                    WHERE source_module = 'don' AND source_id = ?
-                    """,
-                    (montant, date_don, mode, cat_id, libelle, don_id),
-                )
-                _conn2.commit()
-            finally:
-                _conn2.close()
-        else:
-            add_operation(
-                compte_id=compte_id,
-                type_operation="recette",
-                libelle=libelle,
-                montant=montant,
-                date_operation=date_don,
-                categorie_id=cat_id,
-                mode_paiement=mode,
-                numero_facture=None,
-                evenement_id=None,
-                fournisseur_id=None,
-                statut="valide",
-                est_automatique=1,
-                source_module="don",
-                source_id=don_id,
-                commentaire=commentaire,
-            )
-    except Exception as exc:  # noqa: BLE001
-        logger.error("_sync_operation_tresorerie_don (don %s): %s", don_id, exc)
-
+    donateur = _build_nom_complet(
+        don_data.get('donateur_prenom'), don_data.get('donateur_nom'), defaut="Donateur"
+    )
+    upsert_operation_auto(
+        conn,
+        'don',
+        don_id,
+        type_operation="recette",
+        libelle=f"Don — {donateur}",
+        montant=montant,
+        date_operation=str(don_data.get('date_don') or date.today().isoformat()),
+        categorie_id=get_categorie_id_par_mot(conn, "recette", "don"),
+        mode_paiement=don_data.get('mode_versement') or "autre",
+        commentaire="Don automatique enregistré",
+    )
 
 
 def _fetch_all(query: str, params: tuple[Any, ...] = ()) -> list[dict]:
@@ -178,14 +116,15 @@ def add_don(**kwargs) -> int:
             f'INSERT INTO dons ({colonnes}) VALUES ({placeholders})',
             tuple(valeurs),
         )
-        conn.commit()
         don_id = int(cur.lastrowid)
+        _sync_operation_tresorerie_don(conn, don_id, champs)
+        conn.commit()
+        return don_id
+    except Exception:
+        conn.rollback()
+        raise
     finally:
         conn.close()
-
-    if don_id:
-        _sync_operation_tresorerie_don(don_id, champs)
-    return don_id
 
 
 def get_all_dons(filters: dict[str, Any] | None = None) -> list[dict]:
@@ -261,30 +200,35 @@ def update_don(don_id: int, **kwargs) -> bool:
             f"UPDATE dons SET {', '.join(assignees)} WHERE id = ?",
             tuple(valeurs),
         )
+        row = conn.execute('SELECT * FROM dons WHERE id = ?', (don_id,)).fetchone()
+        if row:
+            _sync_operation_tresorerie_don(conn, don_id, dict(row))
         conn.commit()
-        ok = True
+        return True
     except Exception as exc:  # noqa: BLE001
         logger.error('update_don: %s', exc)
+        conn.rollback()
         return False
     finally:
         conn.close()
 
-    if ok:
-        don = get_don_by_id(don_id)
-        if don:
-            _sync_operation_tresorerie_don(don_id, don)
-    return ok
-
 
 def delete_don(don_id: int) -> bool:
+    """Supprime un don et neutralise son écriture dans la même transaction."""
+    from db.models.tresorerie import annuler_operations_auto
+
     conn = get_connection()
     try:
         conn.execute('DELETE FROM dons WHERE id = ?', (don_id,))
+        annuler_operations_auto(conn, 'don', don_id)
         conn.commit()
+        return True
+    except Exception as exc:  # noqa: BLE001
+        logger.error('delete_don(%s): %s', don_id, exc)
+        conn.rollback()
+        return False
     finally:
         conn.close()
-    _annuler_operation_tresorerie_don(don_id)
-    return True
 
 
 def marquer_recu_emis(don_id: int) -> bool:

@@ -11,45 +11,49 @@ from utils.logger import get_logger
 logger = get_logger(__name__)
 
 
+def _poster_remboursement_tombola(conn, lot_info: dict, mode: str, date_remboursement: str) -> None:
+    """Crée (idempotent) l'écriture de dépense d'un remboursement de lot tombola.
+
+    Aucun commit : l'appelant regroupe le marquage du lot et l'écriture dans une
+    même transaction. Les erreurs sont propagées.
+    """
+    montant_avance = lot_info.get('montant_avance')
+    if not montant_avance or float(montant_avance) <= 0:
+        return
+
+    from db.models.tresorerie import upsert_operation_auto
+
+    lot_id = lot_info.get('id')
+    beneficiaire_nom = _build_nom_complet(
+        lot_info.get('membre_prenom'), lot_info.get('membre_nom'), defaut="Bénéficiaire inconnu"
+    )
+    description = lot_info.get('description') or f"Lot #{lot_id}"
+    upsert_operation_auto(
+        conn,
+        "tombola_remboursement",
+        lot_id,
+        type_operation="depense",
+        libelle=f"Remboursement lot tombola — {beneficiaire_nom}",
+        montant=float(montant_avance),
+        date_operation=date_remboursement,
+        categorie_id=None,
+        mode_paiement=mode or "especes",
+        commentaire=f"Remboursement automatique lot tombola #{lot_id} — {description}",
+        evenement_id=lot_info.get('evenement_id'),
+    )
+
+
 def _creer_operation_remboursement_tombola(lot_info: dict, mode: str, date_remboursement: str) -> None:
     """Crée une opération de dépense dans la trésorerie pour un remboursement de lot tombola."""
+    conn = get_connection()
     try:
-        montant_avance = lot_info.get('montant_avance')
-        if not montant_avance or float(montant_avance) <= 0:
-            return
-
-        from db.models.tresorerie import add_operation, get_all_comptes, get_operation_auto
-        if get_operation_auto("tombola_remboursement", lot_info.get('id')):
-            return
-        comptes = get_all_comptes(actif_only=True)
-        if not comptes:
-            return
-
-        lot_id = lot_info.get('id')
-        beneficiaire_nom = _build_nom_complet(
-            lot_info.get('membre_prenom'), lot_info.get('membre_nom'), defaut="Bénéficiaire inconnu"
-        )
-        description = lot_info.get('description') or f"Lot #{lot_id}"
-
-        add_operation(
-            compte_id=comptes[0]["id"],
-            type_operation="depense",
-            libelle=f"Remboursement lot tombola — {beneficiaire_nom}",
-            montant=float(montant_avance),
-            date_operation=date_remboursement,
-            categorie_id=None,
-            mode_paiement=mode or "especes",
-            numero_facture=None,
-            evenement_id=lot_info.get('evenement_id'),
-            fournisseur_id=None,
-            statut="valide",
-            est_automatique=1,
-            source_module="tombola_remboursement",
-            source_id=lot_id,
-            commentaire=f"Remboursement automatique lot tombola #{lot_id} — {description}",
-        )
-    except Exception as exc:  # noqa: BLE001
-        logger.error('_creer_operation_remboursement_tombola: %s', exc)
+        _poster_remboursement_tombola(conn, lot_info, mode, date_remboursement)
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
 
 
 _QUERY_EVENEMENTS = """
@@ -246,37 +250,40 @@ def marquer_rembourse(
     }
 
     if source == 'tombola':
+        conn = get_connection()
         try:
-            from db.models.tombola import marquer_rembourse_lot
-            from db.connection import get_connection as _gc
-
-            # Récupérer les infos du lot avant remboursement
-            _conn = _gc()
-            try:
-                _lot = _conn.execute(
-                    """
-                    SELECT tl.id, tl.montant_avance, tl.evenement_id, tl.description,
-                           m.nom AS membre_nom, m.prenom AS membre_prenom
-                    FROM tombola_lots tl
-                    LEFT JOIN membres m ON m.id = tl.acheteur_membre_id
-                    WHERE tl.id = ?
-                    """,
-                    (identifiant,),
-                ).fetchone()
-                lot_info = dict(_lot) if _lot else {}
-            finally:
-                _conn.close()
-
-            ok = marquer_rembourse_lot(identifiant, mode, reference, date)
-            if ok:
-                if not lot_info:
-                    logger.warning("marquer_rembourse (tombola): lot #%s introuvable, pas d'opération trésorerie créée", identifiant)
-                else:
-                    _creer_operation_remboursement_tombola(lot_info, mode, date)
-            return ok
-        except (ImportError, OSError) as exc:
+            lot = conn.execute(
+                """
+                SELECT tl.id, tl.montant_avance, tl.evenement_id, tl.description,
+                       m.nom AS membre_nom, m.prenom AS membre_prenom
+                FROM tombola_lots tl
+                LEFT JOIN membres m ON m.id = tl.acheteur_membre_id
+                WHERE tl.id = ?
+                """,
+                (identifiant,),
+            ).fetchone()
+            if not lot:
+                logger.warning("marquer_rembourse (tombola): lot #%s introuvable", identifiant)
+                return False
+            # Marquage du lot et écriture trésorerie : une seule transaction.
+            conn.execute(
+                """
+                UPDATE tombola_lots
+                SET remboursement_statut = 'rembourse', remboursement_mode = ?,
+                    remboursement_reference = ?, remboursement_date = ?
+                WHERE id = ?
+                """,
+                (mode or None, reference or None, date, identifiant),
+            )
+            _poster_remboursement_tombola(conn, dict(lot), mode, date)
+            conn.commit()
+            return True
+        except Exception as exc:  # noqa: BLE001
+            conn.rollback()
             logger.error('marquer_rembourse (tombola): %s', exc)
             return False
+        finally:
+            conn.close()
 
     table = tables.get(source, '')
     if not table:

@@ -154,6 +154,16 @@ def test_run_migrations_reconstruit_tables_caisses_si_absentes(tmp_db) -> None:
             )
             """
         )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS tresorerie_operations (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                statut TEXT,
+                source_module TEXT,
+                source_id INTEGER
+            )
+            """
+        )
         legacy_migrations = sorted(
             migration.name
             for migration in MIGRATIONS_DIR.glob("*.sql")
@@ -201,6 +211,7 @@ def test_run_migrations_reconstruit_tables_caisses_si_absentes(tmp_db) -> None:
     assert {
         "0021_evenement_caisses_detail.sql",
         "0022_caisse_designations.sql",
+        "0023_ecritures_auto_unique.sql",
     }.issubset(migrations)
 
 
@@ -240,6 +251,16 @@ def test_run_migrations_met_a_jour_evenement_caisses_historique(tmp_db) -> None:
             """
             INSERT INTO evenement_caisses (evenement_id, nom_caisse, commentaire)
             VALUES (1, 'Caisse historique', 'legacy')
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS tresorerie_operations (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                statut TEXT,
+                source_module TEXT,
+                source_id INTEGER
+            )
             """
         )
         legacy_migrations = sorted(
