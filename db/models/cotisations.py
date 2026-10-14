@@ -291,13 +291,16 @@ def renouveler_cotisations_masse(
 
         nb_crees = 0
         for row in rows:
-            conn.execute(
+            cur = conn.execute(
                 """
                 INSERT INTO cotisations
                     (adherent_id, exercice_id, annee, montant, statut)
                 VALUES (?, ?, ?, ?, ?)
                 """,
                 (row["id"], exercice_id, annee, montant, statut),
+            )
+            _sync_operation_tresorerie(
+                conn, cur.lastrowid, row["id"], annee, montant, statut, None, None,
             )
             nb_crees += 1
 

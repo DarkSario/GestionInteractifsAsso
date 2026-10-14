@@ -378,8 +378,8 @@ def get_operation_auto(source_module: str, source_id) -> dict | None:
 
 
 # Modules dont les écritures automatiques sont protégées par un index unique
-# (voir migration 0023) : une seule écriture non annulée par (module, source).
-SOURCES_AUTOMATIQUES = ("cotisation", "don", "tombola_remboursement")
+# (voir migrations 0023 et 0025) : une seule écriture non annulée par (module, source).
+SOURCES_AUTOMATIQUES = ("cotisation", "don", "tombola_remboursement", "subvention")
 
 
 _MODES_PAIEMENT = {
@@ -935,10 +935,54 @@ def update_subvention(subvention_id, **kwargs) -> bool:
     try:
         for statement, value in updates:
             conn.execute(statement, (value, subvention_id))
+        _sync_operation_subvention(conn, subvention_id)
         conn.commit()
+    except Exception as exc:
+        logger.exception("update_subvention(%s): %s", subvention_id, exc)
+        conn.rollback()
+        return False
     finally:
         conn.close()
     return True
+
+
+def _sync_operation_subvention(conn, subvention_id: int) -> int | None:
+    """Synchronise l'écriture de trésorerie d'une subvention avec son état courant.
+
+    Aucun commit : la subvention et son écriture sont enregistrées ensemble.
+    - accordée avec montant > 0 : crée, met à jour ou réactive l'unique écriture ;
+    - sinon : neutralise (statut 'annule') l'écriture existante, sans la supprimer.
+    Lève une exception si l'écriture ne peut pas être passée.
+    """
+    row = conn.execute("SELECT * FROM subventions WHERE id = ?", (subvention_id,)).fetchone()
+    if row is None:
+        return None
+    sub = dict(row)
+    montant = float(sub.get("montant_obtenu") or 0)
+    if sub.get("statut") == "accordee" and montant > 0:
+        operation_id = upsert_operation_auto(
+            conn,
+            "subvention",
+            subvention_id,
+            type_operation="recette",
+            libelle=f"Subvention {sub['organisme']}",
+            montant=montant,
+            date_operation=(
+                sub.get("date_versement") or sub.get("date_decision") or date.today().isoformat()
+            ),
+            categorie_id=get_categorie_id_par_mot(conn, "recette", "subvention"),
+            mode_paiement=None,
+            commentaire=sub.get("objet"),
+            compte_id=sub.get("compte_id"),
+        )
+        if operation_id is None:
+            raise ValueError("Aucun compte actif disponible pour la subvention")
+        conn.execute(
+            "UPDATE subventions SET operation_id = ? WHERE id = ?", (operation_id, subvention_id)
+        )
+        return operation_id
+    annuler_operations_auto(conn, "subvention", subvention_id)
+    return sub.get("operation_id")
 
 
 def accorder_subvention(
@@ -948,31 +992,10 @@ def accorder_subvention(
     date_versement: str,
     compte_id: int,
 ) -> bool:
-    subvention = _fetch_one("SELECT * FROM subventions WHERE id = ?", (subvention_id,))
-    if not subvention:
-        return False
-
     conn = get_connection()
     try:
-        op_cur = conn.execute(
-            """
-            INSERT INTO tresorerie_operations (
-                compte_id, type_operation, libelle, montant, date_operation,
-                statut, est_automatique, source_module, source_id, commentaire
-            )
-            VALUES (?, 'recette', ?, ?, ?, 'valide', 1, 'subvention', ?, ?)
-            """,
-            (
-                compte_id,
-                f"Subvention {subvention['organisme']}",
-                float(montant_obtenu or 0),
-                date_versement,
-                subvention_id,
-                subvention.get("objet"),
-            ),
-        )
-        operation_id = op_cur.lastrowid
-
+        if conn.execute("SELECT 1 FROM subventions WHERE id = ?", (subvention_id,)).fetchone() is None:
+            return False
         conn.execute(
             """
             UPDATE subventions
@@ -980,21 +1003,18 @@ def accorder_subvention(
                 montant_obtenu = ?,
                 date_decision = ?,
                 date_versement = ?,
-                compte_id = ?,
-                operation_id = ?
+                compte_id = ?
             WHERE id = ?
             """,
-            (
-                float(montant_obtenu or 0),
-                date_decision,
-                date_versement,
-                compte_id,
-                operation_id,
-                subvention_id,
-            ),
+            (float(montant_obtenu or 0), date_decision, date_versement, compte_id, subvention_id),
         )
+        _sync_operation_subvention(conn, subvention_id)
         conn.commit()
         return True
+    except Exception as exc:
+        logger.exception("accorder_subvention(%s): %s", subvention_id, exc)
+        conn.rollback()
+        return False
     finally:
         conn.close()
 

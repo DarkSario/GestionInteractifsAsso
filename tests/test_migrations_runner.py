@@ -212,6 +212,7 @@ def test_run_migrations_reconstruit_tables_caisses_si_absentes(tmp_db) -> None:
         "0021_evenement_caisses_detail.sql",
         "0022_caisse_designations.sql",
         "0023_ecritures_auto_unique.sql",
+        "0025_subventions_auto_unique.sql",
     }.issubset(migrations)
 
 
