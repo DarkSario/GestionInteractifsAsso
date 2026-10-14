@@ -17,7 +17,6 @@ from typing import Any
 
 import customtkinter as ctk
 
-from core.bilan_ag import reset_template_bilan
 from core.recus_fiscaux import (
     VARIABLES_TEMPLATE_ATTESTATION,
     VARIABLES_TEMPLATE_CERFA,
@@ -1112,33 +1111,17 @@ class ParametresApp(ctk.CTkToplevel):
 
         self._maj_apercu_couleurs_export()
 
-        # Modèle Bilan AG
+        # Bilan AG
         ctk.CTkLabel(frame, text="Bilan AG", font=fonts.get("subtitle")).pack(
             anchor="w", pady=(16, 4)
         )
         ctk.CTkLabel(
             frame,
-            text="Personnalisez le template Markdown du Bilan AG.",
+            text="Le PDF du Bilan AG utilise le générateur unique du menu Exports. "
+            "L'ancien template Markdown n'est plus utilisé.",
             font=fonts.get("small"),
             text_color="grey",
         ).pack(anchor="w")
-        f_bilan = ctk.CTkFrame(frame, fg_color="transparent")
-        f_bilan.pack(anchor="w", pady=(6, 0))
-        ctk.CTkButton(
-            f_bilan,
-            text="✏️ Modifier le modèle Bilan AG",
-            width=240,
-            command=self._ouvrir_editeur_template_bilan,
-        ).pack(side="left")
-        ctk.CTkButton(
-            f_bilan,
-            text="🔄 Restaurer le modèle par défaut",
-            width=240,
-            fg_color="#8b1a1a",
-            hover_color="#6b1414",
-            command=self._restaurer_template_bilan,
-        ).pack(side="left", padx=(8, 0))
-
 
         ctk.CTkLabel(frame, text="Reçus de dons", font=fonts.get("subtitle")).pack(
             anchor="w", pady=(18, 4)
@@ -1291,12 +1274,6 @@ class ParametresApp(ctk.CTkToplevel):
         if self._pdf_police_corps_var.get() not in valeurs_polices:
             self._pdf_police_corps_var.set(valeurs_polices[0])
 
-    def _ouvrir_editeur_template_bilan(self) -> None:
-        from ui.modules.administration.editeur_template_bilan import EditeurTemplateBilan
-
-        editeur = EditeurTemplateBilan(self)
-        self.wait_window(editeur)
-
     def _ouvrir_editeur_template_cerfa(self) -> None:
         self._ouvrir_editeur_template_document(
             titre="✏️ Modifier template Cerfa 11580",
@@ -1350,19 +1327,6 @@ class ParametresApp(ctk.CTkToplevel):
         except Exception as exc:
             afficher_erreur(self, "Erreur", f"Impossible de restaurer le modèle : {exc}")
 
-    def _restaurer_template_bilan(self) -> None:
-        if not demander_confirmation(
-            self,
-            "Restaurer le modèle par défaut",
-            "Toutes vos modifications du modèle Bilan AG seront perdues.\n"
-            "Voulez-vous vraiment restaurer le modèle par défaut ?",
-        ):
-            return
-        try:
-            reset_template_bilan()
-            afficher_info(self, "Succès", "Le modèle Bilan AG par défaut a été restauré.")
-        except Exception as exc:
-            afficher_erreur(self, "Erreur", f"Impossible de restaurer le modèle : {exc}")
 
     def _enregistrer_pdf(self) -> None:
         try:

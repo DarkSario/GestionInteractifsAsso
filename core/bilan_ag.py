@@ -1,7 +1,8 @@
-"""Données du Bilan AG (template Markdown, Phase 16) et point d'entrée PDF unifié.
+"""Compatibilité du template Markdown historique et point d'entrée PDF unifié.
 
-Le template est stocké dans config/bilan_ag_template.md et peut être
-modifié librement sans toucher au code Python.
+Le PDF du Bilan AG est généré par ``PdfBilanAG``. Les fonctions de gestion du
+template Markdown restent disponibles pour compatibilité, mais ce template
+n'est pas utilisé par le générateur PDF.
 """
 
 from __future__ import annotations
@@ -47,7 +48,7 @@ VARIABLES_DISPONIBLES = [
 
 
 def get_template_bilan() -> str:
-    """Lit le template depuis config/bilan_ag_template.md.
+    """Lit le template Markdown historique depuis config/bilan_ag_template.md.
 
     Si le fichier n'existe pas, retourne le template par défaut.
     """
@@ -62,7 +63,7 @@ def get_template_bilan() -> str:
 
 
 def save_template_bilan(contenu: str) -> None:
-    """Sauvegarde le template modifié dans config/bilan_ag_template.md."""
+    """Sauvegarde le template Markdown historique."""
     try:
         _TEMPLATE_PATH.write_text(contenu, encoding="utf-8")
     except Exception as exc:
@@ -71,7 +72,7 @@ def save_template_bilan(contenu: str) -> None:
 
 
 def reset_template_bilan() -> None:
-    """Remet le template par défaut (copie bilan_ag_template.default.md)."""
+    """Restaure le template Markdown historique par défaut."""
     try:
         contenu_defaut = _TEMPLATE_DEFAULT_PATH.read_text(encoding="utf-8")
         _TEMPLATE_PATH.write_text(contenu_defaut, encoding="utf-8")
@@ -153,7 +154,7 @@ def collecter_donnees_bilan(
         "valeur_stock": "0,00 €",
         "nb_mouvements_stock": "0",
         "tableau_dons": "_Aucun don._",
-        "total_dons": "0.00 €",
+        "total_dons": "0,00 EUR",
     }
 
     # Nom de l'association
@@ -334,7 +335,8 @@ def collecter_donnees_bilan(
         conn = get_connection()
         try:
             val = conn.execute(
-                "SELECT COALESCE(SUM(quantite_stock * prix_unitaire_ht), 0) FROM articles WHERE actif = 1"
+                "SELECT COALESCE(SUM(quantite * prix_achat), 0) FROM stock "
+                "WHERE COALESCE(statut_archive, 0) = 0"
             ).fetchone()[0]
             nb_mouvements = conn.execute(
                 "SELECT COUNT(*) FROM mouvements_stock"
