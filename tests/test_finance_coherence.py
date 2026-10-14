@@ -430,3 +430,90 @@ def test_suppression_lot_tombola_neutralise_ecriture(db_fin):
     assert marquer_rembourse("tombola", 5, "especes", None, "2026-03-02")
     assert delete_lot(5)
     assert [o["statut"] for o in _ops("tombola_remboursement", 5)] == ["annule"]
+
+
+# ── PR11 : subventions et renouvellement en masse ─────────────────────────────
+
+
+def _compte_id(db_fin) -> int:
+    from db.models.tresorerie import add_compte, get_all_comptes
+
+    comptes = get_all_comptes()
+    if comptes:
+        return comptes[0]["id"]
+    return add_compte("Compte courant", "courant", 0.0)
+
+
+def _nouvelle_subvention() -> int:
+    from db.models.tresorerie import add_subvention
+
+    return add_subvention("Mairie", "mairie", 2026, "Fonctionnement", 500.0, "2026-01-05", "")
+
+
+def test_accorder_subvention_idempotent(db_fin):
+    from db.models.tresorerie import accorder_subvention
+
+    sid, cid = _nouvelle_subvention(), _compte_id(db_fin)
+    assert accorder_subvention(sid, 300.0, "2026-02-01", "2026-02-10", cid)
+    assert accorder_subvention(sid, 300.0, "2026-02-01", "2026-02-10", cid)
+    assert accorder_subvention(sid, 350.0, "2026-02-01", "2026-02-10", cid)
+    ops = _ops("subvention", sid)
+    assert len(ops) == 1 and ops[0]["montant"] == 350.0 and ops[0]["statut"] == "valide"
+    conn = db_fin.get_connection()
+    try:
+        assert conn.execute("SELECT operation_id FROM subventions WHERE id = ?", (sid,)).fetchone()[0] == ops[0]["id"]
+    finally:
+        conn.close()
+
+
+def test_update_subvention_synchronise_ledger(db_fin):
+    from db.models.tresorerie import update_subvention
+
+    sid, cid = _nouvelle_subvention(), _compte_id(db_fin)
+    assert update_subvention(sid, statut="accordee", montant_obtenu=200.0, compte_id=cid, date_versement="2026-03-01")
+    ops = _ops("subvention", sid)
+    assert len(ops) == 1 and ops[0]["montant"] == 200.0 and ops[0]["statut"] == "valide"
+
+    update_subvention(sid, montant_obtenu=250.0)
+    assert [o["montant"] for o in _ops("subvention", sid)] == [250.0]
+
+    update_subvention(sid, statut="annulee")
+    assert [o["statut"] for o in _ops("subvention", sid)] == ["annule"]
+
+    update_subvention(sid, statut="accordee")
+    ops = _ops("subvention", sid)
+    assert len(ops) == 1 and ops[0]["statut"] == "valide" and ops[0]["montant"] == 250.0
+
+    update_subvention(sid, statut="en_attente")
+    assert [o["statut"] for o in _ops("subvention", sid)] == ["annule"]
+
+
+def test_index_unique_subvention(db_fin):
+    import sqlite3
+
+    sid, cid = _nouvelle_subvention(), _compte_id(db_fin)
+    conn = db_fin.get_connection()
+    try:
+        sql = ("INSERT INTO tresorerie_operations (compte_id, type_operation, libelle, montant, "
+               "date_operation, statut, est_automatique, source_module, source_id) "
+               "VALUES (?, 'recette', 'x', 1, '2026-01-01', 'valide', 1, 'subvention', ?)")
+        conn.execute(sql, (cid, sid))
+        with pytest.raises(sqlite3.IntegrityError):
+            conn.execute(sql, (cid, sid))
+    finally:
+        conn.close()
+
+
+def test_renouvellement_masse_offert_et_paye(db_fin):
+    from db.models.cotisations import renouveler_cotisations_masse
+
+    assert renouveler_cotisations_masse(2030) == 1
+    assert _ops("cotisation") == []
+
+    assert renouveler_cotisations_masse(2031, 15.0, "payee") == 1
+    ops = _ops("cotisation")
+    assert len(ops) == 1 and ops[0]["montant"] == 15.0 and ops[0]["statut"] == "valide"
+
+    # Retry : aucune création ni écriture supplémentaire
+    assert renouveler_cotisations_masse(2031, 15.0, "payee") == 0
+    assert len(_ops("cotisation")) == 1
