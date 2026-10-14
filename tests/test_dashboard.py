@@ -207,6 +207,38 @@ def test_get_bilan_dernier_evenement_integre_caisses():
     assert result["benefice_net"] == 37.0
 
 
+def test_get_bilan_dernier_evenement_caisse_incomplete_et_canonique():
+    from db.connection import get_connection
+    from db.models.evenement_caisses import get_total_recettes_caisses_evenement
+
+    conn = get_connection()
+    try:
+        ev_id = conn.execute(
+            "INSERT INTO evenements (nom, date_debut, statut) VALUES ('Caisse incomplète', '2026-08-01', 'termine')"
+        ).lastrowid
+        caisse_id = conn.execute(
+            "INSERT INTO evenement_caisses (evenement_id, nom, nom_caisse, statut) VALUES (?, 'Fond seul', 'Fond seul', 'ouvert')",
+            (ev_id,),
+        ).lastrowid
+        conn.execute(
+            """
+            INSERT INTO evenement_caisse_lignes
+                (caisse_id, type_ouverture, designation, montant_unitaire, quantite, total)
+            VALUES (?, 'debut', 'Fond', 1, 10, 10)
+            """,
+            (caisse_id,),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    result = get_bilan_dernier_evenement()
+    assert result is not None
+    assert get_total_recettes_caisses_evenement(ev_id) == 0.0
+    assert result["recettes_nettes"] == 0.0
+    assert result["benefice_net"] == 0.0
+
+
 def test_get_bilan_dernier_evenement_filtre_tableaux_afficher_total():
     from db.connection import get_connection
 

@@ -9,6 +9,7 @@ from datetime import date, timedelta
 from typing import Any
 
 from db.connection import get_connection
+from db.models.evenement_caisses import get_total_recettes_caisses_evenement
 from utils.finance_rules import sql_filtre_comptable
 from utils.logger import get_logger
 
@@ -521,20 +522,7 @@ def get_bilan_dernier_evenement() -> dict | None:
             0,
         )
     )
-    recettes_caisses = float(
-        _fetch_scalar(
-            """
-            SELECT COALESCE(SUM(CASE WHEN l.type_ouverture = 'fin' THEN l.total
-                                     WHEN l.type_ouverture = 'debut' THEN -l.total
-                                     ELSE 0 END), 0)
-            FROM evenement_caisses c
-            LEFT JOIN evenement_caisse_lignes l ON l.caisse_id = c.id
-            WHERE c.evenement_id = ?
-            """,
-            (ev_id,),
-            0,
-        )
-    )
+    recettes_caisses = get_total_recettes_caisses_evenement(ev_id)
     depenses = float(
         _fetch_scalar(
             """
