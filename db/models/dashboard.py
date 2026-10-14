@@ -54,6 +54,9 @@ def _fetch_scalar(query: str, params: tuple = (), default: Any = 0) -> Any:
         conn.close()
 
 
+PERIMETRE_RECETTES_MENSUELLES = "Trésorerie + billetterie"
+
+
 def _sum_evenement_ventes_net(
     *,
     evenement_id: int | None = None,
@@ -120,8 +123,14 @@ def get_recettes_depenses_mois(annee: int, mois: int) -> dict:
         annee: Année (ex. 2026).
         mois: Mois 1-12.
 
+    Périmètre explicite des recettes : opérations de trésorerie comptables
+    + ventes de billetterie. Les autres recettes d'événement (stands, tableaux,
+    tombola, buvette, caisses) n'y figurent que lorsqu'elles sont saisies en
+    trésorerie ; le total « complet » d'un événement est affiché dans sa fiche
+    et la liste des événements.
+
     Returns:
-        {total_recettes, total_depenses, solde_net}
+        {total_recettes, total_depenses, solde_net, perimetre_recettes}
     """
     debut = f"{annee}-{mois:02d}-01"
     # Dernier jour du mois
@@ -179,6 +188,7 @@ def get_recettes_depenses_mois(annee: int, mois: int) -> dict:
         "total_recettes": round(total_recettes, 2),
         "total_depenses": round(total_depenses, 2),
         "solde_net": round(total_recettes - total_depenses, 2),
+        "perimetre_recettes": PERIMETRE_RECETTES_MENSUELLES,
     }
 
 

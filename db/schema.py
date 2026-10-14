@@ -1,4 +1,8 @@
-"""Référence descriptive du schéma SQL de l'application."""
+"""Référence descriptive du schéma SQL de l'application.
+
+Ce fichier est une documentation : la source de vérité reste les migrations
+(``db/migrations/*.sql``). Il doit être corrigé lorsque les migrations évoluent.
+"""
 
 TABLES = {
     "config": (
@@ -291,7 +295,7 @@ TABLES = {
         "numero_facture TEXT",
         "evenement_id INTEGER REFERENCES evenements(id)",
         "fournisseur_id INTEGER REFERENCES fournisseurs(id)",
-        "statut TEXT NOT NULL DEFAULT 'valide' CHECK(statut IN ('valide','annule','en_attente'))",
+        "statut TEXT NOT NULL DEFAULT 'valide' CHECK(statut IN ('valide','en_attente','rapproche','annule'))",
         "est_automatique INTEGER DEFAULT 0",
         "source_module TEXT",
         "source_id INTEGER",
