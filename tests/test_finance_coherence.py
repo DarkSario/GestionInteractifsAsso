@@ -517,3 +517,83 @@ def test_renouvellement_masse_offert_et_paye(db_fin):
     # Retry : aucune création ni écriture supplémentaire
     assert renouveler_cotisations_masse(2031, 15.0, "payee") == 0
     assert len(_ops("cotisation")) == 1
+
+
+# ── PR14 : base caisse, virements internes, caisses incomplètes ───────────────
+
+
+def test_subvention_accordee_non_versee_hors_tresorerie(db_fin):
+    from db.models.tresorerie import get_stats_tresorerie, update_subvention
+
+    sid, cid = _nouvelle_subvention(), _compte_id(db_fin)
+    assert update_subvention(sid, statut="accordee", montant_obtenu=300.0, compte_id=cid)
+    assert [o for o in _ops("subvention", sid) if o["statut"] != "annule"] == []
+    assert get_stats_tresorerie()["total_recettes"] == 0.0
+
+    update_subvention(sid, date_versement="2026-03-01")
+    assert get_stats_tresorerie()["total_recettes"] == 300.0
+
+
+def test_subvention_partielle_poste_montant_recu(db_fin):
+    from db.models.tresorerie import get_stats_tresorerie, update_subvention
+
+    sid, cid = _nouvelle_subvention(), _compte_id(db_fin)
+    assert update_subvention(
+        sid, statut="partielle", montant_obtenu=120.0, compte_id=cid, date_versement="2026-03-01"
+    )
+    ops = _ops("subvention", sid)
+    assert len(ops) == 1 and ops[0]["montant"] == 120.0 and ops[0]["statut"] == "valide"
+    assert get_stats_tresorerie()["total_recettes"] == 120.0
+
+
+def test_virements_internes_exclus_des_totaux_bruts(db_fin):
+    from db.models.tresorerie import (
+        add_compte,
+        add_operation,
+        add_virement_interne,
+        get_compte_by_id,
+        get_stats_tresorerie,
+    )
+
+    c1 = _compte_id(db_fin)
+    c2 = add_compte("Livret", "livret", 0.0, 0, 0, "", "", 2)
+    add_operation(c1, "recette", "Vente", 100.0, "2026-02-01", None, None, None, None, None, "valide", 0, None, None, None)
+    add_virement_interne(c1, c2, 40.0, "2026-02-02", "Épargne", "")
+
+    stats = get_stats_tresorerie()
+    assert stats["total_recettes"] == 100.0
+    assert stats["total_depenses"] == 0.0
+    assert stats["solde"] == 100.0
+    assert get_stats_tresorerie(compte_id=c1)["solde"] == 60.0
+    assert get_stats_tresorerie(compte_id=c2)["solde"] == 40.0
+    assert get_compte_by_id(c1)["solde_actuel"] == 60.0
+    assert get_compte_by_id(c2)["solde_actuel"] == 40.0
+
+
+def test_totaux_operations_exclut_virements():
+    ops = [
+        {"type_operation": "recette", "montant": 50, "statut": "valide"},
+        {"type_operation": "virement_interne", "montant": 20, "statut": "valide", "source_module": "virement_sortant"},
+        {"type_operation": "virement_interne", "montant": 20, "statut": "valide", "source_module": "virement_entrant"},
+    ]
+    assert totaux_operations(ops) == {"total_recettes": 50.0, "total_depenses": 0.0, "solde": 50.0}
+
+
+def test_caisse_incomplete_ne_distord_pas_recette_evenement(db_fin):
+    from db.models.evenement_caisses import (
+        ajouter_ligne_caisse,
+        creer_caisse,
+        get_recette_caisse,
+        get_total_recettes_caisses_evenement,
+    )
+    from db.models.evenements import add_evenement
+
+    eid = add_evenement("Fête", None, None, "2026-06-10", None, "planifie", None)
+    complete = creer_caisse(eid, "Complète")
+    ajouter_ligne_caisse(complete, "debut", "Pièces", 1.0, 50)
+    ajouter_ligne_caisse(complete, "fin", "Pièces", 1.0, 80)
+    incomplete = creer_caisse(eid, "Incomplète")
+    ajouter_ligne_caisse(incomplete, "debut", "Pièces", 1.0, 100)
+
+    assert get_recette_caisse(incomplete) == 0.0
+    assert get_total_recettes_caisses_evenement(eid) == 30.0

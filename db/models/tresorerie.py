@@ -14,7 +14,9 @@ from db.models.cloture import (  # noqa: F401
 )
 from utils.finance_rules import (
     montant_signe as _montant_signe,
+    est_virement_interne,
     sql_filtre_comptable,
+    subvention_est_encaissee,
 )
 from utils.logger import get_logger
 
@@ -961,7 +963,7 @@ def _sync_operation_subvention(conn, subvention_id: int) -> int | None:
     """Synchronise l'écriture de trésorerie d'une subvention avec son état courant.
 
     Aucun commit : la subvention et son écriture sont enregistrées ensemble.
-    - accordée avec montant > 0 : crée, met à jour ou réactive l'unique écriture ;
+    - base caisse : accordée/partielle, montant reçu > 0 et date de versement : crée, met à jour ou réactive l'unique écriture ;
     - sinon : neutralise (statut 'annule') l'écriture existante, sans la supprimer.
     Lève une exception si l'écriture ne peut pas être passée.
     """
@@ -970,7 +972,7 @@ def _sync_operation_subvention(conn, subvention_id: int) -> int | None:
         return None
     sub = dict(row)
     montant = float(sub.get("montant_obtenu") or 0)
-    if sub.get("statut") == "accordee" and montant > 0:
+    if subvention_est_encaissee(sub):
         operation_id = upsert_operation_auto(
             conn,
             "subvention",
@@ -979,7 +981,7 @@ def _sync_operation_subvention(conn, subvention_id: int) -> int | None:
             libelle=f"Subvention {sub['organisme']}",
             montant=montant,
             date_operation=(
-                sub.get("date_versement") or sub.get("date_decision") or date.today().isoformat()
+                sub["date_versement"]
             ),
             categorie_id=get_categorie_id_par_mot(conn, "recette", "subvention"),
             mode_paiement=None,
@@ -1072,10 +1074,14 @@ def get_stats_tresorerie(compte_id=None, date_debut=None, date_fin=None) -> dict
 
     total_recettes = 0.0
     total_depenses = 0.0
+    net = 0.0
     par_categorie: dict[str, float] = {}
 
     for operation in operations:
         signed = _operation_signed_amount(operation)
+        net += signed
+        if est_virement_interne(operation):
+            continue
         categorie = operation.get("categorie_nom") or "Sans catégorie"
         par_categorie[categorie] = round(par_categorie.get(categorie, 0.0) + signed, 2)
 
@@ -1089,7 +1095,7 @@ def get_stats_tresorerie(compte_id=None, date_debut=None, date_fin=None) -> dict
     return {
         "total_recettes": total_recettes,
         "total_depenses": total_depenses,
-        "solde": round(total_recettes - total_depenses, 2),
+        "solde": round(net, 2),
         "par_categorie": par_categorie,
     }
 
