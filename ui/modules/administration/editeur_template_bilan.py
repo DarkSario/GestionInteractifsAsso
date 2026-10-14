@@ -72,7 +72,8 @@ class EditeurTemplateBilan(ctk.CTkToplevel):
         ).pack(anchor="w", padx=8, pady=(8, 2))
         ctk.CTkLabel(
             frame_editor,
-            text="Utilisez {{variable}} pour insérer des données dynamiques.",
+            text="Utilisez {{variable}} pour insérer des données dynamiques. "
+            "Le PDF du Bilan AG (menu Exports) est produit par le même générateur unique.",
             font=fonts.get("small"),
             text_color="grey",
             anchor="w",

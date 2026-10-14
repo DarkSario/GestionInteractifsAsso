@@ -177,14 +177,17 @@ def export_bilan_ag_pdf(exercice: str, chemin_sortie: str,
                         avec_graphiques: bool = False,
                         type_periode: str = "scolaire",
                         introduction: str = "",
-                        conclusion: str = "") -> bool:
-    """Génère le bilan AG au format PDF."""
+                        conclusion: str = "",
+                        date_debut: str | None = None,
+                        date_fin: str | None = None) -> bool:
+    """Génère le bilan AG au format PDF (générateur unique : PdfBilanAG)."""
     try:
         from core.pdf_bilan_ag import PdfBilanAG
 
         gen = PdfBilanAG(exercice, sections=sections, avec_graphiques=avec_graphiques,
                          type_periode=type_periode,
-                         introduction=introduction, conclusion=conclusion)
+                         introduction=introduction, conclusion=conclusion,
+                         date_debut=date_debut, date_fin=date_fin)
         return gen.generer(chemin_sortie)
     except Exception as exc:
         logger.exception("export_bilan_ag_pdf: %s", exc)

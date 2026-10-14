@@ -37,6 +37,8 @@ class PdfBilanAG(PdfBasePro):
         type_periode: str = "scolaire",
         introduction: str = "",
         conclusion: str = "",
+        date_debut: str | None = None,
+        date_fin: str | None = None,
     ):
         super().__init__("Bilan Assemblée Générale", orientation=orientation, avec_page_garde=True)
         self.exercice = exercice or self.exercice
@@ -48,6 +50,8 @@ class PdfBilanAG(PdfBasePro):
         self._annee = self._extraire_annee(self.exercice)
         self._introduction = introduction or ""
         self._conclusion = conclusion or ""
+        self._date_debut = date_debut or ""
+        self._date_fin = date_fin or ""
 
     @staticmethod
     def _extraire_annee(exercice: str) -> int | None:
@@ -57,6 +61,8 @@ class PdfBilanAG(PdfBasePro):
         return None
 
     def _periode(self) -> tuple[str, str]:
+        if self._date_debut and self._date_fin:
+            return self._date_debut, self._date_fin
         if not self._annee:
             return "", ""
         if self._type_periode == "civile":
@@ -229,13 +235,15 @@ class PdfBilanAG(PdfBasePro):
 
         date_debut, date_fin = self._periode()
         elements = self._titre_section_pro("Résumé financier")
-        comptes = get_all_comptes(actif_only=False)
+        if date_fin:
+            elements.append(Paragraph(f"Soldes des comptes au {self._formater_date(date_fin)}.", self._style_normal))
+        comptes = get_all_comptes(actif_only=False, date_fin=date_fin or None)
         stats = get_stats_tresorerie(date_debut=date_debut or None, date_fin=date_fin or None)
 
         if not comptes:
             return elements + [self._message_aucune_donnee()]
 
-        donnees = [["Compte", "Type", "Solde"]]
+        donnees = [["Compte", "Type", "Solde (fin de période)"]]
         for compte in comptes:
             donnees.append(
                 [
@@ -314,25 +322,30 @@ class PdfBilanAG(PdfBasePro):
         return elements
 
     def _section_evenements(self) -> list:
+        from core.caisses_evenement import calculer_bilan_complet_evenement
         from db.connection import get_connection
 
+        date_debut, date_fin = self._periode()
         elements = self._titre_section_pro("Événements")
         conn = get_connection()
         try:
-            if self._annee:
+            colonnes = (
+                "id, nom, type, date_debut, date_fin, statut, budget_previsionnel"
+            )
+            if date_debut and date_fin:
                 rows = conn.execute(
-                    """
-                    SELECT nom, type, date_debut, date_fin, statut, budget_previsionnel
+                    f"""
+                    SELECT {colonnes}
                     FROM evenements
-                    WHERE substr(COALESCE(date_debut, date_fin, ''), 1, 4) = ?
-                       OR substr(COALESCE(date_fin, date_debut, ''), 1, 4) = ?
+                    WHERE substr(COALESCE(date_debut, date_fin, ''), 1, 10) BETWEEN ? AND ?
+                       OR substr(COALESCE(date_fin, date_debut, ''), 1, 10) BETWEEN ? AND ?
                     ORDER BY date_debut DESC, id DESC
                     """,
-                    (str(self._annee), str(self._annee)),
+                    (date_debut, date_fin, date_debut, date_fin),
                 ).fetchall()
             else:
                 rows = conn.execute(
-                    "SELECT nom, type, date_debut, date_fin, statut, budget_previsionnel FROM evenements ORDER BY date_debut DESC, id DESC"
+                    f"SELECT {colonnes} FROM evenements ORDER BY date_debut DESC, id DESC"
                 ).fetchall()
             evenements = [dict(row) for row in rows]
         finally:
@@ -341,24 +354,48 @@ class PdfBilanAG(PdfBasePro):
         if not evenements:
             return elements + [self._message_aucune_donnee()]
 
-        donnees = [["Nom", "Type", "Date", "Statut", "Budget"]]
+        donnees = [["Nom", "Date", "Statut", "Budget", "Recettes", "Dépenses"]]
+        total_recettes = 0.0
+        total_depenses = 0.0
         for evenement in evenements:
             date_label = self._formater_date(evenement.get("date_debut"))
             if evenement.get("date_fin") and evenement.get("date_fin") != evenement.get("date_debut"):
                 date_label = f"{date_label} → {self._formater_date(evenement.get('date_fin'))}"
+            try:
+                bilan = calculer_bilan_complet_evenement(int(evenement["id"]))
+            except Exception as exc:
+                logger.warning("PdfBilanAG._section_evenements bilan %s: %s", evenement.get("id"), exc)
+                bilan = {}
+            recettes = float(bilan.get("total_recettes") or 0)
+            depenses = float(bilan.get("total_depenses") or 0)
+            total_recettes += recettes
+            total_depenses += depenses
             donnees.append(
                 [
                     evenement.get("nom") or "—",
-                    evenement.get("type") or "—",
                     date_label,
                     evenement.get("statut") or "—",
                     self._formater_montant(evenement.get("budget_previsionnel")),
+                    self._formater_montant(recettes),
+                    self._formater_montant(depenses),
                 ]
             )
+        donnees.append(
+            ["Total", "", "", "", self._formater_montant(total_recettes), self._formater_montant(total_depenses)]
+        )
         elements.append(
             self._creer_tableau(
                 donnees,
-                col_widths=[5 * cm, 3 * cm, 4 * cm, 2.5 * cm, 2.5 * cm],
+                col_widths=[4.2 * cm, 3.6 * cm, 2 * cm, 2.4 * cm, 2.4 * cm, 2.4 * cm],
+                avec_total=True,
+            )
+        )
+        elements.append(
+            Paragraph(
+                "Recettes et dépenses issues du module Événements (billetterie, stands, tombola, "
+                "buvette, caisses). Ces montants sont informatifs et ne s'ajoutent pas aux "
+                "totaux de trésorerie.",
+                self._style_normal,
             )
         )
         return elements
@@ -366,11 +403,12 @@ class PdfBilanAG(PdfBasePro):
     def _section_buvette(self) -> list:
         from db.models.buvette import get_all_articles_buvette, get_recettes_buvette
 
+        date_debut, date_fin = self._periode()
         elements = self._titre_section_pro("Bilan buvette")
         articles = get_all_articles_buvette(include_archives=False)
-        recettes = get_recettes_buvette(limit=1000)
-        if self._annee:
-            recettes = [r for r in recettes if str(r.get("date") or "").startswith(str(self._annee))]
+        recettes = get_recettes_buvette(
+            limit=None, date_debut=date_debut or None, date_fin=date_fin or None
+        )
 
         if not articles and not recettes:
             return elements + [self._message_aucune_donnee()]

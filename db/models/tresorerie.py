@@ -71,7 +71,8 @@ def _operation_signed_amount(operation: dict) -> float:
 # ── Comptes bancaires ─────────────────────────────────────────────────────────
 
 
-def get_all_comptes(actif_only: bool = True) -> list[dict]:
+def get_all_comptes(actif_only: bool = True, date_fin: str | None = None) -> list[dict]:
+    """Liste les comptes ; ``solde_actuel`` est calculé à ``date_fin`` si fournie."""
     query = """
         SELECT *
         FROM comptes_bancaires
@@ -83,7 +84,7 @@ def get_all_comptes(actif_only: bool = True) -> list[dict]:
 
     comptes = _fetch_all(query, tuple(params))
     for compte in comptes:
-        compte["solde_actuel"] = get_solde_compte(int(compte["id"]))
+        compte["solde_actuel"] = get_solde_compte(int(compte["id"]), date_fin=date_fin)
     return comptes
 
 
@@ -222,21 +223,24 @@ def set_compte_principal(compte_id: int) -> bool:
         conn.close()
 
 
-def get_solde_compte(compte_id: int) -> float:
+def get_solde_compte(compte_id: int, date_fin: str | None = None) -> float:
+    """Solde d'un compte ; si ``date_fin`` est fournie, solde à cette date incluse."""
     compte = _fetch_one(
         "SELECT solde_initial FROM comptes_bancaires WHERE id = ?", (compte_id,)
     )
     if not compte:
         return 0.0
 
-    operations = _fetch_all(
-        """
+    query = """
         SELECT type_operation, montant, statut, source_module
         FROM tresorerie_operations
         WHERE compte_id = ?
-        """,
-        (compte_id,),
-    )
+    """
+    params: list[Any] = [compte_id]
+    if date_fin:
+        query += " AND substr(date_operation, 1, 10) <= ?"
+        params.append(str(date_fin)[:10])
+    operations = _fetch_all(query, tuple(params))
 
     solde = float(compte.get("solde_initial") or 0)
     for operation in operations:
