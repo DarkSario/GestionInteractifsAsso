@@ -441,3 +441,138 @@ def test_cloture_refusee_avec_operations_en_attente(tmp_db):
     _add_op(compte, "recette", "Attente", 1.0, "2025-02-01", cat, "en_attente")
     assert cloturer_exercice(ex_id, 0.0) is False
     assert get_exercice_by_id(ex_id)["statut"] == "ouvert"
+
+
+# ── PR13 : derniers contournements de clôture ────────────────────────────────
+
+
+def _second_compte():
+    from db.connection import get_connection
+
+    conn = get_connection()
+    try:
+        cur = conn.execute(
+            "INSERT INTO comptes_bancaires (nom, type_compte) VALUES ('Caisse test', 'caisse')"
+        )
+        conn.commit()
+        return cur.lastrowid
+    finally:
+        conn.close()
+
+
+def test_virement_interne_refuse_en_periode_cloturee(tmp_db):
+    import pytest
+
+    from db.connection import get_connection
+    from db.models.cloture import PeriodeClotureeError
+    from db.models.tresorerie import add_virement_interne
+
+    _setup(tmp_db)
+    compte, _ = _ctx()
+    autre = _second_compte()
+    ex_id = add_exercice("2025", "civile", "2025-01-01", "2025-12-31", 0.0)
+    assert cloturer_exercice(ex_id, 0.0)
+
+    with pytest.raises(PeriodeClotureeError):
+        add_virement_interne(compte, autre, 50.0, "2025-06-01", "V", None)
+    conn = get_connection()
+    try:
+        n = conn.execute(
+            "SELECT COUNT(*) FROM tresorerie_operations WHERE type_operation='virement_interne'"
+        ).fetchone()[0]
+    finally:
+        conn.close()
+    assert n == 0
+
+    sortie, entree = add_virement_interne(compte, autre, 50.0, "2026-06-01", "V", None)
+    assert sortie and entree
+
+
+def test_suppression_cotisation_refusee_en_periode_cloturee(tmp_db):
+    from db.connection import get_connection
+    from db.models.cotisations import add_cotisation, delete_cotisation
+
+    _setup(tmp_db)
+    conn = get_connection()
+    try:
+        cur = conn.execute("INSERT INTO membres (nom, prenom) VALUES ('Dupont', 'Jean')")
+        conn.commit()
+        mid = cur.lastrowid
+    finally:
+        conn.close()
+    cid = add_cotisation(mid, 2025, 10.0, "payee", date_paiement="2025-03-01")
+    ex_id = add_exercice("2025", "civile", "2025-01-01", "2025-12-31", 0.0)
+    assert cloturer_exercice(ex_id, 10.0)
+
+    assert delete_cotisation(cid) is False
+    conn = get_connection()
+    try:
+        assert conn.execute("SELECT COUNT(*) FROM cotisations WHERE id=?", (cid,)).fetchone()[0] == 1
+        statuts = [r[0] for r in conn.execute(
+            "SELECT statut FROM tresorerie_operations WHERE source_module='cotisation' AND source_id=?",
+            (cid,),
+        )]
+    finally:
+        conn.close()
+    assert statuts and "annule" not in statuts
+
+
+def test_suppression_cotisation_periode_ouverte(tmp_db):
+    from db.connection import get_connection
+    from db.models.cotisations import add_cotisation, delete_cotisation
+
+    _setup(tmp_db)
+    conn = get_connection()
+    try:
+        cur = conn.execute("INSERT INTO membres (nom, prenom) VALUES ('Dupont', 'Jean')")
+        conn.commit()
+        mid = cur.lastrowid
+    finally:
+        conn.close()
+    cid = add_cotisation(mid, 2025, 10.0, "payee", date_paiement="2025-03-01")
+    assert delete_cotisation(cid) is True
+    conn = get_connection()
+    try:
+        statuts = [r[0] for r in conn.execute(
+            "SELECT statut FROM tresorerie_operations WHERE source_module='cotisation' AND source_id=?",
+            (cid,),
+        )]
+    finally:
+        conn.close()
+    assert statuts and set(statuts) == {"annule"}
+
+
+def test_add_operation_atomique_vis_a_vis_cloture(tmp_db):
+    """La vérification de période se fait dans la transaction d'écriture."""
+    import pytest
+
+    from db.connection import get_connection
+    from db.models.cloture import PeriodeClotureeError
+
+    _setup(tmp_db)
+    compte, cat = _ctx()
+    add_exercice("2025", "civile", "2025-01-01", "2025-12-31", 0.0)
+
+    # Une clôture « en vol » : verrou d'écriture tenu par une autre connexion
+    # qui clôture l'exercice ; l'insertion doit attendre puis être refusée.
+    import threading
+    import time
+
+    blocker = get_connection()
+    blocker.execute("BEGIN IMMEDIATE")
+    blocker.execute("UPDATE exercices SET statut='cloture' WHERE date_debut='2025-01-01'")
+    errors = []
+
+    def _insert():
+        try:
+            _add_op(compte, "recette", "Course", 10.0, "2025-05-01", cat)
+        except Exception as exc:  # noqa: BLE001
+            errors.append(exc)
+
+    t = threading.Thread(target=_insert)
+    t.start()
+    time.sleep(0.3)
+    blocker.commit()
+    blocker.close()
+    t.join(10)
+    assert errors and isinstance(errors[0], PeriodeClotureeError)

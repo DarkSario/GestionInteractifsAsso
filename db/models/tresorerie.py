@@ -324,11 +324,10 @@ def add_operation(
 ) -> int:
     conn = get_connection()
     try:
+        conn.execute("BEGIN IMMEDIATE")
         verifier_periode_ouverte(conn, date_operation)
-    finally:
-        conn.close()
-    return _execute(
-        """
+        cur = conn.execute(
+            """
         INSERT INTO tresorerie_operations (
             compte_id, type_operation, libelle, montant, date_operation,
             categorie_id, mode_paiement, numero_facture, evenement_id,
@@ -360,7 +359,14 @@ def add_operation(
             remboursement_mode,
             remboursement_reference,
         ),
-    )
+        )
+        conn.commit()
+        return cur.lastrowid
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
 
 
 def get_operation_auto(source_module: str, source_id) -> dict | None:
@@ -665,6 +671,8 @@ def add_virement_interne(
     libelle_base = libelle or "Virement interne"
     conn = get_connection()
     try:
+        conn.execute("BEGIN IMMEDIATE")
+        verifier_periode_ouverte(conn, date_operation)
         cur_sortie = conn.execute(
             """
             INSERT INTO tresorerie_operations (
@@ -712,6 +720,9 @@ def add_virement_interne(
         )
         conn.commit()
         return int(sortie_id), int(entree_id)
+    except Exception:
+        conn.rollback()
+        raise
     finally:
         conn.close()
 
