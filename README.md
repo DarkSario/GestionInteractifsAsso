@@ -50,6 +50,18 @@ Application de gestion complète pour associations, développée avec Python et 
 
 Les migrations SQLite sont situées dans `db/migrations/` sous forme de fichiers numérotés (`0001_init.sql`, `0002_...sql`). Elles sont exécutées automatiquement au démarrage via `db.migrations.runner.run_migrations()` de manière ordonnée et atomique (avec support des déclencheurs et transactions sécurisées).
 
+### Architecture du stock
+
+Le catalogue d'articles et les mouvements historiques restent gérés par
+`db.models.stock` et les règles de saisie associées par `core.stock`. Le suivi
+détaillé des lots, le FIFO, les tags et les péremptions relèvent de
+`core.stock_v2`. Cette dernière synchronise `stock.quantite` afin de préserver
+la compatibilité des écrans et rapports historiques.
+
+Pour toute nouvelle logique liée aux lots ou au FIFO, utiliser `core.stock_v2`.
+Les écrans historiques continuent d'utiliser leurs points d'entrée existants;
+ne pas y ajouter une seconde implémentation du suivi des lots.
+
 ## Premier démarrage
 
 Au premier lancement, l'application vous demande de créer ou sélectionner

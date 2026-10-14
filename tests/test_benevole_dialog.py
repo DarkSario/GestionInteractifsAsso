@@ -321,13 +321,30 @@ def test_actualiser_resume_financier_logue_une_erreur(monkeypatch, caplog):
 
 def test_charger_fournisseurs_logue_une_erreur(monkeypatch, caplog):
     fiche = _load_fiche_module_with_ui_stubs(monkeypatch)
+    import importlib
+
+    depense_dialog = importlib.import_module(
+        "ui.modules.evenements.depense_dialog"
+    )
 
     def fail_to_load():
         raise RuntimeError("database unavailable")
 
-    monkeypatch.setattr(fiche, "get_all_fournisseurs", fail_to_load)
-    with caplog.at_level(logging.ERROR, logger=fiche.logger.name):
+    monkeypatch.setattr(depense_dialog, "get_all_fournisseurs", fail_to_load)
+    with caplog.at_level(logging.ERROR, logger=depense_dialog.logger.name):
         fournisseurs = fiche._DialogDepense._charger_fournisseurs()
 
     assert fournisseurs == []
     assert "Impossible de charger les fournisseurs" in caplog.text
+    assert fiche._DialogDepense is depense_dialog._DialogDepense
+
+
+def test_lire_quantite_billet_logue_une_valeur_invalide(monkeypatch, caplog):
+    fiche = _load_fiche_module_with_ui_stubs(monkeypatch)
+
+    with caplog.at_level(logging.WARNING, logger=fiche.logger.name):
+        quantite = fiche._DialogVente._lire_quantite(_DummyVar("pas un nombre"))
+
+    assert quantite == 0
+    assert "Quantité de billet invalide" in caplog.text
+    assert fiche._DialogVente._lire_quantite(_DummyVar("")) == 0
