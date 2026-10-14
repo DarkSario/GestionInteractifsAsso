@@ -1,4 +1,4 @@
-"""Génération du Bilan AG en PDF depuis un template Markdown (Phase 16).
+"""Données du Bilan AG (template Markdown, Phase 16) et point d'entrée PDF unifié.
 
 Le template est stocké dans config/bilan_ag_template.md et peut être
 modifié librement sans toucher au code Python.
@@ -283,7 +283,7 @@ def collecter_donnees_bilan(
 
         comptes = [
             {"nom": c["nom"], "solde": c.get("solde_actuel") or 0}
-            for c in get_all_comptes(actif_only=True)
+            for c in get_all_comptes(actif_only=True, date_fin=periode_fin or None)
         ]
         donnees["tableau_comptes"] = _construire_tableau_comptes(comptes)
     except Exception as exc:
@@ -368,108 +368,46 @@ def generer_bilan_ag(
     introduction: str = "",
     conclusion: str = "",
 ) -> dict:
-    """Génère le PDF du bilan AG depuis le template Markdown.
+    """Génère le PDF du bilan AG via le générateur unique ``PdfBilanAG``.
+
+    Chemin unifié avec l'export du menu Exports (``core.exports.export_bilan_ag_pdf``).
+    Le rendu Markdown historique est abandonné : le modèle Markdown n'est plus
+    utilisé que pour les variables de ``collecter_donnees_bilan``.
 
     Returns:
         {succes: bool, chemin: str, message: str}
     """
     try:
-        from reportlab.lib.pagesizes import A4
-        from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
-        from reportlab.lib.units import cm
-        from reportlab.platypus import (
-            Paragraph,
-            SimpleDocTemplate,
-            Spacer,
-        )
-    except ImportError as exc:
-        return {
-            "succes": False,
-            "chemin": chemin_destination,
-            "message": f"Dépendance manquante : {exc}",
-        }
+        from core.exports import export_bilan_ag_pdf
+        from db.connection import get_connection
 
-    try:
-        donnees = collecter_donnees_bilan(exercice_id, introduction, conclusion)
-        template = get_template_bilan()
-        contenu_md = _remplacer_variables(template, donnees)
+        conn = get_connection()
+        try:
+            row = conn.execute(
+                "SELECT nom, type_exercice, date_debut, date_fin FROM exercices WHERE id = ?",
+                (exercice_id,),
+            ).fetchone()
+        finally:
+            conn.close()
+        if not row:
+            return {"succes": False, "chemin": chemin_destination, "message": "Exercice introuvable."}
 
-        # Générer un PDF simple depuis le texte Markdown
-        doc = SimpleDocTemplate(
+        debut, fin = row["date_debut"] or "", row["date_fin"] or ""
+        nom = row["nom"] or f"{debut[:4]}-{fin[:4]}"
+        ok = export_bilan_ag_pdf(
+            nom,
             chemin_destination,
-            pagesize=A4,
-            rightMargin=2 * cm,
-            leftMargin=2 * cm,
-            topMargin=2 * cm,
-            bottomMargin=2 * cm,
+            type_periode=row["type_exercice"] or "scolaire",
+            introduction=introduction,
+            conclusion=conclusion,
+            date_debut=debut or None,
+            date_fin=fin or None,
         )
-
-        styles = getSampleStyleSheet()
-        elements = []
-
-        style_h1 = ParagraphStyle(
-            "H1Bilan",
-            parent=styles["Heading1"],
-            fontSize=16,
-            spaceAfter=12,
-        )
-        style_h2 = ParagraphStyle(
-            "H2Bilan",
-            parent=styles["Heading2"],
-            fontSize=13,
-            spaceAfter=8,
-            spaceBefore=12,
-        )
-        style_h3 = ParagraphStyle(
-            "H3Bilan",
-            parent=styles["Heading3"],
-            fontSize=11,
-            spaceAfter=6,
-            spaceBefore=8,
-        )
-        style_normal = styles["Normal"]
-        style_normal.fontSize = 10
-        style_normal.spaceAfter = 4
-
-        for ligne in contenu_md.splitlines():
-            ligne_strip = ligne.strip()
-            if not ligne_strip:
-                elements.append(Spacer(1, 0.3 * cm))
-            elif ligne_strip.startswith("# "):
-                elements.append(Paragraph(ligne_strip[2:], style_h1))
-            elif ligne_strip.startswith("## "):
-                elements.append(Paragraph(ligne_strip[3:], style_h2))
-            elif ligne_strip.startswith("### "):
-                elements.append(Paragraph(ligne_strip[4:], style_h3))
-            elif ligne_strip.startswith("---"):
-                elements.append(Spacer(1, 0.2 * cm))
-            elif (
-                ligne_strip.startswith("*")
-                and ligne_strip.endswith("*")
-                and len(ligne_strip) > 2
-                and not ligne_strip.startswith("* ")
-                and not ligne_strip.startswith("**")
-            ):
-                # Italique de document (ex. : *texte italique*)
-                elements.append(Paragraph(f"<i>{ligne_strip[1:-1]}</i>", style_normal))
-            else:
-                # Transformer **texte** en gras pour ReportLab
-                rendu = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", ligne_strip)
-                rendu = re.sub(r"\*(.+?)\*", r"<i>\1</i>", rendu)
-                elements.append(Paragraph(rendu, style_normal))
-
-        doc.build(elements)
-
         return {
-            "succes": True,
+            "succes": bool(ok),
             "chemin": chemin_destination,
-            "message": "Bilan AG généré avec succès.",
+            "message": "Bilan AG généré avec succès." if ok else "Le bilan AG n'a pas pu être généré.",
         }
-
     except Exception as exc:
         logger.exception("generer_bilan_ag: %s", exc)
-        return {
-            "succes": False,
-            "chemin": chemin_destination,
-            "message": str(exc),
-        }
+        return {"succes": False, "chemin": chemin_destination, "message": str(exc)}

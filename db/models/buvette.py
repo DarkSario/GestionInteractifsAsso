@@ -713,22 +713,35 @@ def enregistrer_recette_evenement(evenement_id: int) -> int:
         conn.close()
 
 
-def get_recettes_buvette(limit=50) -> list[dict]:
-    """Retourne l'historique des recettes buvette."""
+def get_recettes_buvette(limit=50, date_debut=None, date_fin=None) -> list[dict]:
+    """Retourne l'historique des recettes buvette.
+
+    ``limit=None`` retourne toutes les lignes ; ``date_debut``/``date_fin``
+    (incluses) filtrent en SQL avant la limite.
+    """
     conn = get_connection()
     try:
-        rows = conn.execute(
-            """
+        where, params = [], []
+        if date_debut:
+            where.append("substr(r.date, 1, 10) >= ?")
+            params.append(str(date_debut)[:10])
+        if date_fin:
+            where.append("substr(r.date, 1, 10) <= ?")
+            params.append(str(date_fin)[:10])
+        sql = """
             SELECT r.id, r.evenement_id, e.nom AS evenement_nom,
                    r.date, r.total_brut, r.total_fond_caisse, r.recette_nette,
                    r.commentaire, r.tresorerie_id
             FROM recettes_buvette r
             LEFT JOIN evenements e ON e.id = r.evenement_id
-            ORDER BY r.date DESC, r.id DESC
-            LIMIT ?
-            """,
-            (limit,),
-        ).fetchall()
+        """
+        if where:
+            sql += " WHERE " + " AND ".join(where)
+        sql += " ORDER BY r.date DESC, r.id DESC"
+        if limit is not None:
+            sql += " LIMIT ?"
+            params.append(limit)
+        rows = conn.execute(sql, tuple(params)).fetchall()
         return [dict(r) for r in rows]
     finally:
         conn.close()
