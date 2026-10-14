@@ -6,6 +6,7 @@ from datetime import date
 
 from db.connection import get_connection
 from db.models import _build_nom_complet
+from db.models.tresorerie import annuler_operations_auto
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -241,12 +242,9 @@ def delete_cotisation(cotisation_id: int) -> bool:
     """Supprime une cotisation."""
     conn = get_connection()
     try:
+        conn.execute("BEGIN IMMEDIATE")
+        annuler_operations_auto(conn, "cotisation", cotisation_id)
         conn.execute("DELETE FROM cotisations WHERE id = ?", (cotisation_id,))
-        conn.execute(
-            "UPDATE tresorerie_operations SET statut = 'annule' "
-            "WHERE source_module = 'cotisation' AND source_id = ? AND statut != 'annule'",
-            (cotisation_id,),
-        )
         conn.commit()
         return True
     except Exception as exc:
