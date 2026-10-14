@@ -301,3 +301,132 @@ def db_module_conn():
     import db.connection as db_module
 
     return db_module.get_connection()
+
+
+# ── PR9 : écritures automatiques atomiques et idempotentes ─────────────────────
+
+
+def _total_comptable() -> float:
+    from db.models.tresorerie import get_stats_tresorerie
+
+    return float(get_stats_tresorerie()["total_recettes"])
+
+
+def test_index_unique_empeche_doublon_ecriture_auto(db_fin):
+    import sqlite3
+
+    from db.models.cotisations import add_cotisation
+
+    cid = add_cotisation(_membre_id(db_fin), 2026, 20.0, "payee", date_paiement="2026-01-10")
+    conn = db_fin.get_connection()
+    try:
+        with pytest.raises(sqlite3.IntegrityError):
+            conn.execute(
+                "INSERT INTO tresorerie_operations (compte_id, type_operation, libelle, montant, "
+                "date_operation, statut, est_automatique, source_module, source_id) "
+                "SELECT compte_id, type_operation, libelle, montant, date_operation, 'valide', 1, "
+                "source_module, source_id FROM tresorerie_operations WHERE source_module='cotisation'"
+            )
+    finally:
+        conn.close()
+    assert len(_ops("cotisation", cid)) == 1
+
+
+def test_cotisation_rollback_si_ecriture_echoue(db_fin, monkeypatch):
+    import db.models.tresorerie as tres
+    from db.models.cotisations import add_cotisation, update_cotisation
+
+    mid = _membre_id(db_fin)
+    cid = add_cotisation(mid, 2026, 20.0, "en_attente")
+
+    def boom(*a, **k):
+        raise RuntimeError("échec écriture")
+
+    monkeypatch.setattr(tres, "upsert_operation_auto", boom)
+    assert add_cotisation(mid, 2027, 30.0, "payee") == 0
+    assert update_cotisation(cid, statut="payee") is False
+    conn = db_fin.get_connection()
+    try:
+        assert conn.execute("SELECT COUNT(*) FROM cotisations").fetchone()[0] == 1
+        assert conn.execute("SELECT statut FROM cotisations WHERE id = ?", (cid,)).fetchone()[0] == "en_attente"
+    finally:
+        conn.close()
+    assert _ops("cotisation") == []
+
+
+def test_suppression_cotisation_et_don_neutralise_totaux(db_fin):
+    from db.models.cotisations import add_cotisation, delete_cotisation
+    from db.models.dons import add_don, delete_don
+
+    cid = add_cotisation(_membre_id(db_fin), 2026, 20.0, "payee", date_paiement="2026-01-10")
+    did = add_don(donateur_nom="Martin", nature_don="argent", montant=40.0, date_don="2026-02-01")
+    assert _total_comptable() == 60.0
+    assert delete_cotisation(cid) and delete_don(did)
+    assert _total_comptable() == 0.0
+    assert [o["statut"] for o in _ops("cotisation", cid)] == ["annule"]
+    assert [o["statut"] for o in _ops("don", did)] == ["annule"]
+
+
+def test_don_requalifie_puis_restaure(db_fin):
+    from db.models.dons import add_don, update_don
+
+    did = add_don(donateur_nom="Martin", nature_don="argent", montant=40.0, date_don="2026-02-01")
+    update_don(did, nature_don="nature", montant=0, valeur_estimee=40.0)
+    assert [o["statut"] for o in _ops("don", did)] == ["annule"]
+    assert _total_comptable() == 0.0
+    update_don(did, nature_don="argent", montant=40.0)
+    ops = _ops("don", did)
+    assert len(ops) == 1 and ops[0]["statut"] == "valide"
+    assert _total_comptable() == 40.0
+    update_don(did, montant=0)
+    assert _total_comptable() == 0.0
+
+
+def test_remboursement_tombola_atomique_et_reessai(db_fin, monkeypatch):
+    import db.models.tresorerie as tres
+    from db.models.remboursements import marquer_rembourse
+
+    conn = db_fin.get_connection()
+    conn.execute("INSERT INTO evenements (id, nom, date) VALUES (1, 'Ev', '2026-03-01')")
+    conn.execute(
+        "INSERT INTO tombola_lots (id, numero, evenement_id, description, montant_avance, remboursement_statut) "
+        "VALUES (5, 1, 1, 'Lot', 15.0, 'a_rembourser')"
+    )
+    conn.commit()
+    conn.close()
+
+    def statut_lot():
+        c = db_fin.get_connection()
+        try:
+            return c.execute("SELECT remboursement_statut FROM tombola_lots WHERE id = 5").fetchone()[0]
+        finally:
+            c.close()
+
+    reel = tres.upsert_operation_auto
+    monkeypatch.setattr(tres, "upsert_operation_auto", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("x")))
+    assert marquer_rembourse("tombola", 5, "especes", None, "2026-03-02") is False
+    assert statut_lot() == "a_rembourser"
+    assert _ops("tombola_remboursement", 5) == []
+
+    monkeypatch.setattr(tres, "upsert_operation_auto", reel)
+    assert marquer_rembourse("tombola", 5, "especes", None, "2026-03-02") is True
+    assert marquer_rembourse("tombola", 5, "especes", None, "2026-03-02") is True
+    assert statut_lot() == "rembourse"
+    assert len(_ops("tombola_remboursement", 5)) == 1
+
+
+def test_suppression_lot_tombola_neutralise_ecriture(db_fin):
+    from db.models.remboursements import marquer_rembourse
+    from db.models.tombola import delete_lot
+
+    conn = db_fin.get_connection()
+    conn.execute("INSERT INTO evenements (id, nom, date) VALUES (1, 'Ev', '2026-03-01')")
+    conn.execute(
+        "INSERT INTO tombola_lots (id, numero, evenement_id, description, montant_avance, remboursement_statut) "
+        "VALUES (5, 1, 1, 'Lot', 15.0, 'a_rembourser')"
+    )
+    conn.commit()
+    conn.close()
+    assert marquer_rembourse("tombola", 5, "especes", None, "2026-03-02")
+    assert delete_lot(5)
+    assert [o["statut"] for o in _ops("tombola_remboursement", 5)] == ["annule"]

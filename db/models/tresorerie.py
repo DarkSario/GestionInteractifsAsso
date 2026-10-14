@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import unicodedata
 from datetime import date, timedelta
 from typing import Any
 
@@ -364,6 +365,113 @@ def get_operation_auto(source_module: str, source_id) -> dict | None:
         "SELECT * FROM tresorerie_operations WHERE source_module = ? AND source_id = ? ORDER BY id LIMIT 1",
         (source_module, source_id),
     )
+
+
+# Modules dont les écritures automatiques sont protégées par un index unique
+# (voir migration 0023) : une seule écriture non annulée par (module, source).
+SOURCES_AUTOMATIQUES = ("cotisation", "don", "tombola_remboursement")
+
+
+_MODES_PAIEMENT = {
+    "especes", "cheque", "carte", "sumup", "virement", "prelevement", "autre",
+}
+
+
+def _normaliser_mode_paiement(mode) -> str:
+    """Ramène un mode de paiement libre (ex. « Espèces ») à une valeur autorisée."""
+    texte = unicodedata.normalize("NFKD", str(mode or "")).encode("ascii", "ignore").decode()
+    texte = texte.strip().lower().replace("è", "e")
+    return texte if texte in _MODES_PAIEMENT else "autre"
+
+
+def get_compte_defaut_id(conn) -> int | None:
+    """Premier compte actif (même ordre que get_all_comptes), via la connexion fournie."""
+    row = conn.execute(
+        "SELECT id FROM comptes_bancaires WHERE actif = 1 ORDER BY ordre ASC, id ASC LIMIT 1"
+    ).fetchone()
+    return int(row[0]) if row else None
+
+
+def get_categorie_id_par_mot(conn, type_categorie: str, mot: str) -> int | None:
+    """Première catégorie dont le nom contient `mot`, via la connexion fournie."""
+    rows = conn.execute(
+        "SELECT id, nom FROM tresorerie_categories "
+        "WHERE type_categorie IN (?, 'les_deux') ORDER BY ordre ASC, nom ASC",
+        (type_categorie,),
+    ).fetchall()
+    for row in rows:
+        if mot in (row[1] or "").lower():
+            return int(row[0])
+    return None
+
+
+def upsert_operation_auto(
+    conn,
+    source_module: str,
+    source_id,
+    *,
+    type_operation: str,
+    libelle: str,
+    montant: float,
+    date_operation: str,
+    categorie_id,
+    mode_paiement,
+    commentaire,
+    evenement_id=None,
+    compte_id=None,
+) -> int | None:
+    """Crée ou met à jour (et réactive) l'écriture automatique d'une source.
+
+    Aucun commit : l'appelant maîtrise la transaction afin que l'objet métier et
+    l'écriture soient enregistrés ensemble. Lève une exception en cas d'échec.
+    Retourne l'id de l'écriture, ou None si aucun compte actif n'est disponible.
+    """
+    mode_paiement = _normaliser_mode_paiement(mode_paiement)
+    row = conn.execute(
+        "SELECT id FROM tresorerie_operations WHERE source_module = ? AND source_id = ? "
+        "ORDER BY (statut = 'annule') ASC, id ASC LIMIT 1",
+        (source_module, source_id),
+    ).fetchone()
+    if row:
+        conn.execute(
+            """
+            UPDATE tresorerie_operations
+            SET montant = ?, date_operation = ?, mode_paiement = ?, categorie_id = ?,
+                libelle = ?, statut = CASE WHEN statut = 'annule' THEN 'valide' ELSE statut END
+            WHERE id = ?
+            """,
+            (float(montant), date_operation, mode_paiement, categorie_id, libelle, row[0]),
+        )
+        return int(row[0])
+    compte = compte_id or get_compte_defaut_id(conn)
+    if not compte:
+        return None
+    cur = conn.execute(
+        """
+        INSERT INTO tresorerie_operations (
+            compte_id, type_operation, libelle, montant, date_operation, categorie_id,
+            mode_paiement, evenement_id, statut, est_automatique, source_module,
+            source_id, commentaire
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'valide', 1, ?, ?, ?)
+        """,
+        (
+            compte, type_operation, libelle, float(montant), date_operation,
+            categorie_id, mode_paiement, evenement_id, source_module, source_id,
+            commentaire,
+        ),
+    )
+    return int(cur.lastrowid)
+
+
+def annuler_operations_auto(conn, source_module: str, source_id) -> int:
+    """Neutralise (statut 'annule') les écritures d'une source, sans commit."""
+    cur = conn.execute(
+        "UPDATE tresorerie_operations SET statut = 'annule' "
+        "WHERE source_module = ? AND source_id = ? AND statut != 'annule'",
+        (source_module, source_id),
+    )
+    return cur.rowcount
 
 
 def update_operation(operation_id, **kwargs) -> bool:
