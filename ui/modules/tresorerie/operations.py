@@ -63,7 +63,9 @@ from db.models.tresorerie import (
 from ui import theme as app_theme
 from ui.components.dialogs import afficher_erreur, afficher_info, demander_confirmation
 from ui.components.form_dialog import FormDialog
+from utils.logger import get_logger
 
+logger = get_logger(__name__)
 
 COULEURS = {
     "recette": "#2e7d32",
@@ -85,7 +87,7 @@ _STATUTS = {
 }
 
 
-def _periode_contient_cloture() -> bool:
+def _periode_contient_cloture() -> bool | None:
     """Retourne True si des opérations rapprochées signalent une période clôturée."""
     try:
         from db.connection import get_connection
@@ -99,7 +101,8 @@ def _periode_contient_cloture() -> bool:
             conn.close()
         return (row["nb"] if row else 0) > 0
     except Exception:
-        return False
+        logger.exception("Impossible de vérifier l'état de clôture de la trésorerie.")
+        return None
 
 
 def _parse_float(value: str | float | int | None) -> float:
@@ -436,12 +439,22 @@ class _OperationsTab(ctk.CTkFrame):
             command=self.refresh,
         ).pack(side="right", padx=(0, 8))
 
-        if _periode_contient_cloture():
+        etat_cloture = _periode_contient_cloture()
+        if etat_cloture:
             bandeau = ctk.CTkFrame(self, fg_color="#fff3e0", corner_radius=6)
             bandeau.pack(fill="x", padx=12, pady=(0, 4))
             ctk.CTkLabel(
                 bandeau,
                 text="🔒 Période clôturée — Les opérations affichées sont en lecture seule",
+                font=fonts.get("bold"),
+                text_color="#e65100",
+            ).pack(padx=12, pady=6)
+        elif etat_cloture is None:
+            bandeau = ctk.CTkFrame(self, fg_color="#fff3e0", corner_radius=6)
+            bandeau.pack(fill="x", padx=12, pady=(0, 4))
+            ctk.CTkLabel(
+                bandeau,
+                text="⚠️ Impossible de vérifier l'état de clôture de la période",
                 font=fonts.get("bold"),
                 text_color="#e65100",
             ).pack(padx=12, pady=6)
@@ -568,6 +581,7 @@ class _OperationsTab(ctk.CTkFrame):
                 conn.close()
             exercices = [dict(r) for r in rows]
         except Exception:
+            logger.exception("Impossible de charger les exercices de trésorerie.")
             exercices = []
 
         labels = ["Tous"]

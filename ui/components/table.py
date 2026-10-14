@@ -1,9 +1,14 @@
 """Treeview générique stylé pour l'affichage de données tabulaires."""
 
 import tkinter.ttk as ttk
-from typing import Any, Sequence
+from typing import Any, Callable, Sequence
 
 import customtkinter as ctk
+
+
+def bind_double_click_to_open(tree: Any, callback: Callable[..., Any]) -> None:
+    """Associe l'ouverture de l'élément sélectionné au double-clic."""
+    tree.bind("<Double-1>", callback)
 
 
 class DataTable(ctk.CTkFrame):
