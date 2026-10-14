@@ -277,22 +277,18 @@ def collecter_donnees_bilan(
     except Exception as exc:
         logger.warning("collecter_donnees_bilan – tableau_evenements: %s", exc)
 
-    # Comptes
+    # Comptes (table courante : comptes_bancaires, soldes via le modèle trésorerie)
     try:
-        from db.connection import get_connection
+        from db.models.tresorerie import get_all_comptes
 
-        conn = get_connection()
-        try:
-            comptes = conn.execute(
-                "SELECT nom, solde FROM tresorerie_comptes WHERE actif = 1 ORDER BY nom"
-            ).fetchall()
-        finally:
-            conn.close()
-        donnees["tableau_comptes"] = _construire_tableau_comptes(
-            [dict(c) for c in comptes]
-        )
+        comptes = [
+            {"nom": c["nom"], "solde": c.get("solde_actuel") or 0}
+            for c in get_all_comptes(actif_only=True)
+        ]
+        donnees["tableau_comptes"] = _construire_tableau_comptes(comptes)
     except Exception as exc:
-        logger.warning("collecter_donnees_bilan – tableau_comptes: %s", exc)
+        logger.error("collecter_donnees_bilan – tableau_comptes: %s", exc)
+        donnees["tableau_comptes"] = "_Soldes des comptes indisponibles (erreur de lecture)._"
 
     # Dons
     try:

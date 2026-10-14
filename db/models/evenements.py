@@ -36,6 +36,24 @@ def _normaliser_module_evenement(module: str | None) -> str:
 # ── Événements ───────────────────────────────────────────────────────────────
 
 
+def _aligner_totaux_sur_bilan_complet(evenements: list[dict]) -> None:
+    """Aligne total_recettes/total_depenses sur le périmètre de la fiche événement.
+
+    Périmètre unique : billetterie, stands, tableaux, tombola, buvette et caisses
+    (core.caisses_evenement.calculer_bilan_complet_evenement). En cas d'erreur,
+    les valeurs SQL de repli (périmètre réduit) sont conservées.
+    """
+    from core.caisses_evenement import calculer_bilan_complet_evenement
+
+    for ev in evenements:
+        try:
+            bilan = calculer_bilan_complet_evenement(int(ev["id"]))
+            ev["total_recettes"] = bilan["total_recettes"]
+            ev["total_depenses"] = bilan["total_depenses"]
+        except Exception:
+            logger.exception("Totaux événement %s: repli sur le calcul SQL réduit", ev.get("id"))
+
+
 def get_all_evenements(statut: str | None = None) -> list[dict]:
     """Retourne tous les événements, optionnellement filtrés par statut."""
     conn = get_connection()
@@ -79,9 +97,11 @@ def get_all_evenements(statut: str | None = None) -> list[dict]:
             """,
             params,
         ).fetchall()
-        return [dict(r) for r in rows]
+        evenements = [dict(r) for r in rows]
     finally:
         conn.close()
+    _aligner_totaux_sur_bilan_complet(evenements)
+    return evenements
 
 
 def get_evenement_by_id(evenement_id: int) -> dict | None:
