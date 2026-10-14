@@ -257,7 +257,7 @@ def get_stats_exercice(exercice_id: int) -> dict:
         SELECT type_operation, montant, statut
         FROM tresorerie_operations
         WHERE date_operation BETWEEN ? AND ?
-          AND statut != 'annule'
+          AND statut IN ('valide', 'rapproche')
           AND {sql_filtre_comptable()}
         """,
         (exercice["date_debut"], exercice["date_fin"]),

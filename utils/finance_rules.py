@@ -14,6 +14,10 @@ from __future__ import annotations
 
 from typing import Iterable
 
+# Règle canonique : une opération « rapprochée » (verrouillée par la clôture d'un
+# exercice) compte comme une opération validée dans tous les totaux.
+STATUTS_COMPTABLES = frozenset({"valide", "rapproche"})
+
 SOURCES_NON_COMPTABLES = frozenset({"remise_cheque", "depot_especes"})
 
 # Sources qui créent automatiquement une écriture comptable (recette/dépense).
@@ -26,8 +30,8 @@ def est_source_comptable(source_module: str | None) -> bool:
 
 
 def est_operation_comptable(operation: dict) -> bool:
-    """Opération validée et issue d'une source comptable."""
-    return operation.get("statut") == "valide" and est_source_comptable(operation.get("source_module"))
+    """Opération validée ou rapprochée et issue d'une source comptable."""
+    return operation.get("statut") in STATUTS_COMPTABLES and est_source_comptable(operation.get("source_module"))
 
 
 def sql_filtre_comptable(alias: str = "") -> str:

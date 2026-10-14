@@ -136,7 +136,7 @@ def get_recettes_depenses_mois(annee: int, mois: int) -> dict:
             SELECT COALESCE(SUM(montant), 0)
             FROM tresorerie_operations
             WHERE type_operation IN ('recette')
-              AND statut = 'valide'
+              AND statut IN ('valide', 'rapproche')
               AND {sql_filtre_comptable()}
               AND date_operation >= ?
               AND date_operation < ?
@@ -151,7 +151,7 @@ def get_recettes_depenses_mois(annee: int, mois: int) -> dict:
             SELECT COALESCE(SUM(montant), 0)
             FROM tresorerie_operations
             WHERE type_operation IN ('depense')
-              AND statut = 'valide'
+              AND statut IN ('valide', 'rapproche')
               AND {sql_filtre_comptable()}
               AND date_operation >= ?
               AND date_operation < ?
@@ -241,7 +241,7 @@ def get_evolution_tresorerie(nb_mois: int = 12) -> list[dict]:
         f"""
         SELECT date_operation, type_operation, montant, statut, source_module
         FROM tresorerie_operations
-        WHERE statut = 'valide'
+        WHERE statut IN ('valide', 'rapproche')
           AND type_operation NOT IN ('virement_sortant', 'virement_entrant')
           AND {sql_filtre_comptable()}
         ORDER BY date_operation ASC
@@ -301,7 +301,7 @@ def get_top_categories_depenses(annee: int, mois: int, top_n: int = 3) -> list[d
         FROM tresorerie_operations o
         LEFT JOIN tresorerie_categories c ON c.id = o.categorie_id
         WHERE o.type_operation = 'depense'
-          AND o.statut = 'valide'
+          AND o.statut IN ('valide', 'rapproche')
           AND {sql_filtre_comptable('o')}
           AND o.date_operation >= ?
           AND o.date_operation < ?
