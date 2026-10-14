@@ -172,8 +172,16 @@ class MouvementsStock(ctk.CTkToplevel):
                 self._article = article
             self._mouvements = get_mouvements_by_article(self._article["id"])
         except Exception as exc:
-            logger.exception("Erreur chargement mouvements : %s", exc)
+            logger.exception(
+                "Impossible de charger les mouvements de l'article %s.",
+                self._article.get("id"),
+            )
             self._mouvements = []
+            afficher_erreur(
+                self,
+                "Mouvements de stock",
+                f"Impossible de charger les mouvements de l'article « {self._article.get('nom', '')} » : {exc}",
+            )
 
         # Mise à jour de l'étiquette de stock
         quantite = self._article.get("quantite", 0)
@@ -260,7 +268,16 @@ class _FormulaireMouvement(ctk.CTkToplevel):
         try:
             self._fournisseurs = get_fournisseurs_for_select()
         except Exception:
+            logger.exception(
+                "Impossible de charger les fournisseurs pour l'article %s.",
+                self._article.get("id"),
+            )
             self._fournisseurs = []
+            afficher_erreur(
+                self,
+                "Mouvements de stock",
+                "Impossible de charger la liste des fournisseurs.",
+            )
 
         self._build_ui()
         self._on_type_change()
@@ -390,7 +407,16 @@ class _FormulaireMouvement(ctk.CTkToplevel):
             finally:
                 conn.close()
         except Exception:
+            logger.exception(
+                "Impossible de charger les événements pour l'article %s.",
+                self._article.get("id"),
+            )
             self._evenements = []
+            afficher_erreur(
+                self,
+                "Mouvements de stock",
+                "Impossible de charger la liste des événements.",
+            )
 
         self._event_var = ctk.StringVar(value="— Aucun —")
         event_labels = ["— Aucun —"] + [e["nom"] for e in self._evenements]

@@ -55,18 +55,32 @@ class FormulaireArticle(ctk.CTkToplevel):
     # ── Chargement des référentiels ───────────────────────────────────────────
 
     def _charger_referentiels(self) -> None:
+        referentiels_indisponibles = []
         try:
             self._categories = get_all_categories()
         except Exception:
+            logger.exception("Impossible de charger les catégories du formulaire stock.")
             self._categories = []
+            referentiels_indisponibles.append("catégories")
         try:
             self._unites = get_all_unites()
         except Exception:
+            logger.exception("Impossible de charger les unités du formulaire stock.")
             self._unites = []
+            referentiels_indisponibles.append("unités")
         try:
             self._fournisseurs = get_fournisseurs_for_select()
         except Exception:
+            logger.exception("Impossible de charger les fournisseurs du formulaire stock.")
             self._fournisseurs = []
+            referentiels_indisponibles.append("fournisseurs")
+
+        if referentiels_indisponibles:
+            afficher_erreur(
+                self,
+                "Référentiels du stock",
+                "Impossible de charger : " + ", ".join(referentiels_indisponibles) + ".",
+            )
 
     def _get_cat_labels(self) -> list[str]:
         labels = []

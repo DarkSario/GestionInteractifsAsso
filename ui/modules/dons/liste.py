@@ -15,6 +15,7 @@ from db.models.membres import get_all_membres, get_membre_by_id
 from ui import theme as app_theme
 from ui.components.dialogs import afficher_erreur, afficher_info, afficher_succes, demander_confirmation
 from ui.components.form_dialog import FormDialog
+from ui.components.table import bind_double_click_to_open
 
 _STATUTS = {'tous': 'Tous', 'en_attente': '🟡 En attente', 'emis': '🟢 Émis', 'annule': '🔴 Annulé'}
 _TYPES = {'tous': 'Tous', 'particulier': 'Particulier', 'entreprise': 'Entreprise'}
@@ -120,7 +121,7 @@ class ListeDons(ctk.CTkToplevel):
         self._tree.configure(yscrollcommand=sb.set)
         self._tree.pack(side='left', fill='both', expand=True)
         sb.pack(side='right', fill='y')
-        self._tree.bind('<Double-1>', self._on_double_click)
+        bind_double_click_to_open(self._tree, self._on_double_click)
 
         actions = ctk.CTkFrame(self, fg_color='transparent')
         actions.pack(fill='x', padx=16, pady=(0, 6))
