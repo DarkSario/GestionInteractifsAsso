@@ -11,6 +11,7 @@ import customtkinter as ctk
 from db.models.membres import archiver_membre, get_all_membres
 from ui import theme as app_theme
 from ui.components.dialogs import demander_confirmation
+from ui.components.list_actions import bind_double_click_to_open
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -197,7 +198,7 @@ class ListeMembres(ctk.CTkToplevel):
         scrollbar.pack(side="right", fill="y")
 
         # Colonne fictive pour les boutons — on utilise les événements de clic
-        tree.bind("<Double-1>", self._on_double_clic)
+        bind_double_click_to_open(tree, self._on_double_clic)
 
         # Ajout des boutons d'action via frame de boutons (hors Treeview)
         self._frame_actions = ctk.CTkFrame(parent, fg_color="transparent")

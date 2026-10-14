@@ -19,6 +19,7 @@ from db.models.cloture import (
 )
 from ui import theme as app_theme
 from ui.components.dialogs import afficher_erreur
+from ui.components.list_actions import bind_double_click_to_open
 
 
 class GestionExercices(ctk.CTkToplevel):
@@ -101,7 +102,7 @@ class GestionExercices(ctk.CTkToplevel):
         scrollbar.pack(side="right", fill="y")
 
         self._tree.bind("<<TreeviewSelect>>", self._on_selection)
-        self._tree.bind("<Double-1>", self._consulter)
+        bind_double_click_to_open(self._tree, self._consulter)
 
         # Boutons d'action
         btn_frame = ctk.CTkFrame(self, fg_color="transparent")

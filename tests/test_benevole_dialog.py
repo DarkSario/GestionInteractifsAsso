@@ -128,6 +128,7 @@ def _load_fiche_module_with_ui_stubs(monkeypatch):
     fake_ctk.CTkScrollableFrame = _DummyWidget
     fake_ctk.CTkLabel = _DummyWidget
     fake_ctk.CTkEntry = _DummyWidget
+    fake_ctk.CTkTextbox = _DummyWidget
     fake_ctk.CTkButton = _DummyWidget
     fake_ctk.CTkOptionMenu = _DummyOptionMenu
     fake_ctk.CTkCheckBox = _DummyWidget
@@ -296,7 +297,11 @@ def test_dialogues_extraits_reexportes_par_fiche(monkeypatch):
 
 def test_onglets_modules_a_masquer(monkeypatch):
     fiche = _load_fiche_module_with_ui_stubs(monkeypatch)
+    import importlib
 
+    onglets = importlib.import_module("ui.modules.evenements.fiche_tabs")
+
+    assert fiche._onglets_modules_a_masquer is onglets._onglets_modules_a_masquer
     assert fiche._onglets_modules_a_masquer({"billetterie"}) == [
         "💸 Dépenses",
         "💰 Budget",
@@ -310,6 +315,96 @@ def test_onglets_modules_a_masquer(monkeypatch):
         fiche._onglets_modules_a_masquer(set(fiche.MODULES_EVENEMENT_DISPONIBLES))
         == []
     )
+
+
+def test_fiche_build_tabs_delegue_assemblage(monkeypatch):
+    fiche = _load_fiche_module_with_ui_stubs(monkeypatch)
+    instance = object.__new__(fiche.FicheEvenement)
+    appels = []
+    monkeypatch.setattr(
+        fiche,
+        "construire_onglets_fiche",
+        lambda cible: appels.append(cible),
+    )
+
+    instance._build_tabs()
+
+    assert appels == [instance]
+    assert (
+        fiche.FicheEvenement._build_onglet_general
+        is fiche._OngletGeneralMixin._build_onglet_general
+    )
+
+
+def test_construire_onglets_fiche_preserve_ordre_et_callbacks(monkeypatch):
+    fiche = _load_fiche_module_with_ui_stubs(monkeypatch)
+    import importlib
+
+    onglets = importlib.import_module("ui.modules.evenements.fiche_tabs")
+    noms_onglets = []
+    appels = []
+
+    class TabView:
+        def __init__(self, _parent):
+            pass
+
+        def pack(self, **_kwargs):
+            pass
+
+        def add(self, nom):
+            noms_onglets.append(nom)
+
+        def tab(self, nom):
+            return nom
+
+    monkeypatch.setattr(onglets.ctk, "CTkTabview", TabView)
+    instance = types.SimpleNamespace()
+    methodes = (
+        "_build_onglet_general",
+        "_build_onglet_billetterie",
+        "_build_onglet_depenses",
+        "_build_onglet_budget",
+        "_build_onglet_benevoles",
+        "_build_onglet_tombola",
+        "_build_onglet_stands",
+        "_build_onglet_tableaux",
+        "_build_onglet_caisses",
+    )
+    for methode in methodes:
+        setattr(instance, methode, lambda parent, nom=methode: appels.append((nom, parent)))
+
+    onglets.construire_onglets_fiche(instance)
+
+    assert noms_onglets == [
+        "📋 Général",
+        "🎫 Billetterie",
+        "💸 Dépenses",
+        "💰 Budget",
+        "👥 Bénévoles",
+        "🎰 Tombola",
+        "🏪 Stands",
+        "📊 Tableaux",
+        "🧾 Caisses",
+    ]
+    assert appels == list(zip(methodes, noms_onglets))
+    assert (
+        fiche.FicheEvenement._build_onglet_general
+        is fiche._OngletGeneralMixin._build_onglet_general
+    )
+
+
+def test_onglet_general_conserve_ses_champs_et_modules(monkeypatch):
+    fiche = _load_fiche_module_with_ui_stubs(monkeypatch)
+    instance = object.__new__(fiche.FicheEvenement)
+
+    instance._build_onglet_general(_DummyWidget())
+
+    assert instance._var_statut.get() == "Planifié"
+    assert instance._var_budget.get() in ("", None)
+    assert set(instance._vars_modules) == set(fiche.MODULES_EVENEMENT_DISPONIBLES)
+    assert {
+        module for module, variable in instance._vars_modules.items() if variable.get()
+    } == set(fiche.MODULES_CREATION_INITIAUX)
 
 
 def test_fiche_build_ui_delegue_entete_et_onglets(monkeypatch):

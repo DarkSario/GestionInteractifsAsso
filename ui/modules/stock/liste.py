@@ -13,6 +13,7 @@ from core.stock_v2 import get_article_tags
 from db.models.stock import archiver_article, get_all_articles
 from ui import theme as app_theme
 from ui.components.dialogs import demander_confirmation
+from ui.components.list_actions import bind_double_click_to_open
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -223,7 +224,7 @@ class ListeStock(ctk.CTkToplevel):
         tree.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
 
-        tree.bind("<Double-1>", self._on_double_clic)
+        bind_double_click_to_open(tree, self._on_double_clic)
 
         # Boutons d'action
         frame_actions = ctk.CTkFrame(parent, fg_color="transparent")

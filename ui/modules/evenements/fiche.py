@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import tkinter as tk
-from datetime import date, datetime
+from datetime import datetime
 from tkinter import ttk
 from typing import Any
 
@@ -17,7 +17,7 @@ from core.evenements import (
     valider_tarif,
 )
 from db.models.evenements import (
-    MODULES_EVENEMENT_DISPONIBLES,
+    MODULES_EVENEMENT_DISPONIBLES as MODULES_EVENEMENT_DISPONIBLES,
     add_benevole,
     add_billet,
     add_depense,
@@ -75,6 +75,11 @@ from ui.modules.evenements.depense_dialog import MODES_DEPENSE, _DialogDepense
 from ui.modules.evenements.stands import StandsView
 from ui.modules.evenements.tableaux import TableauxView
 from ui.modules.evenements.tombola import TombolaView
+from ui.modules.evenements.fiche_tabs import (
+    _OngletGeneralMixin,
+    _onglets_modules_a_masquer,
+    construire_onglets_fiche,
+)
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -115,18 +120,7 @@ def serialiser_modules_depuis_cases(
     return serialiser_modules_actifs(modules)
 
 
-def _onglets_modules_a_masquer(modules_actifs: set[str]) -> list[str]:
-    """Retourne les onglets associés à des modules désactivés."""
-    if modules_actifs == set(MODULES_EVENEMENT_DISPONIBLES):
-        return []
-    return [
-        nom_onglet
-        for nom_onglet, modules_onglet in ONGLETS_MODULES.items()
-        if not modules_actifs.intersection(modules_onglet)
-    ]
-
-
-class FicheEvenement(ctk.CTkToplevel):
+class FicheEvenement(_OngletGeneralMixin, ctk.CTkToplevel):
     """Fenêtre de création/édition d'un événement avec onglets."""
 
     def __init__(self, parent: Any, evenement_id: int | None) -> None:
@@ -178,28 +172,7 @@ class FicheEvenement(ctk.CTkToplevel):
         ).pack(side="right")
 
     def _build_tabs(self) -> None:
-        self._tabs = ctk.CTkTabview(self)
-        self._tabs.pack(fill="both", expand=True, padx=16, pady=(0, 14))
-
-        self._tabs.add("📋 Général")
-        self._tabs.add("🎫 Billetterie")
-        self._tabs.add("💸 Dépenses")
-        self._tabs.add("💰 Budget")
-        self._tabs.add("👥 Bénévoles")
-        self._tabs.add("🎰 Tombola")
-        self._tabs.add("🏪 Stands")
-        self._tabs.add("📊 Tableaux")
-        self._tabs.add("🧾 Caisses")
-
-        self._build_onglet_general(self._tabs.tab("📋 Général"))
-        self._build_onglet_billetterie(self._tabs.tab("🎫 Billetterie"))
-        self._build_onglet_depenses(self._tabs.tab("💸 Dépenses"))
-        self._build_onglet_budget(self._tabs.tab("💰 Budget"))
-        self._build_onglet_benevoles(self._tabs.tab("👥 Bénévoles"))
-        self._build_onglet_tombola(self._tabs.tab("🎰 Tombola"))
-        self._build_onglet_stands(self._tabs.tab("🏪 Stands"))
-        self._build_onglet_tableaux(self._tabs.tab("📊 Tableaux"))
-        self._build_onglet_caisses(self._tabs.tab("🧾 Caisses"))
+        construire_onglets_fiche(self)
 
     def _ouvrir_export(self) -> None:
         """Ouvre le dialogue d'export de l'événement."""
@@ -216,148 +189,6 @@ class FicheEvenement(ctk.CTkToplevel):
     # ══════════════════════════════════════════════════════════════════════════
     # Onglet Général
     # ══════════════════════════════════════════════════════════════════════════
-
-    def _build_onglet_general(self, parent: Any) -> None:
-        fonts = app_theme.FONTS
-
-        frame = ctk.CTkScrollableFrame(parent)
-        frame.pack(fill="both", expand=True, padx=10, pady=10)
-
-        def row(label: str, widget_fn, **kwargs):
-            f = ctk.CTkFrame(frame, fg_color="transparent")
-            f.pack(fill="x", pady=3)
-            ctk.CTkLabel(f, text=label, width=180, anchor="e").pack(
-                side="left", padx=(0, 8)
-            )
-            w = widget_fn(f, **kwargs)
-            w.pack(side="left", fill="x", expand=True)
-            return w
-
-        # Nom
-        self._var_nom = tk.StringVar()
-        row("Nom *", lambda p, **kw: ctk.CTkEntry(p, textvariable=self._var_nom, **kw))
-
-        # Type
-        self._var_type = tk.StringVar()
-        row("Type", lambda p, **kw: ctk.CTkEntry(p, textvariable=self._var_type, **kw))
-
-        # Description
-        f_desc = ctk.CTkFrame(frame, fg_color="transparent")
-        f_desc.pack(fill="x", pady=3)
-        ctk.CTkLabel(f_desc, text="Description", width=180, anchor="ne").pack(
-            side="left", padx=(0, 8), anchor="n", pady=2
-        )
-        self._txt_description = ctk.CTkTextbox(f_desc, height=80)
-        self._txt_description.pack(side="left", fill="x", expand=True)
-
-        # Date début
-        self._var_date_debut = tk.StringVar(value=date.today().strftime("%Y-%m-%d"))
-        row(
-            "Date début *",
-            lambda p, **kw: ctk.CTkEntry(
-                p,
-                textvariable=self._var_date_debut,
-                placeholder_text="AAAA-MM-JJ",
-                **kw,
-            ),
-        )
-
-        # Date fin
-        self._var_date_fin = tk.StringVar()
-        row(
-            "Date fin",
-            lambda p, **kw: ctk.CTkEntry(
-                p,
-                textvariable=self._var_date_fin,
-                placeholder_text="AAAA-MM-JJ (optionnel)",
-                **kw,
-            ),
-        )
-
-        # Statut
-        self._var_statut = tk.StringVar(value="Planifié")
-        row(
-            "Statut",
-            lambda p, **kw: ctk.CTkOptionMenu(
-                p, values=list(LABELS_STATUT.values()), variable=self._var_statut, **kw
-            ),
-        )
-
-        # Budget prévisionnel
-        self._var_budget = tk.StringVar()
-        row(
-            "Budget prévisionnel",
-            lambda p, **kw: ctk.CTkEntry(
-                p,
-                textvariable=self._var_budget,
-                placeholder_text="Montant optionnel",
-                **kw,
-            ),
-        )
-
-        modules_frame = ctk.CTkFrame(frame)
-        modules_frame.pack(fill="x", pady=(10, 6))
-        ctk.CTkLabel(
-            modules_frame,
-            text="Modules activés",
-            font=fonts.get("bold"),
-        ).pack(anchor="w", padx=12, pady=(10, 6))
-        ctk.CTkLabel(
-            modules_frame,
-            text=(
-                "Choisissez les modules à activer pour cet événement.\n"
-                "Ces choix pourront être modifiés ultérieurement."
-            ),
-        ).pack(anchor="w", padx=12, pady=(0, 6))
-
-        self._vars_modules: dict[str, tk.BooleanVar] = {}
-        grille_modules = ctk.CTkFrame(modules_frame, fg_color="transparent")
-        grille_modules.pack(fill="x", padx=12, pady=(0, 10))
-        for index, module in enumerate(MODULES_EVENEMENT_DISPONIBLES):
-            var = tk.BooleanVar(value=module in MODULES_CREATION_INITIAUX)
-            self._vars_modules[module] = var
-            checkbox = ctk.CTkCheckBox(
-                grille_modules,
-                text=LIBELLES_MODULES.get(module, module.replace("_", " ").title()),
-                variable=var,
-                onvalue=True,
-                offvalue=False,
-            )
-            checkbox.grid(row=index // 2, column=index % 2, sticky="w", padx=(0, 18), pady=4)
-
-        # Bilan de fin
-        f_bilan = ctk.CTkFrame(frame, fg_color="transparent")
-        f_bilan.pack(fill="x", pady=3)
-        ctk.CTkLabel(f_bilan, text="Bilan de fin", width=180, anchor="ne").pack(
-            side="left", padx=(0, 8), anchor="n", pady=2
-        )
-        self._txt_bilan = ctk.CTkTextbox(f_bilan, height=80)
-        self._txt_bilan.pack(side="left", fill="x", expand=True)
-
-        # Résumé financier (lecture seule)
-        sep = ctk.CTkFrame(frame, height=2, fg_color="#444")
-        sep.pack(fill="x", pady=8)
-
-        ctk.CTkLabel(frame, text="Résumé financier", font=fonts.get("bold")).pack(
-            anchor="w", pady=(0, 4)
-        )
-
-        self._lbl_recettes = ctk.CTkLabel(frame, text="Recettes globales : —")
-        self._lbl_recettes.pack(anchor="w", padx=16)
-        self._lbl_depenses = ctk.CTkLabel(frame, text="Dépenses : —")
-        self._lbl_depenses.pack(anchor="w", padx=16)
-        self._lbl_benefice = ctk.CTkLabel(frame, text="Bénéfice estimé : —")
-        self._lbl_benefice.pack(anchor="w", padx=16)
-
-        # Bouton sauvegarder
-        sep2 = ctk.CTkFrame(frame, height=2, fg_color="#444")
-        sep2.pack(fill="x", pady=8)
-
-        ctk.CTkButton(
-            frame,
-            text="💾 Enregistrer",
-            command=self._sauvegarder_general,
-        ).pack(anchor="w")
 
     def _charger_evenement(self) -> None:
         if not self._evenement_id:
