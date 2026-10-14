@@ -12,6 +12,7 @@ import customtkinter as ctk
 from db.models.evenements import get_all_evenements
 from ui import theme as app_theme
 from ui.components.dialogs import afficher_erreur
+from ui.components.list_actions import bind_double_click_to_open
 
 COULEURS_STATUT = {
     "planifie": "#1a7abf",
@@ -126,7 +127,7 @@ class ListeEvenements(ctk.CTkToplevel):
         self._tree.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
 
-        self._tree.bind("<Double-1>", self._on_double_click)
+        bind_double_click_to_open(self._tree, self._on_double_click)
 
         # Bouton voir
         frame_actions = ctk.CTkFrame(self, fg_color="transparent")

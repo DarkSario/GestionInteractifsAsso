@@ -52,6 +52,7 @@ from db.connection import get_connection
 from db.models.tresorerie import add_operation, delete_operation, get_all_comptes, get_operation_by_id, update_operation
 from ui import theme as app_theme
 from ui.components.dialogs import afficher_erreur, afficher_info, demander_confirmation
+from ui.components.list_actions import bind_double_click_to_open
 
 
 _STATUTS_LABELS_DEPOT = {
@@ -342,7 +343,7 @@ class _DepotEspecesTab(ctk.CTkFrame):
         self._tree.configure(yscrollcommand=scrollbar.set)
         scrollbar.pack(side="right", fill="y")
 
-        self._tree.bind("<Double-1>", lambda _e: self._modifier())
+        bind_double_click_to_open(self._tree, lambda _e: self._modifier())
 
     def _ouvrir_formulaire(self, depot_id: int | None = None) -> None:
         if not self._comptes:
@@ -425,4 +426,3 @@ def build_tab_depot_especes(parent: ctk.CTkFrame, root: Any) -> None:
         widget.destroy()
     tab = _DepotEspecesTab(parent, root)
     tab.pack(fill="both", expand=True)
-

@@ -59,6 +59,7 @@ from db.models.tresorerie import (
 )
 from ui import theme as app_theme
 from ui.components.dialogs import afficher_erreur, afficher_info, demander_confirmation
+from ui.components.list_actions import bind_double_click_to_open
 
 
 _DATE_FORMAT = "%Y-%m-%d"
@@ -334,7 +335,7 @@ class _RemisesTab(ctk.CTkFrame):
         self._tree.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
 
-        self._tree.bind("<Double-1>", lambda _e: self._modifier())
+        bind_double_click_to_open(self._tree, lambda _e: self._modifier())
 
     def _ouvrir_formulaire(self, remise: dict[str, Any] | None = None) -> None:
         if not self._comptes:
