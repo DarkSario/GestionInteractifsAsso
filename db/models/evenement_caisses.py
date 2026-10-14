@@ -375,8 +375,22 @@ def get_total_caisse(caisse_id: int, type_ouverture: str) -> float:
         conn.close()
 
 
+def _a_comptage_fin(caisse_id: int) -> bool:
+    """Une caisse sans comptage de fin est incomplète : pas de recette déclarée."""
+    conn = _open_connection("_a_comptage_fin")
+    try:
+        return conn.execute(
+            "SELECT 1 FROM evenement_caisse_lignes WHERE caisse_id = ? AND type_ouverture = 'fin' LIMIT 1",
+            (int(caisse_id),),
+        ).fetchone() is not None
+    finally:
+        conn.close()
+
+
 def get_recette_caisse(caisse_id: int) -> float:
     """Retourne la recette d'une caisse (fin - début)."""
+    if not _a_comptage_fin(caisse_id):
+        return 0.0
     total_debut = get_total_caisse(caisse_id, "debut")
     total_fin = get_total_caisse(caisse_id, "fin")
     return round(total_fin - total_debut, 2)
@@ -396,6 +410,10 @@ def get_total_recettes_caisses_evenement(evenement_id: int) -> float:
             FROM evenement_caisses c
             LEFT JOIN evenement_caisse_lignes l ON l.caisse_id = c.id
             WHERE c.evenement_id = ?
+              AND EXISTS (
+                  SELECT 1 FROM evenement_caisse_lignes f
+                  WHERE f.caisse_id = c.id AND f.type_ouverture = 'fin'
+              )
             """,
             (int(evenement_id),),
         ).fetchone()

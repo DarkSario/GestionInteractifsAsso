@@ -24,6 +24,27 @@ SOURCES_NON_COMPTABLES = frozenset({"remise_cheque", "depot_especes"})
 SOURCES_ECRITURE_AUTO = frozenset({"cotisation", "don", "tombola_remboursement"})
 
 
+# Base de trésorerie : CAISSE. Une subvention n'est une recette que lorsqu'elle est
+# réellement versée (date de versement renseignée) ; « partielle » ne compte que
+# pour le montant effectivement reçu. Les virements internes ne sont ni recette
+# ni dépense brute : ils n'affectent que les soldes de comptes.
+STATUTS_SUBVENTION_ENCAISSABLES = frozenset({"accordee", "partielle"})
+
+
+def subvention_est_encaissee(subvention: dict) -> bool:
+    """Vrai si la subvention doit figurer en trésorerie (base caisse)."""
+    return (
+        subvention.get("statut") in STATUTS_SUBVENTION_ENCAISSABLES
+        and float(subvention.get("montant_obtenu") or 0) > 0
+        and bool(str(subvention.get("date_versement") or "").strip())
+    )
+
+
+def est_virement_interne(operation: dict) -> bool:
+    """Opération de virement interne (jambe sortante ou entrante)."""
+    return operation.get("type_operation") == "virement_interne"
+
+
 def est_source_comptable(source_module: str | None) -> bool:
     """Indique si une source alimente la comptabilité (False = traçabilité seule)."""
     return (source_module or "") not in SOURCES_NON_COMPTABLES
@@ -63,15 +84,19 @@ def totaux_operations(operations: Iterable[dict]) -> dict[str, float]:
     """Agrège recettes, dépenses et solde (hors non-comptable / non validé)."""
     recettes = 0.0
     depenses = 0.0
+    net = 0.0
     for operation in operations:
         signed = montant_signe(operation)
+        net += signed
+        if est_virement_interne(operation):
+            continue
         if signed >= 0:
             recettes += signed
         else:
             depenses += -signed
     recettes = round(recettes, 2)
     depenses = round(depenses, 2)
-    return {"total_recettes": recettes, "total_depenses": depenses, "solde": round(recettes - depenses, 2)}
+    return {"total_recettes": recettes, "total_depenses": depenses, "solde": round(net, 2)}
 
 
 def formater_montant_eur(valeur, defaut: str = "—") -> str:
