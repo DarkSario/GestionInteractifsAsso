@@ -6,6 +6,11 @@ from datetime import date, timedelta
 from typing import Any
 
 from db.connection import get_connection
+from utils.finance_rules import (
+    SOURCES_NON_COMPTABLES as _SOURCES_NON_COMPTABLES,
+    montant_signe as _montant_signe,
+    sql_filtre_comptable,
+)
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -22,9 +27,6 @@ _SUBVENTION_STATUTS = {
     "partielle": "partielle",
 }
 _SUBVENTION_STATUTS_OBTENUS = {"accordee", "partielle"}
-
-# Traçabilité bancaire uniquement — déjà comptabilisé dans les recettes événements
-_SOURCES_NON_COMPTABLES = {"remise_cheque", "depot_especes"}
 
 
 def _fetch_all(query: str, params: tuple = ()) -> list[dict]:
@@ -56,25 +58,7 @@ def _execute(query: str, params: tuple = ()) -> int:
 
 
 def _operation_signed_amount(operation: dict) -> float:
-    montant = float(operation.get("montant") or 0)
-    statut = operation.get("statut")
-    if statut != "valide":
-        return 0.0
-    # Traçabilité bancaire uniquement — déjà comptabilisé dans les recettes événements
-    if operation.get("source_module") in _SOURCES_NON_COMPTABLES:
-        return 0.0
-
-    type_operation = operation.get("type_operation")
-    if type_operation == "recette":
-        return montant
-    if type_operation == "depense":
-        return -montant
-    if type_operation == "virement_interne":
-        source_module = operation.get("source_module")
-        if source_module == "virement_entrant":
-            return montant
-        return -montant
-    return 0.0
+    return _montant_signe(operation)
 
 
 # ── Comptes bancaires ─────────────────────────────────────────────────────────
@@ -369,6 +353,20 @@ def add_operation(
     )
 
 
+def get_operation_auto(source_module: str, source_id) -> dict | None:
+    """Retourne l'écriture automatique liée à (source_module, source_id), si elle existe.
+
+    Sert de garde d'idempotence : une même opération métier ne doit produire
+    qu'une seule écriture comptable.
+    """
+    if source_id is None:
+        return None
+    return _fetch_one(
+        "SELECT * FROM tresorerie_operations WHERE source_module = ? AND source_id = ? ORDER BY id LIMIT 1",
+        (source_module, source_id),
+    )
+
+
 def update_operation(operation_id, **kwargs) -> bool:
     operation = _fetch_one(
         "SELECT est_automatique FROM tresorerie_operations WHERE id = ?",
@@ -486,7 +484,7 @@ def get_operations(
         query += " AND o.evenement_id = ?"
         params.append(evenement_id)
     if exclude_non_comptable:
-        query += " AND (o.source_module IS NULL OR o.source_module NOT IN ('remise_cheque', 'depot_especes'))"
+        query += f" AND {sql_filtre_comptable('o')}"
 
     query += " ORDER BY o.date_operation DESC, o.id DESC"
     return _fetch_all(query, tuple(params))

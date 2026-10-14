@@ -13,7 +13,7 @@ from core.recus_fiscaux import (
 )
 from db.models.dons import get_don_by_id, update_don
 from db.models.parametres_globaux import get_parametre
-from db.models.tresorerie import add_operation, get_all_categories, get_all_comptes
+from db.models.tresorerie import add_operation, get_all_categories, get_all_comptes, get_operation_auto
 
 
 def _nom_donateur(don: dict) -> str:
@@ -113,6 +113,11 @@ def creer_recette_tresorerie(don_id: int) -> int:
         return 0
     if don.get('tresorerie_id'):
         return int(don['tresorerie_id'])
+    # Idempotence : add_don/update_don créent déjà l'écriture automatique (source 'don').
+    existante = get_operation_auto('don', don_id)
+    if existante:
+        update_don(don_id, tresorerie_id=existante['id'])
+        return int(existante['id'])
 
     compte_id = _get_compte_recette_defaut()
     if not compte_id:

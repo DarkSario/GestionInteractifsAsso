@@ -18,7 +18,9 @@ def _creer_operation_remboursement_tombola(lot_info: dict, mode: str, date_rembo
         if not montant_avance or float(montant_avance) <= 0:
             return
 
-        from db.models.tresorerie import add_operation, get_all_comptes
+        from db.models.tresorerie import add_operation, get_all_comptes, get_operation_auto
+        if get_operation_auto("tombola_remboursement", lot_info.get('id')):
+            return
         comptes = get_all_comptes(actif_only=True)
         if not comptes:
             return

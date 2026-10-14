@@ -12,6 +12,7 @@ import customtkinter as ctk
 from db.models.tresorerie import get_operations
 from ui import theme as app_theme
 from ui.components.dialogs import afficher_erreur, afficher_info
+from utils.finance_rules import est_source_comptable
 
 
 class ExportCSVTresorerieDialog(ctk.CTkToplevel):
@@ -173,10 +174,6 @@ class ExportCSVTresorerieDialog(ctk.CTkToplevel):
         self.destroy()
 
 
-# ── Sources non comptables à exclure même si exclude_non_comptable=False ───────
-_SOURCES_TRACABILITE = {"depot_especes", "remise_cheque"}
-
-
 def _ecrire_csv(operations: list[dict], chemin: str) -> None:
     """Écrit les opérations dans un fichier CSV UTF-8 BOM compatible Excel français."""
     colonnes = ["Date", "Libellé", "Catégorie", "Type", "Montant", "Mode paiement", "Statut", "Compte"]
@@ -185,8 +182,7 @@ def _ecrire_csv(operations: list[dict], chemin: str) -> None:
         writer = csv.writer(f, delimiter=";")
         writer.writerow(colonnes)
         for op in operations:
-            source = op.get("source_module") or ""
-            if source in _SOURCES_TRACABILITE:
+            if not est_source_comptable(op.get("source_module")):
                 continue
 
             montant_raw = float(op.get("montant") or 0)

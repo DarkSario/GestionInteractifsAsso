@@ -22,6 +22,7 @@ from reportlab.platypus import (
 )
 
 from core.pdf_base_pro import PdfBasePro, COULEUR_GRIS, MARGE
+from utils.finance_rules import sql_filtre_comptable
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -479,14 +480,14 @@ class PdfDossierSubvention(PdfBasePro):
             conn = get_connection()
             try:
                 rows = conn.execute(
-                    """SELECT c.nom as categorie, o.type_operation,
+                    f"""SELECT c.nom as categorie, o.type_operation,
                               COUNT(*) as nb,
                               COALESCE(SUM(o.montant), 0) as total
                        FROM tresorerie_operations o
                        LEFT JOIN tresorerie_categories c ON o.categorie_id = c.id
                        WHERE o.date_operation >= ? AND o.date_operation <= ?
                          AND o.statut = 'valide'
-                         AND (o.source_module IS NULL OR o.source_module NOT IN ('remise_cheque', 'depot_especes'))
+                         AND {sql_filtre_comptable('o')}
                        GROUP BY c.nom, o.type_operation
                        ORDER BY c.nom, o.type_operation""",
                     (self._date_debut, self._date_fin),
@@ -524,7 +525,7 @@ class PdfDossierSubvention(PdfBasePro):
             conn = get_connection()
             try:
                 rows = conn.execute(
-                    """SELECT c.nom,
+                    f"""SELECT c.nom,
                               COALESCE(SUM(
                                   CASE
                                     WHEN o.type_operation = 'recette' THEN o.montant
@@ -536,7 +537,7 @@ class PdfDossierSubvention(PdfBasePro):
                        LEFT JOIN tresorerie_operations o ON o.compte_id = c.id
                            AND o.date_operation >= ? AND o.date_operation <= ?
                            AND o.statut = 'valide'
-                           AND (o.source_module IS NULL OR o.source_module NOT IN ('remise_cheque', 'depot_especes'))
+                           AND {sql_filtre_comptable('o')}
                        WHERE c.actif = 1
                        GROUP BY c.id, c.nom
                        ORDER BY c.nom""",
