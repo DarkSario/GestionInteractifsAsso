@@ -7,6 +7,11 @@ from datetime import date, timedelta
 from typing import Any
 
 from db.connection import get_connection
+from db.models.cloture import (  # noqa: F401
+    PeriodeClotureeError,
+    periode_cloturee_conn,
+    verifier_periode_ouverte,
+)
 from utils.finance_rules import (
     montant_signe as _montant_signe,
     sql_filtre_comptable,
@@ -317,6 +322,11 @@ def add_operation(
     remboursement_mode=None,
     remboursement_reference=None,
 ) -> int:
+    conn = get_connection()
+    try:
+        verifier_periode_ouverte(conn, date_operation)
+    finally:
+        conn.close()
     return _execute(
         """
         INSERT INTO tresorerie_operations (
@@ -433,6 +443,10 @@ def upsert_operation_auto(
         (source_module, source_id),
     ).fetchone()
     if row:
+        ancienne = conn.execute(
+            "SELECT date_operation FROM tresorerie_operations WHERE id = ?", (row[0],)
+        ).fetchone()
+        verifier_periode_ouverte(conn, ancienne[0], date_operation)
         conn.execute(
             """
             UPDATE tresorerie_operations
@@ -443,6 +457,7 @@ def upsert_operation_auto(
             (float(montant), date_operation, mode_paiement, categorie_id, libelle, row[0]),
         )
         return int(row[0])
+    verifier_periode_ouverte(conn, date_operation)
     compte = compte_id or get_compte_defaut_id(conn)
     if not compte:
         return None
@@ -466,6 +481,12 @@ def upsert_operation_auto(
 
 def annuler_operations_auto(conn, source_module: str, source_id) -> int:
     """Neutralise (statut 'annule') les écritures d'une source, sans commit."""
+    for row in conn.execute(
+        "SELECT date_operation FROM tresorerie_operations "
+        "WHERE source_module = ? AND source_id = ? AND statut != 'annule'",
+        (source_module, source_id),
+    ).fetchall():
+        verifier_periode_ouverte(conn, row[0])
     cur = conn.execute(
         "UPDATE tresorerie_operations SET statut = 'annule' "
         "WHERE source_module = ? AND source_id = ? AND statut != 'annule'",
@@ -476,7 +497,7 @@ def annuler_operations_auto(conn, source_module: str, source_id) -> int:
 
 def update_operation(operation_id, **kwargs) -> bool:
     operation = _fetch_one(
-        "SELECT est_automatique FROM tresorerie_operations WHERE id = ?",
+        "SELECT est_automatique, date_operation FROM tresorerie_operations WHERE id = ?",
         (operation_id,),
     )
     if not operation:
@@ -514,6 +535,10 @@ def update_operation(operation_id, **kwargs) -> bool:
 
     conn = get_connection()
     try:
+        if periode_cloturee_conn(
+            conn, operation.get("date_operation"), kwargs.get("date_operation")
+        ):
+            return False
         for statement, value in updates:
             conn.execute(statement, (value, operation_id))
         conn.commit()
@@ -527,24 +552,38 @@ def annuler_operation(operation_id: int) -> bool:
     if not operation:
         return False
 
-    _execute(
-        "UPDATE tresorerie_operations SET statut = 'annule' WHERE id = ?",
-        (operation_id,),
-    )
+    conn = get_connection()
+    try:
+        if periode_cloturee_conn(conn, operation.get("date_operation")):
+            return False
+        conn.execute(
+            "UPDATE tresorerie_operations SET statut = 'annule' WHERE id = ?",
+            (operation_id,),
+        )
+        conn.commit()
+    finally:
+        conn.close()
     return True
 
 
 def delete_operation(operation_id: int) -> bool:
     """Supprime définitivement une opération manuelle."""
     operation = _fetch_one(
-        "SELECT est_automatique FROM tresorerie_operations WHERE id = ?",
+        "SELECT est_automatique, date_operation FROM tresorerie_operations WHERE id = ?",
         (operation_id,),
     )
     if not operation:
         return False
     if int(operation.get("est_automatique") or 0) == 1:
         return False
-    _execute("DELETE FROM tresorerie_operations WHERE id = ?", (operation_id,))
+    conn = get_connection()
+    try:
+        if periode_cloturee_conn(conn, operation.get("date_operation")):
+            return False
+        conn.execute("DELETE FROM tresorerie_operations WHERE id = ?", (operation_id,))
+        conn.commit()
+    finally:
+        conn.close()
     return True
 
 

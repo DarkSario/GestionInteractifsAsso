@@ -142,10 +142,10 @@ class ClotureDialog(ctk.CTkToplevel):
     def _confirmer(self) -> None:
         """Effectue la clôture après confirmation."""
         commentaire = self._commentaire_entry.get().strip() or None
-        if commentaire:
-            self._exercice["commentaire"] = commentaire
 
-        ok = cloturer_exercice(int(self._exercice["id"]), self._solde_cloture)
+        ok = cloturer_exercice(
+            int(self._exercice["id"]), self._solde_cloture, commentaire
+        )
         if ok:
             afficher_info(self, "Clôture effectuée", "L'exercice a été clôturé avec succès.")
             self.destroy()

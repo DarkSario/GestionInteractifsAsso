@@ -118,46 +118,93 @@ def update_exercice(
         conn.close()
 
 
-def cloturer_exercice(exercice_id: int, solde_cloture: float) -> bool:
+class PeriodeClotureeError(ValueError):
+    """Écriture refusée : la date appartient à un exercice clôturé."""
+
+
+def periode_cloturee_conn(conn, *dates: str | None) -> bool:
+    """True si l'une des dates tombe dans un exercice clôturé (connexion fournie)."""
+    for d in dates:
+        if not d:
+            continue
+        row = conn.execute(
+            "SELECT 1 FROM exercices WHERE statut = 'cloture' "
+            "AND substr(?, 1, 10) BETWEEN date_debut AND date_fin LIMIT 1",
+            (str(d),),
+        ).fetchone()
+        if row:
+            return True
+    return False
+
+
+def verifier_periode_ouverte(conn, *dates: str | None) -> None:
+    """Lève PeriodeClotureeError si une date est dans un exercice clôturé."""
+    if periode_cloturee_conn(conn, *dates):
+        raise PeriodeClotureeError("La période est clôturée : écriture refusée.")
+
+
+def cloturer_exercice(
+    exercice_id: int, solde_cloture: float, commentaire: str | None = None
+) -> bool:
     """Clôture un exercice.
 
     1. Met statut='cloture', date_cloture=now(), solde_cloture.
-    2. Verrouille les opérations de la période (statut → 'rapproche').
-    3. Insère un log 'cloture'.
+    2. Verrouille les opérations valides de la période (statut → 'rapproche')
+       en mémorisant celles modifiées dans exercices_operations_cloturees.
+    3. Insère un log 'cloture' avec le commentaire saisi.
+    Tout se déroule dans une seule transaction.
     """
-    exercice = get_exercice_by_id(exercice_id)
-    if not exercice or exercice["statut"] != "ouvert":
-        return False
-
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     conn = get_connection()
     try:
+        conn.execute("BEGIN IMMEDIATE")
+        exercice = conn.execute(
+            "SELECT * FROM exercices WHERE id = ?", (exercice_id,)
+        ).fetchone()
+        if not exercice or exercice["statut"] != "ouvert":
+            conn.rollback()
+            return False
+        exercice = dict(exercice)
+        commentaire = (commentaire or "").strip() or exercice.get("commentaire")
+
+        nb_attente = conn.execute(
+            "SELECT COUNT(*) FROM tresorerie_operations "
+            "WHERE statut = 'en_attente' AND date_operation BETWEEN ? AND ?",
+            (exercice["date_debut"], exercice["date_fin"]),
+        ).fetchone()[0]
+        if nb_attente:
+            conn.rollback()
+            return False
+
         conn.execute(
             """
             UPDATE exercices
-            SET statut = 'cloture',
-                date_cloture = ?,
-                solde_cloture = ?
+            SET statut = 'cloture', date_cloture = ?, solde_cloture = ?,
+                commentaire = ?
             WHERE id = ?
             """,
-            (now, float(solde_cloture), exercice_id),
+            (now, float(solde_cloture), commentaire, exercice_id),
         )
-        # Verrouiller les opérations valides de la période
+        conn.execute(
+            """
+            INSERT INTO exercices_operations_cloturees (exercice_id, operation_id, statut_origine)
+            SELECT ?, id, statut FROM tresorerie_operations
+            WHERE statut = 'valide' AND date_operation BETWEEN ? AND ?
+            """,
+            (exercice_id, exercice["date_debut"], exercice["date_fin"]),
+        )
         conn.execute(
             """
             UPDATE tresorerie_operations
             SET statut = 'rapproche'
-            WHERE statut = 'valide'
-              AND date_operation BETWEEN ? AND ?
+            WHERE id IN (SELECT operation_id FROM exercices_operations_cloturees
+                         WHERE exercice_id = ? AND date_restauration IS NULL)
             """,
-            (exercice["date_debut"], exercice["date_fin"]),
+            (exercice_id,),
         )
         conn.execute(
-            """
-            INSERT INTO exercices_log (exercice_id, action, commentaire)
-            VALUES (?, 'cloture', ?)
-            """,
-            (exercice_id, exercice.get("commentaire")),
+            "INSERT INTO exercices_log (exercice_id, action, commentaire) VALUES (?, 'cloture', ?)",
+            (exercice_id, commentaire),
         )
         conn.commit()
         return True
@@ -173,40 +220,60 @@ def decloturer_exercice(exercice_id: int) -> bool:
     """Déclôture un exercice.
 
     1. Met statut='ouvert', date_decloture=now().
-    2. Déverrouille les opérations (statut 'rapproche' → 'valide').
-    3. Insère un log 'decloture'.
+    2. Restaure uniquement les opérations modifiées par cette clôture, et
+       seulement si elles sont toujours 'rapproche' et non couvertes par un
+       autre exercice clôturé (dans ce cas, la mémorisation lui est transférée).
+    3. Insère un log 'decloture'. Les traces de clôture sont conservées.
     """
-    exercice = get_exercice_by_id(exercice_id)
-    if not exercice or exercice["statut"] != "cloture":
-        return False
-
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     conn = get_connection()
     try:
+        conn.execute("BEGIN IMMEDIATE")
+        exercice = conn.execute(
+            "SELECT * FROM exercices WHERE id = ?", (exercice_id,)
+        ).fetchone()
+        if not exercice or exercice["statut"] != "cloture":
+            conn.rollback()
+            return False
+
         conn.execute(
-            """
-            UPDATE exercices
-            SET statut = 'ouvert',
-                date_decloture = ?
-            WHERE id = ?
-            """,
+            "UPDATE exercices SET statut = 'ouvert', date_decloture = ? WHERE id = ?",
             (now, exercice_id),
         )
-        # Déverrouiller les opérations de la période
-        conn.execute(
+        suivis = conn.execute(
             """
-            UPDATE tresorerie_operations
-            SET statut = 'valide'
-            WHERE statut = 'rapproche'
-              AND date_operation BETWEEN ? AND ?
+            SELECT c.operation_id, c.statut_origine, o.statut, o.date_operation
+            FROM exercices_operations_cloturees c
+            JOIN tresorerie_operations o ON o.id = c.operation_id
+            WHERE c.exercice_id = ? AND c.date_restauration IS NULL
             """,
-            (exercice["date_debut"], exercice["date_fin"]),
+            (exercice_id,),
+        ).fetchall()
+        for row in suivis:
+            autre = conn.execute(
+                "SELECT id FROM exercices WHERE statut = 'cloture' AND id != ? "
+                "AND substr(?, 1, 10) BETWEEN date_debut AND date_fin ORDER BY id LIMIT 1",
+                (exercice_id, row["date_operation"]),
+            ).fetchone()
+            if autre:
+                # Toujours verrouillée par un autre exercice : transfert du suivi.
+                conn.execute(
+                    "INSERT INTO exercices_operations_cloturees "
+                    "(exercice_id, operation_id, statut_origine) VALUES (?, ?, ?)",
+                    (autre["id"], row["operation_id"], row["statut_origine"]),
+                )
+            elif row["statut"] == "rapproche":
+                conn.execute(
+                    "UPDATE tresorerie_operations SET statut = ? WHERE id = ?",
+                    (row["statut_origine"], row["operation_id"]),
+                )
+        conn.execute(
+            "UPDATE exercices_operations_cloturees SET date_restauration = ? "
+            "WHERE exercice_id = ? AND date_restauration IS NULL",
+            (now, exercice_id),
         )
         conn.execute(
-            """
-            INSERT INTO exercices_log (exercice_id, action)
-            VALUES (?, 'decloture')
-            """,
+            "INSERT INTO exercices_log (exercice_id, action) VALUES (?, 'decloture')",
             (exercice_id,),
         )
         conn.commit()
