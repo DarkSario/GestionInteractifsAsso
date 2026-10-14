@@ -5,12 +5,10 @@ from __future__ import annotations
 from datetime import datetime
 
 from db.models.tresorerie import get_all_categories
+from utils.finance_rules import montant_signe
 
 MIN_VALID_YEAR = 2000
 MAX_VALID_YEAR_OFFSET = 50
-
-# Traçabilité bancaire uniquement — déjà comptabilisé dans les recettes événements
-_SOURCES_NON_COMPTABLES = {"remise_cheque", "depot_especes"}
 
 
 def to_float(value: str | float | int | None) -> float | None:
@@ -107,25 +105,8 @@ def valider_remise_cheque(cheques: list[dict]) -> list[str]:
 
 def calculer_solde_compte(solde_initial: float, operations: list[dict]) -> float:
     solde = float(solde_initial or 0)
-
     for operation in operations:
-        if operation.get("statut") != "valide":
-            continue
-        if operation.get("source_module") in _SOURCES_NON_COMPTABLES:
-            continue
-
-        montant = float(operation.get("montant") or 0)
-        type_operation = operation.get("type_operation")
-        if type_operation == "recette":
-            solde += montant
-        elif type_operation == "depense":
-            solde -= montant
-        elif type_operation == "virement_interne":
-            if operation.get("source_module") == "virement_entrant":
-                solde += montant
-            else:
-                solde -= montant
-
+        solde += montant_signe(operation)
     return round(solde, 2)
 
 

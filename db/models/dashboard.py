@@ -9,6 +9,7 @@ from datetime import date, timedelta
 from typing import Any
 
 from db.connection import get_connection
+from utils.finance_rules import sql_filtre_comptable
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -131,12 +132,12 @@ def get_recettes_depenses_mois(annee: int, mois: int) -> dict:
 
     total_recettes_treso = float(
         _fetch_scalar(
-            """
+            f"""
             SELECT COALESCE(SUM(montant), 0)
             FROM tresorerie_operations
             WHERE type_operation IN ('recette')
               AND statut = 'valide'
-              AND (source_module IS NULL OR source_module NOT IN ('remise_cheque', 'depot_especes'))
+              AND {sql_filtre_comptable()}
               AND date_operation >= ?
               AND date_operation < ?
             """,
@@ -146,12 +147,12 @@ def get_recettes_depenses_mois(annee: int, mois: int) -> dict:
     )
     total_depenses_treso = float(
         _fetch_scalar(
-            """
+            f"""
             SELECT COALESCE(SUM(montant), 0)
             FROM tresorerie_operations
             WHERE type_operation IN ('depense')
               AND statut = 'valide'
-              AND (source_module IS NULL OR source_module NOT IN ('remise_cheque', 'depot_especes'))
+              AND {sql_filtre_comptable()}
               AND date_operation >= ?
               AND date_operation < ?
             """,
@@ -237,12 +238,12 @@ def get_evolution_tresorerie(nb_mois: int = 12) -> list[dict]:
 
     # Toutes les opérations valides classées chronologiquement
     ops = _fetch_all(
-        """
+        f"""
         SELECT date_operation, type_operation, montant, statut, source_module
         FROM tresorerie_operations
         WHERE statut = 'valide'
           AND type_operation NOT IN ('virement_sortant', 'virement_entrant')
-          AND (source_module IS NULL OR source_module NOT IN ('remise_cheque', 'depot_especes'))
+          AND {sql_filtre_comptable()}
         ORDER BY date_operation ASC
         """
     )
@@ -294,13 +295,14 @@ def get_top_categories_depenses(annee: int, mois: int, top_n: int = 3) -> list[d
         fin = f"{annee}-{mois + 1:02d}-01"
 
     rows = _fetch_all(
-        """
+        f"""
         SELECT COALESCE(c.nom, 'Sans catégorie') AS categorie,
                SUM(o.montant) AS montant
         FROM tresorerie_operations o
         LEFT JOIN tresorerie_categories c ON c.id = o.categorie_id
         WHERE o.type_operation = 'depense'
           AND o.statut = 'valide'
+          AND {sql_filtre_comptable('o')}
           AND o.date_operation >= ?
           AND o.date_operation < ?
         GROUP BY COALESCE(c.nom, 'Sans catégorie')

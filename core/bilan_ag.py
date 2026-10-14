@@ -10,6 +10,7 @@ import re
 from datetime import date
 from pathlib import Path
 
+from utils.finance_rules import formater_montant_eur, sql_filtre_comptable
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -84,14 +85,7 @@ def reset_template_bilan() -> None:
 
 def _formater_montant(valeur: float) -> str:
     """Formate un montant (ASCII uniquement, compatible Helvetica)."""
-    try:
-        val = float(valeur or 0)
-        entier = f"{int(abs(val)):,}".replace(",", " ")
-        decimales = round(abs(val) % 1 * 100)
-        signe = "-" if val < 0 else ""
-        return f"{signe}{entier},{decimales:02d} EUR"
-    except (TypeError, ValueError):
-        return "0,00 EUR"
+    return formater_montant_eur(valeur, defaut="0,00 EUR")
 
 
 def _construire_tableau_evenements(evenements: list[dict]) -> str:
@@ -170,7 +164,8 @@ def collecter_donnees_bilan(
     except Exception as exc:
         logger.warning("collecter_donnees_bilan – nom_asso: %s", exc)
 
-    # Exercice
+    # Exercice (bornes de période : les opérations et événements n'ont pas de colonne exercice_id)
+    periode_debut, periode_fin = "", ""
     try:
         from db.connection import get_connection
 
@@ -183,6 +178,7 @@ def collecter_donnees_bilan(
         finally:
             conn.close()
         if row:
+            periode_debut, periode_fin = row["date_debut"] or "", row["date_fin"] or ""
             donnees["exercice"] = row["nom"] or (
                 f"{(row['date_debut'] or '')[:4]}–{(row['date_fin'] or '')[:4]}"
             )
@@ -229,16 +225,16 @@ def collecter_donnees_bilan(
         conn = get_connection()
         try:
             row_fin = conn.execute(
-                """
+                f"""
                 SELECT
                     COALESCE(SUM(CASE WHEN type_operation = 'recette' THEN montant ELSE 0 END), 0) AS recettes,
                     COALESCE(SUM(CASE WHEN type_operation = 'depense' THEN montant ELSE 0 END), 0) AS depenses
                 FROM tresorerie_operations
-                WHERE exercice_id = ?
+                WHERE date_operation BETWEEN ? AND ?
                   AND statut = 'valide'
-                  AND (source_module IS NULL OR source_module NOT IN ('remise_cheque', 'depot_especes'))
+                  AND {sql_filtre_comptable()}
                 """,
-                (exercice_id,),
+                (periode_debut, periode_fin),
             ).fetchone()
         finally:
             conn.close()
@@ -259,19 +255,19 @@ def collecter_donnees_bilan(
         conn = get_connection()
         try:
             evenements = conn.execute(
-                """
+                f"""
                 SELECT e.nom, e.date_debut,
                     COALESCE(SUM(CASE WHEN o.type_operation = 'recette' THEN o.montant ELSE 0 END), 0) AS total_recettes,
                     COALESCE(SUM(CASE WHEN o.type_operation = 'depense' THEN o.montant ELSE 0 END), 0) AS total_depenses
                 FROM evenements e
                 LEFT JOIN tresorerie_operations o ON o.evenement_id = e.id
                     AND o.statut = 'valide'
-                    AND (o.source_module IS NULL OR o.source_module NOT IN ('remise_cheque', 'depot_especes'))
-                WHERE e.exercice_id = ?
+                    AND {sql_filtre_comptable('o')}
+                WHERE e.date_debut BETWEEN ? AND ?
                 GROUP BY e.id, e.nom, e.date_debut
                 ORDER BY e.date_debut
                 """,
-                (exercice_id,),
+                (periode_debut, periode_fin),
             ).fetchall()
         finally:
             conn.close()

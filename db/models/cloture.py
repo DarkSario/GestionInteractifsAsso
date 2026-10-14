@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 
 from db.connection import get_connection
+from utils.finance_rules import sql_filtre_comptable
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -252,11 +253,12 @@ def get_stats_exercice(exercice_id: int) -> dict:
         }
 
     rows = _fetch_all(
-        """
+        f"""
         SELECT type_operation, montant, statut
         FROM tresorerie_operations
         WHERE date_operation BETWEEN ? AND ?
           AND statut != 'annule'
+          AND {sql_filtre_comptable()}
         """,
         (exercice["date_debut"], exercice["date_fin"]),
     )

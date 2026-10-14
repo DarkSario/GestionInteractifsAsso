@@ -15,6 +15,8 @@ from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import cm
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
+
+from utils.finance_rules import formater_montant_eur
 from reportlab.platypus import (
     HRFlowable,
     Image,
@@ -339,14 +341,7 @@ class BasePDF:
 
     def _formater_montant(self, v) -> str:
         """Formate un montant en euros (caracteres ASCII uniquement, compatible Helvetica)."""
-        try:
-            val = float(v or 0)
-            entier = f"{int(abs(val)):,}".replace(",", " ")
-            decimales = round(abs(val) % 1 * 100)
-            signe = "-" if val < 0 else ""
-            return f"{signe}{entier},{decimales:02d} EUR"
-        except (TypeError, ValueError):
-            return "—"
+        return formater_montant_eur(v)
 
     def _formater_date(self, v: str | None) -> str:
         """Formate une date brute en format JJ/MM/AAAA."""

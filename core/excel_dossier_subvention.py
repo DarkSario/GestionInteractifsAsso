@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
+from utils.finance_rules import sql_filtre_comptable
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -205,8 +206,10 @@ class ExcelDossierSubvention:
 
                 # Recettes
                 row = conn.execute(
-                    """SELECT COALESCE(SUM(montant), 0) as total FROM tresorerie_operations
-                       WHERE type_operation = 'recette' AND date_operation >= ? AND date_operation <= ?""",
+                    f"""SELECT COALESCE(SUM(montant), 0) as total FROM tresorerie_operations
+                       WHERE type_operation = 'recette' AND statut = 'valide'
+                         AND {sql_filtre_comptable()}
+                         AND date_operation >= ? AND date_operation <= ?""",
                     (self._date_debut, self._date_fin),
                 ).fetchone()
                 recettes = float(row["total"]) if row else 0.0
@@ -214,8 +217,10 @@ class ExcelDossierSubvention:
 
                 # Dépenses
                 row = conn.execute(
-                    """SELECT COALESCE(SUM(montant), 0) as total FROM tresorerie_operations
-                       WHERE type_operation = 'depense' AND date_operation >= ? AND date_operation <= ?""",
+                    f"""SELECT COALESCE(SUM(montant), 0) as total FROM tresorerie_operations
+                       WHERE type_operation = 'depense' AND statut = 'valide'
+                         AND {sql_filtre_comptable()}
+                         AND date_operation >= ? AND date_operation <= ?""",
                     (self._date_debut, self._date_fin),
                 ).fetchone()
                 depenses = float(row["total"]) if row else 0.0
@@ -246,12 +251,15 @@ class ExcelDossierSubvention:
             conn = get_connection()
             try:
                 rows = conn.execute(
-                    """SELECT o.date_operation, o.libelle, c.nom as categorie, o.type_operation, o.montant,
+                    f"""SELECT o.date_operation, o.libelle, c.nom as categorie, o.type_operation, o.montant,
                               cp.nom as compte
                        FROM tresorerie_operations o
                        LEFT JOIN tresorerie_categories c ON o.categorie_id = c.id
                        LEFT JOIN comptes_bancaires cp ON o.compte_id = cp.id
                        WHERE o.date_operation >= ? AND o.date_operation <= ?
+                         AND o.statut = 'valide'
+                         AND o.type_operation IN ('recette', 'depense')
+                         AND {sql_filtre_comptable('o')}
                        ORDER BY o.date_operation""",
                     (self._date_debut, self._date_fin),
                 ).fetchall()
@@ -321,12 +329,14 @@ class ExcelDossierSubvention:
             conn = get_connection()
             try:
                 rows = conn.execute(
-                    """SELECT c.nom as categorie, o.type_operation,
+                    f"""SELECT c.nom as categorie, o.type_operation,
                               COUNT(*) as nb,
                               COALESCE(SUM(o.montant), 0) as total
                        FROM tresorerie_operations o
                        LEFT JOIN tresorerie_categories c ON o.categorie_id = c.id
                        WHERE o.date_operation >= ? AND o.date_operation <= ?
+                         AND o.statut = 'valide'
+                         AND {sql_filtre_comptable('o')}
                        GROUP BY c.nom, o.type_operation
                        ORDER BY c.nom, o.type_operation""",
                     (self._date_debut, self._date_fin),

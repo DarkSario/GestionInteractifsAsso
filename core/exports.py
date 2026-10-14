@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from utils.finance_rules import montant_signe
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -165,19 +166,9 @@ def montant_signe_operation(operation: dict) -> float:
     """Retourne le montant signé d'une opération de trésorerie.
 
     Recettes : positif. Dépenses et virements sortants : négatif.
-    Opérations non validées : 0.
+    Opérations non validées ou non comptables (traçabilité) : 0.
     """
-    montant = float(operation.get("montant") or 0)
-    if operation.get("statut") != "valide":
-        return 0.0
-    type_operation = operation.get("type_operation")
-    if type_operation == "recette":
-        return montant
-    if type_operation == "depense":
-        return -montant
-    if type_operation == "virement_interne":
-        return montant if operation.get("source_module") == "virement_entrant" else -montant
-    return montant
+    return montant_signe(operation)
 
 
 
